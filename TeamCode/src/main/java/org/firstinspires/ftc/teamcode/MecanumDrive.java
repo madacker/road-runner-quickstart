@@ -50,7 +50,7 @@ public final class MecanumDrive {
     public static class Params {
         // drive model parameters
         public double inPerTick = 0.0225669957686882; // 96.0 / 4254.0;
-        public double lateralInPerTick = inPerTick; // Test fails currently
+        public double lateralInPerTick = 0.020179372197309417; // 49.5 / 2453
         public double trackWidthTicks = 690.3255416844875;
 
         // feedforward parameters (in tick units)
@@ -415,7 +415,7 @@ public final class MecanumDrive {
         c.strokePolyline(xPoints, yPoints);
     }
 
-    private static void drawRobot(Canvas c, Pose2d t) {
+    public static void drawRobot(Canvas c, Pose2d t) {
         final double ROBOT_RADIUS = 9;
 
         c.setStrokeWidth(1);
