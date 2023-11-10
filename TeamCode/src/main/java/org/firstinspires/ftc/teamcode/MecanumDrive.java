@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.acmerobotics.dashboard.canvas.Canvas;
@@ -39,42 +41,95 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 
 @Config
 public final class MecanumDrive {
+
+    public static String getBotName() {
+        InspectionState inspection=new InspectionState();
+        inspection.initializeLocal();
+        Log.d("roadrunner", String.format("Device name:" + inspection.deviceName));
+        return inspection.deviceName;
+    }
+    public static boolean isDevBot = getBotName().equals("DevBot");
+
     public static class Params {
-        // drive model parameters
-        public double inPerTick = 0.0225669957686882; // 96.0 / 4254.0;
-        public double lateralInPerTick = 0.020179372197309417; // 49.5 / 2453
-        public double trackWidthTicks = 690.3255416844875;
+        public double inPerTick;
+        public double lateralInPerTick;
+        public double trackWidthTicks;
 
-        // feedforward parameters (in tick units)
-        public double kS = 0.6298460597755153;
-        public double kV = 0.004317546531109388;
-        public double kA = 0;
+        public double kS;
+        public double kV;
+        public double kA;
 
-        // path profile parameters (in inches)
-        public double maxWheelVel = 50;
-        public double minProfileAccel = -30;
-        public double maxProfileAccel = 50;
+        public double maxWheelVel;
+        public double minProfileAccel;
+        public double maxProfileAccel;
 
-        // turn profile parameters (in radians)
-        public double maxAngVel = Math.PI; // shared with path
-        public double maxAngAccel = Math.PI;
+        public double maxAngVel;
+        public double maxAngAccel;
 
-        // path controller gains
-        public double axialGain = 20.0;
-        public double lateralGain = 8.0;
-        public double headingGain = 8.0; // shared with turn
+        public double axialGain;
+        public double lateralGain;
+        public double headingGain;
 
-        public double axialVelGain = 0.0;
-        public double lateralVelGain = 0.0;
-        public double headingVelGain = 0.0; // shared with turn
+        public double axialVelGain;
+        public double lateralVelGain;
+        public double headingVelGain;
+
+        Params() {
+            if (isDevBot) {
+                // drive model parameters
+                inPerTick = 0.0225669957686882; // 96.0 / 4254.0;
+                lateralInPerTick = 0.020179372197309417; // 49.5 / 2453
+                trackWidthTicks = 690.3255416844875;
+
+                // feedforward parameters (in tick units)
+                kS = 0.6298460597755153;
+                kV = 0.004317546531109388;
+                kA = 0;
+
+                // path controller gains
+                axialGain = 20.0;
+                lateralGain = 8.0;
+                headingGain = 8.0; // shared with turn
+            } else {
+                // drive model parameters
+                inPerTick = 0;
+                lateralInPerTick = 1;
+                trackWidthTicks = 0;
+
+                // feedforward parameters (in tick units)
+                kS = 0;
+                kV = 0;
+                kA = 0;
+
+                // path controller gains
+                axialGain = 0.0;
+                lateralGain = 0.0;
+                headingGain = 0.0; // shared with turn
+            }
+
+            // path profile parameters (in inches)
+            maxWheelVel = 50;
+            minProfileAccel = -30;
+            maxProfileAccel = 50;
+
+            // turn profile parameters (in radians)
+            maxAngVel = Math.PI; // shared with path
+            maxAngAccel = Math.PI;
+
+            axialVelGain = 0.0;
+            lateralVelGain = 0.0;
+            headingVelGain = 0.0; // shared with turn
+        }
     }
 
     public static Params PARAMS = new Params();
