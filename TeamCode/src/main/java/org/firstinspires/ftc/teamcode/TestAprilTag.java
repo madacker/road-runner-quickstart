@@ -115,15 +115,14 @@ public class TestAprilTag extends LinearOpMode {
             Canvas c = p.fieldOverlay();
             c.setStroke("#3F51B5");
             MecanumDrive.drawRobot(c, drive.pose);
-            FtcDashboard dashboard = FtcDashboard.getInstance();
-            dashboard.sendTelemetryPacket(p);
 
             // AprilTag stuff:
 
-            telemetryAprilTag();
+            telemetryAprilTag(c);
 
             // Push telemetry to the Driver Station.
             telemetry.update();
+            FtcDashboard.getInstance().sendTelemetryPacket(p);
 
             // Save CPU resources; can resume streaming when needed.
             if (gamepad1.dpad_down) {
@@ -206,11 +205,31 @@ public class TestAprilTag extends LinearOpMode {
 
     }   // end method initAprilTag()
 
+    class AprilTagLocation {
+        int id;
+        double x;
+        double y;
+        double degrees;
+        AprilTagLocation(int id, double x, double y, double degrees) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.degrees = degrees;
+        }
+    }
+
 
     /**
      * Add telemetry about AprilTag detections.
      */
-    private void telemetryAprilTag() {
+    private void telemetryAprilTag(Canvas c) {
+
+        AprilTagLocation[] tagLocations = {
+                new AprilTagLocation(7, -72, -43, 0), // Red audience wall, large
+                new AprilTagLocation(8, -72, -37.5, 0), // Red audience wall, small
+                new AprilTagLocation(9, -72, 37.5, 0), // Blue audience wall, small
+                new AprilTagLocation(10, -72, 43, 0), // Blue audience wall, large
+        };
 
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
         telemetry.addData("# AprilTags Detected", currentDetections.size());
@@ -222,6 +241,30 @@ public class TestAprilTag extends LinearOpMode {
                 telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
                 telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
                 telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
+
+                double xT = 0;
+                double yT = 0;
+                double thetaT = 0;
+                for (AprilTagLocation tag: tagLocations) {
+                    if (tag.id == detection.id) {
+                        xT = tag.x;
+                        yT = tag.y;
+                        thetaT = Math.toRadians(tag.degrees);
+                        break;
+                    }
+                }
+                double dx = detection.ftcPose.x;
+                double dy = detection.ftcPose.y;
+                double distance = Math.sqrt(dx*dx + dy*dy);
+                double theta = Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw);
+                double x = xT + Math.cos(theta) * distance;
+                double y = yT + Math.sin(theta) * distance;
+
+                Pose2d pose = new Pose2d(new Vector2d(x, y), thetaT + theta);
+                c.setStroke("#000000");
+                MecanumDrive.drawRobot(c, pose, 7);
+
+                c.strokeCircle(xT, yT, distance);
             } else {
                 telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
                 telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
@@ -232,6 +275,8 @@ public class TestAprilTag extends LinearOpMode {
         telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
         telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
         telemetry.addLine("RBE = Range, Bearing & Elevation");
+
+
 
     }   // end method telemetryAprilTag()
 
