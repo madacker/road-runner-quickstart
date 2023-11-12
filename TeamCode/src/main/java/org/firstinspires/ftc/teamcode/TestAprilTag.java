@@ -210,11 +210,13 @@ public class TestAprilTag extends LinearOpMode {
         double x;
         double y;
         double degrees;
-        AprilTagLocation(int id, double x, double y, double degrees) {
+        boolean large;
+        AprilTagLocation(int id, double x, double y, double degrees, boolean large) {
             this.id = id;
             this.x = x;
             this.y = y;
             this.degrees = degrees;
+            this.large = large;
         }
     }
 
@@ -225,10 +227,10 @@ public class TestAprilTag extends LinearOpMode {
     private void telemetryAprilTag(Canvas c) {
 
         AprilTagLocation[] tagLocations = {
-                new AprilTagLocation(7, -72, -43, 0), // Red audience wall, large
-                new AprilTagLocation(8, -72, -37.5, 0), // Red audience wall, small
-                new AprilTagLocation(9, -72, 37.5, 0), // Blue audience wall, small
-                new AprilTagLocation(10, -72, 43, 0), // Blue audience wall, large
+                new AprilTagLocation(7, -72, -43, 180, true), // Red audience wall, large
+                new AprilTagLocation(8, -72, -37.5, 180, false), // Red audience wall, small
+                new AprilTagLocation(9, -72, 37.5, 180, false), // Blue audience wall, small
+                new AprilTagLocation(10, -72, 43, 180, true), // Blue audience wall, large
         };
 
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
@@ -242,29 +244,27 @@ public class TestAprilTag extends LinearOpMode {
                 telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
                 telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
 
-                double xT = 0;
-                double yT = 0;
-                double thetaT = 0;
-                for (AprilTagLocation tag: tagLocations) {
-                    if (tag.id == detection.id) {
-                        xT = tag.x;
-                        yT = tag.y;
-                        thetaT = Math.toRadians(tag.degrees);
-                        break;
-                    }
+                AprilTagLocation tag = tagLocations[0];
+                for (AprilTagLocation t: tagLocations) {
+                    if (t.id == detection.id)
+                        tag = t;
                 }
                 double dx = detection.ftcPose.x;
                 double dy = detection.ftcPose.y;
                 double distance = Math.sqrt(dx*dx + dy*dy);
-                double theta = Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw);
-                double x = xT + Math.cos(theta) * distance;
-                double y = yT + Math.sin(theta) * distance;
+                double theta = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw));
+                double x = tag.x + Math.cos(theta) * distance;
+                double y = tag.y + Math.sin(theta) * distance;
 
-                Pose2d pose = new Pose2d(new Vector2d(x, y), thetaT + theta);
-                c.setStroke("#000000");
+                Pose2d pose = new Pose2d(new Vector2d(x, y), Math.toRadians(tag.degrees) + theta);
+
+                if (tag.large)
+                    c.setStroke("#00ff00");
+                else
+                    c.setStroke("#c0c000");
+
                 MecanumDrive.drawRobot(c, pose, 7);
-
-                c.strokeCircle(xT, yT, distance);
+                c.strokeCircle(tag.x, tag.y, distance);
             } else {
                 telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
                 telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
