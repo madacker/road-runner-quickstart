@@ -40,6 +40,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -86,6 +87,8 @@ public class TestAprilTag extends LinearOpMode {
      */
     private VisionPortal visionPortal;
 
+    private TimeSplitter durationSplit = TimeSplitter.create("Loop duration");
+
     @Override
     public void runOpMode() {
 
@@ -96,10 +99,13 @@ public class TestAprilTag extends LinearOpMode {
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
         telemetry.addData(">", "Touch Play to start OpMode");
+        telemetry.addData(">", "The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
         telemetry.update();
         waitForStart();
 
         while (opModeIsActive()) {
+            durationSplit.startSplit();
+
             drive.setDrivePowers(new PoseVelocity2d(
                     new Vector2d(
                             -gamepad1.left_stick_y,
@@ -116,8 +122,7 @@ public class TestAprilTag extends LinearOpMode {
             c.setStroke("#3F51B5");
             MecanumDrive.drawRobot(c, drive.pose);
 
-            // AprilTag stuff:
-
+            // AprilTag logic:
             telemetryAprilTag(c);
 
             // Push telemetry to the Driver Station.
@@ -130,10 +135,14 @@ public class TestAprilTag extends LinearOpMode {
             } else if (gamepad1.dpad_up) {
                 visionPortal.resumeStreaming();
             }
+
+            durationSplit.endSplit();
         }
 
         // Save more CPU resources when camera is no longer needed.
         visionPortal.close();
+
+        TimeSplitter.logAllResults(); // Look for "TimeSplitter" in Logcat
 
     }   // end method runOpMode()
 
@@ -226,6 +235,10 @@ public class TestAprilTag extends LinearOpMode {
      */
     private void telemetryAprilTag(Canvas c) {
 
+        // Camera location on the robot:
+        final double CAMERA_OFFSET_Y = 8.0;
+        final double CAMERA_OFFSET_X = 0.0;
+
         AprilTagLocation[] tagLocations = {
                 new AprilTagLocation(7, -72, -43, 180, true), // Red audience wall, large
                 new AprilTagLocation(8, -72, -37.5, 180, false), // Red audience wall, small
@@ -249,8 +262,8 @@ public class TestAprilTag extends LinearOpMode {
                     if (t.id == detection.id)
                         tag = t;
                 }
-                double dx = detection.ftcPose.x;
-                double dy = detection.ftcPose.y;
+                double dx = detection.ftcPose.x + CAMERA_OFFSET_X;
+                double dy = detection.ftcPose.y + CAMERA_OFFSET_Y;
                 double distance = Math.sqrt(dx*dx + dy*dy);
                 double theta = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw));
                 double x = tag.x + Math.cos(theta) * distance;
@@ -275,9 +288,6 @@ public class TestAprilTag extends LinearOpMode {
         telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
         telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
         telemetry.addLine("RBE = Range, Bearing & Elevation");
-
-
-
     }   // end method telemetryAprilTag()
 
 }   // end class
