@@ -39,6 +39,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.inspection.InspectionState;
 
@@ -272,7 +273,7 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
-    public void setDrivePowersAndUpdatePose(PoseVelocity2d powers) {
+    public void setAssistedDrivePowersAndUpdatePose(PoseVelocity2d powers, Telemetry telemetry) {
         // First calculate the motor voltages considering only the user input. This code is
         // derived from 'setDrivePowers':
         MecanumKinematics.WheelVelocities<Time> wheelVels = new MecanumKinematics(1).inverse(
@@ -323,6 +324,10 @@ public final class MecanumDrive {
         leftBack.setPower(userLeftBackV + autoLeftBackV);
         rightBack.setPower(userRightBackV + autoRightBackV);
         rightFront.setPower(userRightFrontV + autoRightFrontV);
+
+        // Some debugging:
+        telemetry.addData("User left-front V", userLeftFrontV);
+        telemetry.addData("Auto left-front V", autoLeftFrontV);
     }
 
     public final class FollowTrajectoryAction implements Action {
