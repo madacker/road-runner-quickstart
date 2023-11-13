@@ -272,6 +272,59 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
+    public void setDrivePowersAndUpdatePose(PoseVelocity2d powers) {
+        // First calculate the motor voltages considering only the user input. This code is
+        // derived from 'setDrivePowers':
+        MecanumKinematics.WheelVelocities<Time> wheelVels = new MecanumKinematics(1).inverse(
+                PoseVelocity2dDual.constant(powers, 1));
+
+        double maxPowerMag = 1;
+        for (DualNum<Time> power : wheelVels.all()) {
+            maxPowerMag = Math.max(maxPowerMag, power.value());
+        }
+
+        double userLeftFrontV = wheelVels.leftFront.get(0) / maxPowerMag;
+        double userLeftBackV = wheelVels.leftBack.get(0) / maxPowerMag;
+        double userRightBackV = wheelVels.rightBack.get(0) / maxPowerMag;
+        double userRightFrontV = wheelVels.rightFront.get(0) / maxPowerMag;
+
+        // Now calculate the motor voltages as desired by automation. This code is derived
+        // from 'FollowTrajectoryAction::run'.
+        PoseVelocity2d robotVelRobot = updatePoseEstimate();
+
+        double dxVelocity = 0;
+        double dyVelocity = 0;
+        double dAngularVelocity = 0; // Radians
+
+        double[] xPositionAndVelocity = { pose.position.x, dxVelocity };
+        double[] yPositionAndVelocity = { pose.position.y, dyVelocity };
+        double[] angularHeadingAndVelocity = { pose.heading.log(), dAngularVelocity };
+
+        Pose2dDual<Time> targetAutoPose = new Pose2dDual<>(
+            new Vector2dDual<>(new DualNum<>(xPositionAndVelocity), new DualNum<>(yPositionAndVelocity)),
+            Rotation2dDual.exp(new DualNum<>(angularHeadingAndVelocity))
+        );
+        PoseVelocity2dDual<Time> command = new HolonomicController(0, 0, 0)
+                .compute(targetAutoPose, pose, robotVelRobot);
+
+        wheelVels = kinematics.inverse(command);
+        double voltage = voltageSensor.getVoltage();
+
+        final MotorFeedforward feedforward = new MotorFeedforward(
+                PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
+        );
+        double autoLeftFrontV = feedforward.compute(wheelVels.leftFront) / voltage;
+        double autoLeftBackV = feedforward.compute(wheelVels.leftBack) / voltage;
+        double autoRightBackV = feedforward.compute(wheelVels.rightBack) / voltage;
+        double autoRightFrontV = feedforward.compute(wheelVels.rightFront) / voltage;
+
+        // Set the motors to the combined power:
+        leftFront.setPower(userLeftFrontV + autoLeftFrontV);
+        leftBack.setPower(userLeftBackV + autoLeftBackV);
+        rightBack.setPower(userRightBackV + autoRightBackV);
+        rightFront.setPower(userRightFrontV + autoRightFrontV);
+    }
+
     public final class FollowTrajectoryAction implements Action {
         public final TimeTrajectory timeTrajectory;
         private double beginTs = -1;
