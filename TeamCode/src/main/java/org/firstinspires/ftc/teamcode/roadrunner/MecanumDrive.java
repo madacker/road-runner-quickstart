@@ -273,11 +273,21 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
-    public void setAssistedDrivePowersAndUpdatePose(PoseVelocity2d powers, Telemetry telemetry) {
+    /**
+     * Set the drive motor powers according to both user input and automated assist.
+     *
+     * @param telemetry - For debug spew.
+     * @param manual - Motor power as specified by controller input. It's raw power in the range
+     *                 of [-1, 1] and in robot-relative coordinates.
+     * @param assist - Motor power as specified by automation. It's in ft/s and radians/s and
+     *                 in field-relative coordinates.
+     */
+    public void setAssistedDrivePowersAndUpdatePose(Telemetry telemetry, PoseVelocity2d manual, PoseVelocity2d assist)
+    {
         // First calculate the motor voltages considering only the user input. This code is
         // derived from 'setDrivePowers':
         MecanumKinematics.WheelVelocities<Time> wheelVels = new MecanumKinematics(1).inverse(
-                PoseVelocity2dDual.constant(powers, 1));
+                PoseVelocity2dDual.constant(manual, 1));
 
         double maxPowerMag = 1;
         for (DualNum<Time> power : wheelVels.all()) {
@@ -293,13 +303,9 @@ public final class MecanumDrive {
         // from 'FollowTrajectoryAction::run'.
         PoseVelocity2d robotVelRobot = updatePoseEstimate();
 
-        double dxVelocity = 0;
-        double dyVelocity = 0;
-        double dAngularVelocity = 0; // Radians
-
-        double[] xPositionAndVelocity = { pose.position.x, dxVelocity };
-        double[] yPositionAndVelocity = { pose.position.y, dyVelocity };
-        double[] angularHeadingAndVelocity = { pose.heading.log(), dAngularVelocity };
+        double[] xPositionAndVelocity = { pose.position.x, assist.linearVel.x };
+        double[] yPositionAndVelocity = { pose.position.y, assist.linearVel.y };
+        double[] angularHeadingAndVelocity = { pose.heading.log(), assist.angVel };
 
         Pose2dDual<Time> targetAutoPose = new Pose2dDual<>(
             new Vector2dDual<>(new DualNum<>(xPositionAndVelocity), new DualNum<>(yPositionAndVelocity)),

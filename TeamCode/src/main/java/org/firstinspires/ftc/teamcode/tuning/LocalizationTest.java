@@ -18,18 +18,16 @@ public class LocalizationTest extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            PoseVelocity2d poseVelocity = new PoseVelocity2d(
-                    new Vector2d(
-                            -gamepad1.left_stick_y,
-                            -gamepad1.left_stick_x
-                    ),
-                    -gamepad1.right_stick_x
-            );
-
+            PoseVelocity2d manual = new PoseVelocity2d(
+                    new Vector2d(0, 0),
+                    0);
+            PoseVelocity2d assist = new PoseVelocity2d(
+                    new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
+                    -gamepad1.right_stick_x);
             if (true) {
-                drive.setAssistedDrivePowersAndUpdatePose(poseVelocity, telemetry);
+                drive.setAssistedDrivePowersAndUpdatePose(telemetry, manual, assist);
             } else {
-                drive.setDrivePowers(poseVelocity);
+                drive.setDrivePowers(manual);
                 drive.updatePoseEstimate();
             }
 
