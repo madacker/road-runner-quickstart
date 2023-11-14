@@ -41,6 +41,7 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
@@ -156,6 +157,8 @@ public final class MecanumDrive {
     public Pose2d pose;
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
+
+    public TimeSplitter loopTime = TimeSplitter.create("Loop time");
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -506,6 +509,9 @@ public final class MecanumDrive {
     }
 
     public PoseVelocity2d updatePoseEstimate() {
+        loopTime.endSplit();
+        loopTime.startSplit();
+
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
 
