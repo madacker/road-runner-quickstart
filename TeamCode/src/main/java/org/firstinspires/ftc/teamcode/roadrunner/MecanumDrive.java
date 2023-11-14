@@ -319,8 +319,8 @@ public final class MecanumDrive {
 
         final MotorFeedforward feedforward = new MotorFeedforward(
                 // @@@ Need to fix 'kS' handling to handle zero velocities!
-                0, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
                 // PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
+                0, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
         );
         double autoLeftFrontV = feedforward.compute(wheelVels.leftFront) / voltage;
         double autoLeftBackV = feedforward.compute(wheelVels.leftBack) / voltage;

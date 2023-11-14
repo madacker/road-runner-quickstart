@@ -19,11 +19,11 @@ public class LocalizationTest extends LinearOpMode {
 
         while (opModeIsActive()) {
             PoseVelocity2d manual = new PoseVelocity2d(
-                    new Vector2d(0, 0),
-                    0);
-            PoseVelocity2d assist = new PoseVelocity2d(
-                    new Vector2d(-gamepad1.left_stick_y*10, -gamepad1.left_stick_x*10),
+                    new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
                     -gamepad1.right_stick_x);
+            PoseVelocity2d assist = new PoseVelocity2d(
+                    new Vector2d(5, 0),
+                    0);
             if (true) {
                 drive.setAssistedDrivePowersAndUpdatePose(telemetry, manual, assist);
             } else {
