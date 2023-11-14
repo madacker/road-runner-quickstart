@@ -301,11 +301,11 @@ public final class MecanumDrive {
 
         // Now calculate the motor voltages as desired by automation. This code is derived
         // from 'FollowTrajectoryAction::run'.
-        PoseVelocity2d robotVelRobot = updatePoseEstimate();
+        PoseVelocity2d robotVelRobot = updatePoseEstimate(); // @@@ Move this out so that it can be used?
 
-        double[] xPositionAndVelocity = { pose.position.x, assist.linearVel.x };
-        double[] yPositionAndVelocity = { pose.position.y, assist.linearVel.y };
-        double[] angularHeadingAndVelocity = { pose.heading.log(), assist.angVel };
+        double[] xPositionAndVelocity = { pose.position.x, assist.linearVel.x, 0 };
+        double[] yPositionAndVelocity = { pose.position.y, assist.linearVel.y, 0 };
+        double[] angularHeadingAndVelocity = { pose.heading.log(), assist.angVel, 0 };
 
         Pose2dDual<Time> targetAutoPose = new Pose2dDual<>(
             new Vector2dDual<>(new DualNum<>(xPositionAndVelocity), new DualNum<>(yPositionAndVelocity)),
