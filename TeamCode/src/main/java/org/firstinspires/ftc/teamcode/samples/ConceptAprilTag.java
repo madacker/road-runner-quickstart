@@ -27,21 +27,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.firstinspires.ftc.teamcode.explorations;
+package org.firstinspires.ftc.teamcode.samples;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.canvas.Canvas;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
-import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.PoseVelocity2d;
-import com.acmerobotics.roadrunner.Vector2d;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
-import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
@@ -73,7 +66,8 @@ import java.util.List;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list.
  */
 @TeleOp(name = "Concept: AprilTag", group = "Concept")
-public class TestAprilTag extends LinearOpMode {
+@Disabled
+public class ConceptAprilTag extends LinearOpMode {
 
     private static final boolean USE_WEBCAM = true;  // true for webcam, false for phone camera
 
@@ -87,62 +81,39 @@ public class TestAprilTag extends LinearOpMode {
      */
     private VisionPortal visionPortal;
 
-    private TimeSplitter durationSplit = TimeSplitter.create("Loop duration");
-
     @Override
     public void runOpMode() {
 
         initAprilTag();
 
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
         telemetry.addData(">", "Touch Play to start OpMode");
-        telemetry.addData(">", "The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
         telemetry.update();
         waitForStart();
 
-        while (opModeIsActive()) {
-            durationSplit.startSplit();
+        if (opModeIsActive()) {
+            while (opModeIsActive()) {
 
-            drive.setDrivePowers(new PoseVelocity2d(
-                    new Vector2d(
-                            -gamepad1.left_stick_y,
-                            -gamepad1.left_stick_x
-                    ),
-                    -gamepad1.right_stick_x
-            ));
+                telemetryAprilTag();
 
-            drive.updatePoseEstimate();
+                // Push telemetry to the Driver Station.
+                telemetry.update();
 
-            // Code added to draw the pose:
-            TelemetryPacket p = new TelemetryPacket();
-            Canvas c = p.fieldOverlay();
-            c.setStroke("#3F51B5");
-            MecanumDrive.drawRobot(c, drive.pose);
+                // Save CPU resources; can resume streaming when needed.
+                if (gamepad1.dpad_down) {
+                    visionPortal.stopStreaming();
+                } else if (gamepad1.dpad_up) {
+                    visionPortal.resumeStreaming();
+                }
 
-            // AprilTag logic:
-            telemetryAprilTag(c);
-
-            // Push telemetry to the Driver Station.
-            telemetry.update();
-            FtcDashboard.getInstance().sendTelemetryPacket(p);
-
-            // Save CPU resources; can resume streaming when needed.
-            if (gamepad1.dpad_down) {
-                visionPortal.stopStreaming();
-            } else if (gamepad1.dpad_up) {
-                visionPortal.resumeStreaming();
+                // Share the CPU.
+                sleep(20);
             }
-
-            durationSplit.endSplit();
         }
 
         // Save more CPU resources when camera is no longer needed.
         visionPortal.close();
-
-        TimeSplitter.logAllResults(); // Look for "TimeSplitter" in Logcat
 
     }   // end method runOpMode()
 
@@ -184,7 +155,7 @@ public class TestAprilTag extends LinearOpMode {
 
         // Set the camera (webcam vs. built-in RC phone camera).
         if (USE_WEBCAM) {
-            builder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
+            builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"));
         } else {
             builder.setCamera(BuiltinCameraDirection.BACK);
         }
@@ -214,37 +185,11 @@ public class TestAprilTag extends LinearOpMode {
 
     }   // end method initAprilTag()
 
-    class AprilTagLocation {
-        int id;
-        double x;
-        double y;
-        double degrees;
-        boolean large;
-        AprilTagLocation(int id, double x, double y, double degrees, boolean large) {
-            this.id = id;
-            this.x = x;
-            this.y = y;
-            this.degrees = degrees;
-            this.large = large;
-        }
-    }
-
 
     /**
      * Add telemetry about AprilTag detections.
      */
-    private void telemetryAprilTag(Canvas c) {
-
-        // Camera location on the robot:
-        final double CAMERA_OFFSET_Y = 8.0;
-        final double CAMERA_OFFSET_X = 0.0;
-
-        AprilTagLocation[] tagLocations = {
-                new AprilTagLocation(7, -72, -43, 180, true), // Red audience wall, large
-                new AprilTagLocation(8, -72, -37.5, 180, false), // Red audience wall, small
-                new AprilTagLocation(9, -72, 37.5, 180, false), // Blue audience wall, small
-                new AprilTagLocation(10, -72, 43, 180, true), // Blue audience wall, large
-        };
+    private void telemetryAprilTag() {
 
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
         telemetry.addData("# AprilTags Detected", currentDetections.size());
@@ -256,28 +201,6 @@ public class TestAprilTag extends LinearOpMode {
                 telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
                 telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
                 telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
-
-                AprilTagLocation tag = tagLocations[0];
-                for (AprilTagLocation t: tagLocations) {
-                    if (t.id == detection.id)
-                        tag = t;
-                }
-                double dx = detection.ftcPose.x + CAMERA_OFFSET_X;
-                double dy = detection.ftcPose.y + CAMERA_OFFSET_Y;
-                double distance = Math.sqrt(dx*dx + dy*dy);
-                double theta = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw));
-                double x = tag.x + Math.cos(theta) * distance;
-                double y = tag.y + Math.sin(theta) * distance;
-
-                Pose2d pose = new Pose2d(new Vector2d(x, y), Math.toRadians(tag.degrees) + theta);
-
-                if (tag.large)
-                    c.setStroke("#00ff00");
-                else
-                    c.setStroke("#c0c000");
-
-                MecanumDrive.drawRobot(c, pose, 7);
-                c.strokeCircle(tag.x, tag.y, distance);
             } else {
                 telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
                 telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
@@ -288,6 +211,7 @@ public class TestAprilTag extends LinearOpMode {
         telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
         telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
         telemetry.addLine("RBE = Range, Bearing & Elevation");
+
     }   // end method telemetryAprilTag()
 
 }   // end class
