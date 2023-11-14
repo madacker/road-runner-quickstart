@@ -318,7 +318,9 @@ public final class MecanumDrive {
         double voltage = voltageSensor.getVoltage();
 
         final MotorFeedforward feedforward = new MotorFeedforward(
-                PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
+                // @@@ Need to fix 'kS' handling to handle zero velocities!
+                0, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
+                // PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
         );
         double autoLeftFrontV = feedforward.compute(wheelVels.leftFront) / voltage;
         double autoLeftBackV = feedforward.compute(wheelVels.leftBack) / voltage;
@@ -332,6 +334,8 @@ public final class MecanumDrive {
         rightFront.setPower(userRightFrontV + autoRightFrontV);
 
         // Some debugging:
+        telemetry.addData("Assist X", assist.linearVel.x);
+        telemetry.addData("Assist Y", assist.linearVel.y);
         telemetry.addData("User left-front V", userLeftFrontV);
         telemetry.addData("Auto left-front V", autoLeftFrontV);
     }
