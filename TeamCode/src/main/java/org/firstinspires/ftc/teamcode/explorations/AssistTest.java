@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.tuning;
+package org.firstinspires.ftc.teamcode.explorations;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
@@ -10,7 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
-public class LocalizationTest extends LinearOpMode {
+public class AssistTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
@@ -18,12 +18,18 @@ public class LocalizationTest extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            PoseVelocity2d powers = new PoseVelocity2d(
+            PoseVelocity2d manual = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
                     -gamepad1.right_stick_x);
-
-            drive.setDrivePowers(powers);
-            drive.updatePoseEstimate();
+            PoseVelocity2d assist = new PoseVelocity2d(
+                    new Vector2d(5, 0),
+                    0);
+            if (true) {
+                drive.setAssistedDrivePowersAndUpdatePose(telemetry, manual, assist);
+            } else {
+                drive.setDrivePowers(manual);
+                drive.updatePoseEstimate();
+            }
 
             telemetry.addData("x", drive.pose.position.x);
             telemetry.addData("y", drive.pose.position.y);
