@@ -282,7 +282,7 @@ public final class MecanumDrive {
      * @param telemetry - For debug spew.
      * @param manual - Motor power as specified by controller input. It's raw power in the range
      *                 of [-1, 1] and in robot-relative coordinates.
-     * @param assist - Motor power as specified by automation. It's in ft/s and radians/s and
+     * @param assist - Velocities as specified by automation. It's in ft/s and radians/s and
      *                 in field-relative coordinates.
      */
     public void setAssistedDrivePowersAndUpdatePose(Telemetry telemetry, PoseVelocity2d manual, PoseVelocity2d assist)
@@ -297,6 +297,7 @@ public final class MecanumDrive {
             maxPowerMag = Math.max(maxPowerMag, power.value());
         }
 
+        // @@@ Move this normalization to the combined version
         double userLeftFrontV = wheelVels.leftFront.get(0) / maxPowerMag;
         double userLeftBackV = wheelVels.leftBack.get(0) / maxPowerMag;
         double userRightBackV = wheelVels.rightBack.get(0) / maxPowerMag;
