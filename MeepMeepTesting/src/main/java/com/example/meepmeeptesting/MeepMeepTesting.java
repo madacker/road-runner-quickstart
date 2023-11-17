@@ -4,7 +4,6 @@ import static java.lang.System.nanoTime;
 
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.noahbres.meepmeep.MeepMeep;
@@ -60,7 +59,7 @@ public class MeepMeepTesting {
 }
 
 class AutonDriveFactory {
-    public enum POSE_POSITION { LEFT, MIDDLE, RIGHT };
+    public enum PROP_POSITION { LEFT, MIDDLE, RIGHT };
 
     static public double RED_NEAR_START_OFFSET = 48;
 
@@ -68,16 +67,19 @@ class AutonDriveFactory {
     static public double START_TANGENT = Math.toRadians(90);
 
     static public Pose2d LEFT_HASH_POSE = new Pose2d(-38, -34, Math.toRadians(180));
-    static public double LEFT_HASH_TANGENT = Math.toRadians(180);
+    static public double LEFT_HASH_STOP_TANGENT = Math.toRadians(180);
+    static public double LEFT_HASH_START_TANGENT = Math.toRadians(0);
 
-    static public Pose2d MIDDLE_HASH_POSE = new Pose2d(-36, -14, Math.toRadians(-90));
-    static public double MIDDLE_HASH_ENTER_TANGENT = Math.toRadians(90);
-    static public double MIDDLE_HASH_LEAVE_TANGENT = Math.toRadians(45);
+    static public Pose2d MIDDLE_HASH_POSE_FAR = new Pose2d(-36, -14, Math.toRadians(-90));
+    static public Pose2d MIDDLE_HASH_POSE_NEAR = new Pose2d(-36, -34, Math.toRadians(90));
+    static public double MIDDLE_HASH_STOP_TANGENT = Math.toRadians(90);
+    static public double MIDDLE_HASH_START_TANGENT = Math.toRadians(45);
 
     static public Pose2d RIGHT_HASH_POSE = new Pose2d(-32, -34, Math.toRadians(0));
-    static public double RIGHT_HASH_TANGENT = Math.toRadians(0);
+    static public double RIGHT_HASH_STOP_TANGENT = Math.toRadians(0);
+    static public double RIGHT_HASH_START_TANGENT = Math.toRadians(180);
 
-    static public Vector2d FAR_TRUSS_ENTRANCE_POSITION = new Vector2d(-24, -12);
+    static public Vector2d FAR_TRUSS_ENTRANCE_POSITION = new Vector2d(-28, -8);
     static public double FAR_TRUSS_ENTRANCE_TANGENT  = Math.toRadians(0);
     static public Vector2d FAR_TRUSS_EXIT_POSITION = new Vector2d(24, -12);
     static public double FAR_TRUSS_EXIT_TANGENT  = Math.toRadians(0);
@@ -86,13 +88,11 @@ class AutonDriveFactory {
     static public double NEAR_WAYPOINT_TANGENT = Math.toRadians(-45);
 
     static public double BACKBOARD_TANGENT = 0;
-    static public Pose2d LEFT_BACKBOARD_POSE = new Pose2d(48, -30, Math.toRadians(180));
-    static public Pose2d MIDDLE_BACKBOARD_POSE = new Pose2d(48, -36, Math.toRadians(180));
+    static public Pose2d LEFT_BACKBOARD_POSE = new Pose2d(48, -29, Math.toRadians(180));
+    static public Pose2d MIDDLE_BACKBOARD_POSE = new Pose2d(48, -35, Math.toRadians(180));
     static public Pose2d RIGHT_BACKBOARD_POSE = new Pose2d(48, -42, Math.toRadians(180));
 
     MecanumDrive drive;
-    boolean isRed;
-    boolean isFar;
     double xformOffsetX = 0;
     double xformMultY = 1.0;
 
@@ -112,65 +112,88 @@ class AutonDriveFactory {
     private double xform(double tangent) {
         return tangent * xformMultY;
     }
+    private PROP_POSITION xform(PROP_POSITION position) {
+        if ((xformMultY > 0) || (position == PROP_POSITION.MIDDLE))
+            return position;
+        return (position == PROP_POSITION.LEFT) ? PROP_POSITION.RIGHT : PROP_POSITION.LEFT;
+    }
 
-    Action getCameraAction(boolean red, boolean far, POSE_POSITION position,
-                           Action placePurpleAction, Action placeBackdropAction) {
+    Action getCameraAction(boolean red, boolean far, PROP_POSITION position,
+                           Action placePurplePixelAction, Action placeBackdropAction) {
+
         xformOffsetX = far ? 0 : RED_NEAR_START_OFFSET;
         xformMultY = red ? 1 : -1;
+        position = xform(position); // Post-transform
 
         TrajectoryActionBuilder build = this.drive.actionBuilder(xform(START_POSE))
                 .setTangent(xform(START_TANGENT));
 
-        if (position == POSE_POSITION.LEFT) {
-            build = build.splineToSplineHeading(xform(LEFT_HASH_POSE), xform(LEFT_HASH_TANGENT));
-        } else if (position == POSE_POSITION.MIDDLE) {
-            build = build.splineToSplineHeading(xform(MIDDLE_HASH_POSE), xform(MIDDLE_HASH_ENTER_TANGENT));
+        // Drive to the prop location:
+        if (position == PROP_POSITION.LEFT) {
+            build = build.splineToLinearHeading(xform(LEFT_HASH_POSE), xform(LEFT_HASH_STOP_TANGENT));
+        } else if (position == PROP_POSITION.MIDDLE) {
+            if (far) {
+                build = build.splineToLinearHeading(xform(MIDDLE_HASH_POSE_FAR), xform(MIDDLE_HASH_STOP_TANGENT));
+            } else {
+                build = build.splineToLinearHeading(xform(MIDDLE_HASH_POSE_NEAR), xform(MIDDLE_HASH_STOP_TANGENT));
+            }
         } else {
-            build = build.splineToSplineHeading(xform(RIGHT_HASH_POSE), xform(RIGHT_HASH_TANGENT));
+            build = build.splineToLinearHeading(xform(RIGHT_HASH_POSE), xform(RIGHT_HASH_STOP_TANGENT));
         }
 
-        if (placePurpleAction != null) {
-            build = build.stopAndAdd(placePurpleAction);
+        if (placePurplePixelAction != null) {
+            build = build.stopAndAdd(placePurplePixelAction);
         } else {
-            Action sleep = new SleepAction(3);
-            build = build.stopAndAdd(sleep);
+//            Action sleep = new SleepAction(3);
+//            build = build.stopAndAdd(sleep);
         }
 
         xformOffsetX = 0;
-
+        build = build.setReversed(true);
         if (far) {
-            if (position == POSE_POSITION.LEFT) {
-                build = build.setTangent(xform(LEFT_HASH_TANGENT));
-            } else if (position == POSE_POSITION.MIDDLE) {
-                build = build.setTangent(xform(MIDDLE_HASH_LEAVE_TANGENT));
-            } else {
-                build = build.setTangent(xform(RIGHT_HASH_TANGENT));
-            }
-            build = build.splineToConstantHeading(xform(FAR_TRUSS_ENTRANCE_POSITION), xform(FAR_TRUSS_ENTRANCE_TANGENT))
-                    .splineToConstantHeading(xform(FAR_TRUSS_EXIT_POSITION), xform(FAR_TRUSS_EXIT_TANGENT));
+            build = build.splineTo(xform(FAR_TRUSS_ENTRANCE_POSITION), xform(FAR_TRUSS_ENTRANCE_TANGENT))
+                         .splineTo(xform(FAR_TRUSS_EXIT_POSITION), xform(FAR_TRUSS_EXIT_TANGENT));
         } else {
-            if (position == POSE_POSITION.LEFT) {
-                build = build.setTangent(xform(Math.PI - LEFT_HASH_TANGENT));
-            } else if (position == POSE_POSITION.MIDDLE) {
-                build = build.setTangent(xform(Math.PI - MIDDLE_HASH_ENTER_TANGENT));
-            } else {
-                build = build.setTangent(xform(Math.PI - RIGHT_HASH_TANGENT));
-            }
-            build = build.splineToConstantHeading(xform(NEAR_WAYPOINT_POSITION), xform(NEAR_WAYPOINT_TANGENT));
+            build = build.splineTo(xform(NEAR_WAYPOINT_POSITION), xform(NEAR_WAYPOINT_TANGENT));
         }
 
-        if (position == POSE_POSITION.LEFT) {
+        // Drive to the backboard:
+        if (position == PROP_POSITION.LEFT) {
             build = build.splineToSplineHeading(xform(LEFT_BACKBOARD_POSE), xform(BACKBOARD_TANGENT));
-        } else if (position == POSE_POSITION.MIDDLE) {
+        } else if (position == PROP_POSITION.MIDDLE) {
             build = build.splineToSplineHeading(xform(MIDDLE_BACKBOARD_POSE), xform(BACKBOARD_TANGENT));
         } else {
             build = build.splineToSplineHeading(xform(RIGHT_BACKBOARD_POSE), xform(BACKBOARD_TANGENT));
         }
 
+        // Place the yellow pixel:
+        if (placeBackdropAction != null) {
+            build = build.stopAndAdd(placeBackdropAction);
+        }
+
+        Vector2d TO_PIXELS_NEAR_POSITION = new Vector2d(12, -60);
+        Vector2d TO_PIXELS_FAR_POSITION = new Vector2d(-36, -60);
+        double TO_PIXELS_TANGENT = Math.toRadians(180);
+
+        Pose2d WHACK_START_POSE = new Pose2d(-60, -36, Math.toRadians(90));
+        Pose2d WHACK_END_POSE = new Pose2d(-60, -12, Math.toRadians(90));
+        double WHACK_TANGENT = Math.toRadians(90);
+
+        Vector2d FROM_PIXELS_NEAR_POSITION = new Vector2d(48, 0);
+        double FROM_PIXELS_TANGENT = Math.toRadians(0);
+
+        // Drive to knock over the white pixels:
+        build = build.setTangent(xform(TO_PIXELS_TANGENT))
+                .splineTo(xform(TO_PIXELS_NEAR_POSITION), xform(TO_PIXELS_TANGENT))
+                .splineTo(xform(TO_PIXELS_FAR_POSITION), xform(TO_PIXELS_TANGENT))
+                .splineToSplineHeading(xform(WHACK_START_POSE), xform(WHACK_TANGENT))
+                .splineToSplineHeading(xform(WHACK_END_POSE), xform(WHACK_TANGENT))
+                .splineTo(xform(FROM_PIXELS_NEAR_POSITION), xform(FROM_PIXELS_TANGENT));
+
         return build.build();
     }
 
     Action getMeepMeepAction() {
-        return getCameraAction(true, false, POSE_POSITION.RIGHT, null, null);
+        return getCameraAction(false, true, PROP_POSITION.RIGHT, null, null);
     }
 }
