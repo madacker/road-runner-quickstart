@@ -119,7 +119,7 @@ class AutonDriveFactory {
     }
 
     Action getCameraAction(boolean red, boolean far, PROP_POSITION position,
-                           Action placePurplePixelAction, Action placeBackdropAction) {
+                           Action placePurplePixelAction, Action placeBackboardAction) {
 
         xformOffsetX = far ? 0 : RED_NEAR_START_OFFSET;
         xformMultY = red ? 1 : -1;
@@ -166,9 +166,11 @@ class AutonDriveFactory {
             build = build.splineToSplineHeading(xform(RIGHT_BACKBOARD_POSE), xform(BACKBOARD_TANGENT));
         }
 
-        // Place the yellow pixel:
-        if (placeBackdropAction != null) {
-            build = build.stopAndAdd(placeBackdropAction);
+        // Place the yellow pixel on the backboard:
+        if (placeBackboardAction != null) {
+            build = build.stopAndAdd(placeBackboardAction);
+        } else {
+            build = build.endTrajectory();
         }
 
         Vector2d TO_PIXELS_NEAR_POSITION = new Vector2d(12, -60);
@@ -176,10 +178,11 @@ class AutonDriveFactory {
         double TO_PIXELS_TANGENT = Math.toRadians(180);
 
         Pose2d WHACK_START_POSE = new Pose2d(-60, -36, Math.toRadians(90));
-        Pose2d WHACK_END_POSE = new Pose2d(-60, -12, Math.toRadians(90));
+        Pose2d WHACK_END_POSE = new Pose2d(-60, -24, Math.toRadians(90));
         double WHACK_TANGENT = Math.toRadians(90);
 
-        Vector2d FROM_PIXELS_NEAR_POSITION = new Vector2d(48, 0);
+        Vector2d FROM_PIXELS_FAR_POSITION = new Vector2d(-48, -12);
+        Vector2d FROM_PIXELS_NEAR_POSITION = new Vector2d(48, -12);
         double FROM_PIXELS_TANGENT = Math.toRadians(0);
 
         // Drive to knock over the white pixels:
@@ -188,12 +191,13 @@ class AutonDriveFactory {
                 .splineTo(xform(TO_PIXELS_FAR_POSITION), xform(TO_PIXELS_TANGENT))
                 .splineToSplineHeading(xform(WHACK_START_POSE), xform(WHACK_TANGENT))
                 .splineToSplineHeading(xform(WHACK_END_POSE), xform(WHACK_TANGENT))
+                .splineTo(xform(FROM_PIXELS_FAR_POSITION), xform(FROM_PIXELS_TANGENT))
                 .splineTo(xform(FROM_PIXELS_NEAR_POSITION), xform(FROM_PIXELS_TANGENT));
 
         return build.build();
     }
 
     Action getMeepMeepAction() {
-        return getCameraAction(false, true, PROP_POSITION.RIGHT, null, null);
+        return getCameraAction(false, false, PROP_POSITION.RIGHT, null, null);
     }
 }
