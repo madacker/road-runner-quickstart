@@ -241,10 +241,16 @@ public class AprilTagTest extends LinearOpMode {
         final double CAMERA_OFFSET_X = 0.0;
 
         AprilTagLocation[] tagLocations = {
-                new AprilTagLocation(7, -72, -43, 180, true), // Red audience wall, large
-                new AprilTagLocation(8, -72, -37.5, 180, false), // Red audience wall, small
-                new AprilTagLocation(9, -72, 37.5, 180, false), // Blue audience wall, small
-                new AprilTagLocation(10, -72, 43, 180, true), // Blue audience wall, large
+                new AprilTagLocation(1,62.875, -42.750, 0, false), // Blue left backdrop, small
+                new AprilTagLocation(2,62.875, -36.625, 0, false), // Blue middle backdrop, small
+                new AprilTagLocation(3,62.875, -30.625, 0, false), // Blue right backdrop, small
+                new AprilTagLocation(4,62.875,  30.625, 0, false), // Red left backdrop, small
+                new AprilTagLocation(5,62.875,  36.750, 0, false), // Red middle backdrop, small
+                new AprilTagLocation(6,62.875,  42.625, 0, false), // Red right backdrop, small
+                new AprilTagLocation(7,  -72, -43.0, 180, true),   // Red audience wall, large
+                new AprilTagLocation(8,  -72, -37.5, 180, false),  // Red audience wall, small
+                new AprilTagLocation(9,  -72,  37.5, 180, false),  // Blue audience wall, small
+                new AprilTagLocation(10, -72,  43.0, 180, true),   // Blue audience wall, large
         };
 
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
