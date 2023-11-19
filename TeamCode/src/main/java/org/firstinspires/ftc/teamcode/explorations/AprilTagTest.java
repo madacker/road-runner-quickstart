@@ -259,24 +259,39 @@ public class AprilTagTest extends LinearOpMode {
         // Step through the list of detections and display info for each one.
         for (AprilTagDetection detection : currentDetections) {
             if (detection.metadata != null) {
-                telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
-                telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-                telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
-                telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
+//                telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
+//                telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
+//                telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
+//                telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
+                telemetry.addLine(String.format("Tag %6.1f %6.1f %6.1f", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.yaw));
 
                 AprilTagLocation tag = tagLocations[0];
                 for (AprilTagLocation t: tagLocations) {
                     if (t.id == detection.id)
                         tag = t;
                 }
+
+                Pose2d pose;
                 double dx = detection.ftcPose.x + CAMERA_OFFSET_X;
                 double dy = detection.ftcPose.y + CAMERA_OFFSET_Y;
-                double distance = Math.sqrt(dx*dx + dy*dy);
-                double theta = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
-                double x = tag.x + Math.cos(theta) * distance;
-                double y = tag.y + Math.sin(theta) * distance;
+                double distance = Math.sqrt(dx * dx + dy * dy);
 
-                Pose2d pose = new Pose2d(new Vector2d(x, y), Math.PI + theta);
+                if (true) {
+                    // This works better (it fixes the heading):
+                    double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
+                    double x = tag.x + Math.cos(gamma) * distance;
+                    double y = tag.y + Math.sin(gamma) * distance;
+
+                    double theta = Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees);
+                    pose = new Pose2d(new Vector2d(x, y), Math.PI - theta);
+                } else {
+                    // This works...
+                    double theta = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
+                    double x = tag.x + Math.cos(theta) * distance;
+                    double y = tag.y + Math.sin(theta) * distance;
+
+                    pose = new Pose2d(new Vector2d(x, y), Math.PI + theta);
+                }
 
                 if (tag.large)
                     c.setStroke("#00ff00");
@@ -286,8 +301,8 @@ public class AprilTagTest extends LinearOpMode {
                 MecanumDrive.drawRobot(c, pose, 7);
                 c.strokeCircle(tag.x, tag.y, distance);
             } else {
-                telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
-                telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
+//                telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
+//                telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
             }
         }   // end for() loop
 
