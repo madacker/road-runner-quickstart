@@ -5,6 +5,7 @@ import static java.lang.System.nanoTime;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
@@ -24,8 +25,12 @@ class Mechanisms {
         redLed = hardwareMap.get(DigitalChannel.class, "red");
         greenLed = hardwareMap.get(DigitalChannel.class, "green");
 
-        redLed.setState(false);
-        greenLed.setState(false);
+        // The mode defaults to 'input':
+        redLed.setMode(DigitalChannel.Mode.OUTPUT);
+        greenLed.setMode(DigitalChannel.Mode.OUTPUT);
+
+        redLed.setState(true);
+        greenLed.setState(true);
     }
 
     public Action getLedAction() {
@@ -41,11 +46,12 @@ class Mechanisms {
                     startTime = time;
                 }
                 double duration = time - startTime;
-                int interval = (int) Math.floor(duration % 0.5);
-                boolean on = (interval & 1) == 0;
-                redLed.setState(on);
+                int interval = (int) Math.floor(duration / 0.5);
+                greenLed.setState((interval & 1) != 0);
 
                 isRunning = duration < 5;
+                if (!isRunning)
+                    greenLed.setState(true);
                 return isRunning;
             }
         };
@@ -65,16 +71,18 @@ public class Auton extends LinearOpMode {
 
         AutonDriveFactory auton = new AutonDriveFactory(drive);
         AutonDriveFactory.AutonDriveInfo autonInfo = auton.get(true, true,
-                AutonDriveFactory.PROP_POSITION.LEFT, ledAction, ledAction);
+                AutonDriveFactory.PROP_POSITION.LEFT, null, null); //  ledAction, ledAction);
         drive.pose = autonInfo.startPose; // Reset the pose here
 
         waitForStart();
 
-        drive.addAction(ledAction);
-        while (drive.runActions())
-            ;
-
-        // Actions.runBlocking(autonInfo.action);
+        if (false) {
+            drive.addAction(ledAction);
+            while (drive.runActions())
+                ;
+        } else {
+            Actions.runBlocking(autonInfo.action);
+        }
     }
 }
 
@@ -176,8 +184,7 @@ class AutonDriveFactory {
         if (placePurplePixelAction != null) {
             build = build.stopAndAdd(placePurplePixelAction);
         } else {
-//            Action sleep = new SleepAction(3);
-//            build = build.stopAndAdd(sleep);
+            build = build.stopAndAdd(new SleepAction(5));
         }
 
         xformOffsetX = 0;
