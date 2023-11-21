@@ -2,12 +2,9 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
@@ -38,7 +35,7 @@ class Mechanisms {
 
             @Override
             public boolean run(TelemetryPacket telemetry) {
-                double time = nanoTime() * 10e-9;
+                double time = nanoTime() * 1e-9;
                 if (!isRunning) {
                     isRunning = true;
                     startTime = time;
@@ -46,7 +43,7 @@ class Mechanisms {
                 double duration = time - startTime;
                 int interval = (int) Math.floor(duration % 0.5);
                 boolean on = (interval & 1) == 0;
-                greenLed.setState(on);
+                redLed.setState(on);
 
                 isRunning = duration < 5;
                 return isRunning;
@@ -55,21 +52,29 @@ class Mechanisms {
     }
 }
 
-@TeleOp
+@TeleOp(name="Auton", group="Home")
 public class Auton extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
+        // The pose given here is a placeholder until we reset it below:
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        Mechanisms mechanisms = new Mechanisms(hardwareMap);
-        AutonDriveFactory auton = new AutonDriveFactory(drive);
 
+        Mechanisms mechanisms = new Mechanisms(hardwareMap);
         Action ledAction = mechanisms.getLedAction();
-        Action autonAction = auton.getCameraAction(true, true,
+
+        AutonDriveFactory auton = new AutonDriveFactory(drive);
+        AutonDriveFactory.AutonDriveInfo autonInfo = auton.get(true, true,
                 AutonDriveFactory.PROP_POSITION.LEFT, ledAction, ledAction);
+        drive.pose = autonInfo.startPose; // Reset the pose here
 
         waitForStart();
-        Actions.runBlocking(autonAction);
+
+        drive.addAction(ledAction);
+        while (drive.runActions())
+            ;
+
+        // Actions.runBlocking(autonInfo.action);
     }
 }
 
@@ -77,6 +82,15 @@ public class Auton extends LinearOpMode {
  * This contains all of the auton Road Runner logic and is shared with MeepMeepTest.
  */
 class AutonDriveFactory {
+    class AutonDriveInfo {
+        Pose2d startPose;
+        Action action;
+        AutonDriveInfo(Pose2d startPose, Action action) {
+            this.startPose = startPose;
+            this.action = action;
+        }
+    }
+
     public enum PROP_POSITION { LEFT, MIDDLE, RIGHT };
 
     static public double RED_NEAR_START_OFFSET = 48;
@@ -136,8 +150,8 @@ class AutonDriveFactory {
         return (position == PROP_POSITION.LEFT) ? PROP_POSITION.RIGHT : PROP_POSITION.LEFT;
     }
 
-    Action getCameraAction(boolean red, boolean far, PROP_POSITION position,
-                           Action placePurplePixelAction, Action placeBackboardAction) {
+    AutonDriveInfo get(boolean red, boolean far, PROP_POSITION position,
+                       Action placePurplePixelAction, Action placeBackboardAction) {
 
         xformOffsetX = far ? 0 : RED_NEAR_START_OFFSET;
         xformMultY = red ? 1 : -1;
@@ -212,10 +226,10 @@ class AutonDriveFactory {
                 .splineTo(xform(FROM_PIXELS_FAR_POSITION), xform(FROM_PIXELS_TANGENT))
                 .splineTo(xform(FROM_PIXELS_NEAR_POSITION), xform(FROM_PIXELS_TANGENT));
 
-        return build.build();
+        return new AutonDriveInfo(xform(START_POSE), build.build());
     }
 
     Action getMeepMeepAction() {
-        return getCameraAction(false, false, PROP_POSITION.RIGHT, null, null);
+        return get(false, false, PROP_POSITION.RIGHT, null, null).action;
     }
 }

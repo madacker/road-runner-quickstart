@@ -118,7 +118,7 @@ public final class MecanumDrive {
             }
 
             // path profile parameters (in inches)
-            maxWheelVel = 50;
+            maxWheelVel = 10; // @@@@@@@@@@@@ Was 50
             minProfileAccel = -30;
             maxProfileAccel = 50;
 
@@ -578,4 +578,26 @@ public final class MecanumDrive {
                 0.25, 0.1
         );
     }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    LinkedList<Action> actionList = new LinkedList<>();
+
+    public void addAction(Action action) {
+        actionList.add(action);
+    }
+
+    public boolean runActions(TelemetryPacket packet) {
+        LinkedList<Action> deletionList = new LinkedList<>();
+        for (Action action: actionList) {
+            // Once the Action returns false, the action is done:
+            if (!action.run(packet))
+                // We can't delete an item from a list while we're iterating on that list:
+                deletionList.add(action);
+        }
+        actionList.removeAll(deletionList);
+        return actionList.size() != 0;
+    }
+
+    public boolean runActions() { return runActions(null); }
 }
