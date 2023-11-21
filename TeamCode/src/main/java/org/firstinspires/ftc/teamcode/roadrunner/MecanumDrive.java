@@ -154,7 +154,9 @@ public final class MecanumDrive {
     public final IMU imu;
 
     public final Localizer localizer;
+    public final Localizer localizer2;
     public Pose2d pose;
+    public Pose2d pose2;
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
 
@@ -228,6 +230,7 @@ public final class MecanumDrive {
 
     public MecanumDrive(HardwareMap hardwareMap, Pose2d pose) {
         this.pose = pose;
+        this.pose2 = pose;
 
         LynxFirmware.throwIfModulesAreOutdated(hardwareMap);
 
@@ -257,6 +260,7 @@ public final class MecanumDrive {
         voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         localizer = new DriveLocalizer();
+        localizer2 = new DriveLocalizer();
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
     }
@@ -418,11 +422,14 @@ public final class MecanumDrive {
             Canvas c = p.fieldOverlay();
             drawPoseHistory(c);
 
+            c.setStroke("#404040");
+            drawRobot(c, pose2, 4); // Draw pure odometry pose
+
             c.setStroke("#4CAF50");
-            drawRobot(c, txWorldTarget.value());
+            drawRobot(c, txWorldTarget.value()); // Draw target pose
 
             c.setStroke("#3F51B5");
-            drawRobot(c, pose);
+            drawRobot(c, pose); // Draw current pose estimate
 
             c.setStroke("#4CAF50FF");
             c.setStrokeWidth(1);
@@ -515,6 +522,9 @@ public final class MecanumDrive {
 
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
+
+        Twist2dDual<Time> twist2 = localizer2.update(); // Update pure odometry pose
+        pose2 = pose2.plus(twist2.value());
 
         poseHistory.add(pose);
         while (poseHistory.size() > 100) {

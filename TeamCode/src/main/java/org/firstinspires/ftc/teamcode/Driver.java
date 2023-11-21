@@ -1,26 +1,27 @@
 package org.firstinspires.ftc.teamcode;
 
-import android.graphics.Paint;
+import static java.lang.System.nanoTime;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 @TeleOp
-public class Drive extends LinearOpMode {
+public class Driver extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-
-        Paint paint = new Paint();
-        paint.setTextSize(20);
 
         waitForStart();
 
@@ -35,13 +36,12 @@ public class Drive extends LinearOpMode {
 
             drive.updatePoseEstimate();
 
-
             telemetry.addData("x", drive.pose.position.x);
             telemetry.addData("y", drive.pose.position.y);
             telemetry.addData("heading", drive.pose.heading);
             telemetry.update();
 
-            // Code added to draw the pose:
+            // Draw the pose:
             TelemetryPacket p = new TelemetryPacket();
             Canvas c = p.fieldOverlay();
             c.setStroke("#3F51B5");
@@ -51,3 +51,4 @@ public class Drive extends LinearOpMode {
         }
     }
 }
+
