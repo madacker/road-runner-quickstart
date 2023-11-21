@@ -17,8 +17,42 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
+import java.util.LinkedList;
+
+class TeleOpActions {
+    LinkedList<Action> actionList = new LinkedList<>();
+
+    /**
+     * Start an Action to run concurrently with other processing. It will run every time
+     * runActions() is called.
+     */
+    public void addAction(Action action) {
+        actionList.add(action);
+    }
+
+    /**
+     * "Do-work" routine to run an Action on every loop iteration.
+     * @param packet - Can be null.
+     * @return - Returns true if at least one Action is currently running; false if all Actions
+     *           are complete.
+     */
+    public boolean runActions(TelemetryPacket packet) {
+        LinkedList<Action> deletionList = new LinkedList<>();
+        for (Action action: actionList) {
+            // Once the Action returns false, the action is done:
+            if (!action.run(packet))
+                // We can't delete an item from a list while we're iterating on that list:
+                deletionList.add(action);
+        }
+        actionList.removeAll(deletionList);
+        return actionList.size() != 0;
+    }
+}
+
 @TeleOp
 public class Driver extends LinearOpMode {
+
+
     @Override
     public void runOpMode() throws InterruptedException {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
