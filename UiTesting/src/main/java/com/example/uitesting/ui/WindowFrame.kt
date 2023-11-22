@@ -5,6 +5,7 @@ import java.awt.event.WindowEvent
 import javax.swing.BoxLayout
 import javax.swing.JFrame
 import javax.swing.JPanel
+import kotlin.system.exitProcess
 
 class WindowFrame(title: String, windowSize: Int) : JFrame() {
     var internalWidth = windowSize
@@ -22,7 +23,7 @@ class WindowFrame(title: String, windowSize: Int) : JFrame() {
                 super.windowClosing(we)
 
                 dispose()
-                // @@@ exitProcess(0)
+                exitProcess(0);
             }
         })
 
