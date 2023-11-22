@@ -12,12 +12,14 @@ class KeyDispatcher implements KeyEventDispatcher {
     @Override
     public boolean dispatchKeyEvent(KeyEvent keyEvent) {
         int code = keyEvent.getKeyCode();
-        if (code == KeyEvent.VK_UP) {
-            System.out.println("UP");
-            return true;
-        } else if (code == KeyEvent.VK_DOWN) {
-            System.out.println("DOWN");
-            return true;
+        if (keyEvent.getID() == KeyEvent.KEY_PRESSED) {
+            if (code == KeyEvent.VK_UP) {
+                System.out.println("UP");
+                return true;
+            } else if (code == KeyEvent.VK_DOWN) {
+                System.out.println("DOWN");
+                return true;
+            }
         }
         return false;
     }
