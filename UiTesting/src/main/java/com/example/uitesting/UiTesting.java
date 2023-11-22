@@ -3,21 +3,36 @@ package com.example.uitesting;
 import com.example.uitesting.ui.WindowFrame;
 
 import java.awt.*;
-import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
-import java.awt.image.BufferStrategy;
+import java.util.Scanner;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
-import javax.swing.border.EtchedBorder;
+
+class KeyDispatcher implements KeyEventDispatcher {
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent keyEvent) {
+        int code = keyEvent.getKeyCode();
+        if (code == KeyEvent.VK_UP) {
+            System.out.println("UP");
+            return true;
+        } else if (code == KeyEvent.VK_DOWN) {
+            System.out.println("DOWN");
+            return true;
+        }
+        return false;
+    }
+}
 
 class Ui {
     WindowFrame windowFrame;
     Canvas canvas;
+    Scanner keyboard;
 
     Ui() {
         windowFrame = new WindowFrame("UI", 800);
         windowFrame.setVisible(true);
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyDispatcher());
     }
     void render() {
         canvas = windowFrame.getCanvas();
