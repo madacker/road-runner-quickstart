@@ -58,7 +58,7 @@ class Mechanisms {
     }
 }
 
-@TeleOp(name="Auton", group="Home")
+@TeleOp(name="Auton", group="Aardvark")
 public class Auton extends LinearOpMode {
 
     @Override

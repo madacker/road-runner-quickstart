@@ -12,12 +12,13 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
-@TeleOp
+@TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         TimeSplitter startupTime = TimeSplitter.create("Startup time");
         TimeSplitter loopTime = TimeSplitter.create("Loop time");
+        boolean initializedPose = false;
 
         startupTime.startSplit();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
@@ -37,27 +38,38 @@ public class Driver extends LinearOpMode {
                     -gamepad1.right_stick_x
             ));
 
-            // Draw the pose:
-            TelemetryPacket packet = new TelemetryPacket();
-            Canvas canvas = packet.fieldOverlay();
-
             // Update the telemetry pose and update the LED loop:
             drive.updatePoseEstimate();
             led.update();
 
-            // Refine the pose:
+            TelemetryPacket packet = new TelemetryPacket();
+            Canvas canvas = packet.fieldOverlay();
+
+            // Draw the uncorrected reference pose:
+            canvas.setStroke("#a0a0a0");
+            MecanumDrive.drawRobot(canvas, drive.pose2);
+
+            // Draw AprilTag poses and refine them:
             Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
             if (refinedPose != null) {
-                drive.pose = refinedPose;
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
+                drive.pose = refinedPose;
+
+                // Pose2 is used to evaluate drift over the course of a driving session.
+                // It starts the same as the initial pose set but is never again updated
+                // by the pose refinement:
+                if (!initializedPose) {
+                    drive.pose2 = refinedPose;
+                    initializedPose = true;
+                }
             }
 
-            // Draw the pose:
+            // Draw the best estimate pose:
             canvas.setStroke("#3F51B5");
             MecanumDrive.drawRobot(canvas, drive.pose);
-            FtcDashboard.getInstance().sendTelemetryPacket(packet);
 
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
             loopTime.endSplit();
         }
 

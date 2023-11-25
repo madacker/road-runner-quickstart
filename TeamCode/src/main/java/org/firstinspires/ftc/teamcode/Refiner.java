@@ -4,12 +4,16 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import android.graphics.PointF;
+
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.explorations.AprilTagTest;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -22,8 +26,10 @@ import java.util.List;
 public class Refiner {
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
+    private DistanceSensor distanceSensor;
     private final double CAMERA_OFFSET_Y = 8.0; // Camera location on the robot
     private final double CAMERA_OFFSET_X = 0.0;
+    private final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
 
     // Structure defining the location of April Tags:
     class AprilTagLocation {
@@ -55,6 +61,7 @@ public class Refiner {
     };
 
     Refiner(HardwareMap hardwareMap) {
+        distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
 
@@ -118,7 +125,20 @@ public class Refiner {
         //visionPortal.setProcessorEnabled(aprilTag, true);
 
         // Stop streaming to save processing performance:
-        visionPortal.stopStreaming();
+        //visionPortal.stopStreaming();
+    }
+
+    private void processDistance(Pose2d odometryPose, Canvas canvas) {
+        double distance = distanceSensor.getDistance(DistanceUnit.INCH);
+        if (distance >= 0) {
+            distance += DISTANCE_SENSOR_OFFSET;
+
+            double theta = odometryPose.heading.log();
+            double x = odometryPose.position.x + distance * Math.cos(theta);
+            double y = odometryPose.position.y + distance * Math.sin(theta);
+
+            canvas.fillRect(x - 1, y - 1, 3, 3);
+        }
     }
 
     private AprilTagLocation getTag(AprilTagDetection detection) {
@@ -143,8 +163,9 @@ public class Refiner {
     }
 
     Pose2d refinePose(Pose2d odometryPose, Canvas canvas) {
-        Pose2d result = null;
+        processDistance(odometryPose, canvas);
 
+        Pose2d result = null;
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
         for (AprilTagDetection detection : currentDetections) {
             if (detection.metadata != null) {
