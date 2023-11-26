@@ -1,20 +1,28 @@
 package org.firstinspires.ftc.teamcode.tuning;
 
+import static com.acmerobotics.roadrunner.Profiles.constantProfile;
+import static com.acmerobotics.roadrunner.Profiles.profile;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.roadrunner.ftc.Encoder;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
+import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
+import org.firstinspires.ftc.teamcode.roadrunner.TwoDeadWheelLocalizer;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Wrapper for tracking button press state.
@@ -51,7 +59,7 @@ class Buttons {
     }
 }
 @TeleOp
-public class MetaTune extends LinearOpMode {
+public class RoadRunnerTuner extends LinearOpMode {
     int DISTANCE = 72; // Default to 72 inches for every test
     ArrayList<String> deviceNames = new ArrayList<>();
     Buttons buttons;
@@ -107,7 +115,7 @@ public class MetaTune extends LinearOpMode {
         return opModeIsActive();
     }
 
-    void driveRobot(MecanumDrive drive) {
+    void localizerTest(MecanumDrive drive) {
         showMessage("Use the controller to drive the robot around. "
                 + "Press B to return to the main menu when done.");
 
@@ -140,15 +148,52 @@ public class MetaTune extends LinearOpMode {
         }
     }
 
-    void manualKvAndKsTuner(MecanumDrive drive) {
+    void manualFeedforwardTuner(MecanumDrive drive) {
+        // Stolen from TuningOpModes::register
+
+        List<Encoder> leftEncs = new ArrayList<>(), rightEncs = new ArrayList<>();
+        List<Encoder> parEncs = new ArrayList<>(), perpEncs = new ArrayList<>();
+        if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
+            MecanumDrive.DriveLocalizer dl = (MecanumDrive.DriveLocalizer) drive.localizer;
+            leftEncs.add(dl.leftFront);
+            leftEncs.add(dl.leftBack);
+            rightEncs.add(dl.rightFront);
+            rightEncs.add(dl.rightBack);
+        } else if (drive.localizer instanceof ThreeDeadWheelLocalizer) {
+            ThreeDeadWheelLocalizer dl = (ThreeDeadWheelLocalizer) drive.localizer;
+            parEncs.add(dl.par0);
+            parEncs.add(dl.par1);
+            perpEncs.add(dl.perp);
+        } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
+            TwoDeadWheelLocalizer dl = (TwoDeadWheelLocalizer) drive.localizer;
+            parEncs.add(dl.par);
+            perpEncs.add(dl.perp);
+        } else {
+            throw new IllegalArgumentException("unknown localizer: " + drive.localizer.getClass().getName());
+        }        
+        
+        // Stolen from ManualFeedforwardTuner::runOpMode()
+        //
+        // val profile = TimeProfile(constantProfile(
+        //   DISTANCE, 0.0, view.maxVel, view.minAccel, view.maxAccel).baseProfile)
+
+        TimeProfile profile = new TimeProfile(constantProfile(
+                DISTANCE, 0.0,
+                drive.PARAMS.maxWheelVel, drive.PARAMS.minProfileAccel, drive.PARAMS.maxProfileAccel).baseProfile);
+
+        while (isActive() && !buttons.cancel()) {
+            // for (i in view.forwardEncsWrapped.indices) {
+            //     val v = view.forwardEncsWrapped[i].getPositionAndVelocity().velocity
+            //     telemetry.addData("v$i", view.inPerTick * v)
+            // }
+        }
+    }
+
+    void manualFeedbackTunerAxial(MecanumDrive drive) {
 
     }
 
-    void manualAxialPdTuner(MecanumDrive drive) {
-
-    }
-
-    void manualLateralPdTuner(MecanumDrive drive) {
+    void manualFeedbackTunerLateral(MecanumDrive drive) {
         if (readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
                 + "Tune lateralGain to match (values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
@@ -165,7 +210,7 @@ public class MetaTune extends LinearOpMode {
         }
     }
 
-    void manualHeadingPdTuner(MecanumDrive drive) {
+    void manualFeedbackTunerHeading(MecanumDrive drive) {
 
     }
 
@@ -181,21 +226,21 @@ public class MetaTune extends LinearOpMode {
         int selection = 0;
         while (isActive()) {
             String[] options = {
-                    "Drive and reposition robot",
-                    "Manual laterInPerTick tuner",
-                    "Manual kV and kS tuner",
-                    "Manual axial PD tuner",
-                    "Manual lateral PD tuner",
-                    "Manual heading PD tuner"
+                    "Manual LocalizerTest (drive)",
+                    "Manual lateral tuner (lateralInPerTick)",
+//                    "ManualFeedforwardTuner (kV and kS)",
+//                    "ManualFeedbackTuner (axial PD)",
+                    "ManualFeedbackTuner (lateral PD)",
+//                    "ManualFeedbackTuner (heading PD)",
             };
             selection = menu("Use Dpad and A button to select test\n", selection, true, options);
             switch (selection) {
-                case 0: driveRobot(drive); break;
+                case 0: localizerTest(drive); break;
                 case 1: lateralInPerTickTuner(drive); break;
-                case 2: manualKvAndKsTuner(drive); break;
-                case 3: manualAxialPdTuner(drive); break;
-                case 4: manualLateralPdTuner(drive); break;
-                case 5: manualHeadingPdTuner(drive); break;
+                case 99997: manualFeedforwardTuner(drive); break;
+                case 99998: manualFeedbackTunerAxial(drive); break;
+                case 2: manualFeedbackTunerLateral(drive); break;
+                case 99999: manualFeedbackTunerHeading(drive); break;
             }
             drive.pose = defaultPose; // Reset pose for next test
         }
