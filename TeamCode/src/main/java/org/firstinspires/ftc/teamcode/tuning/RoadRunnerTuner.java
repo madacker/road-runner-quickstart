@@ -17,7 +17,11 @@ import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.roadrunner.ftc.DriveType;
+import com.acmerobotics.roadrunner.ftc.DriveView;
+import com.acmerobotics.roadrunner.ftc.DriveViewFactory;
 import com.acmerobotics.roadrunner.ftc.Encoder;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -27,6 +31,7 @@ import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
 import org.firstinspires.ftc.teamcode.roadrunner.TwoDeadWheelLocalizer;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -68,6 +73,62 @@ public class RoadRunnerTuner extends LinearOpMode {
     int DISTANCE = 96; // Default to 72 inches for every test
     ArrayList<String> deviceNames = new ArrayList<>();
     Buttons buttons;
+
+    /**
+     * Create a DriveViewFactory to call tuning opmodes within road-runner-ftc. Taken from
+     * TuningOpModes.register().
+     */
+    DriveViewFactory getDriveViewFactory(MecanumDrive md) {
+        return hardwareMap -> {
+            List<Encoder> leftEncs = new ArrayList<>(), rightEncs = new ArrayList<>();
+            List<Encoder> parEncs = new ArrayList<>(), perpEncs = new ArrayList<>();
+            if (md.localizer instanceof MecanumDrive.DriveLocalizer) {
+                MecanumDrive.DriveLocalizer dl = (MecanumDrive.DriveLocalizer) md.localizer;
+                leftEncs.add(dl.leftFront);
+                leftEncs.add(dl.leftBack);
+                rightEncs.add(dl.rightFront);
+                rightEncs.add(dl.rightBack);
+            } else if (md.localizer instanceof ThreeDeadWheelLocalizer) {
+                ThreeDeadWheelLocalizer dl = (ThreeDeadWheelLocalizer) md.localizer;
+                parEncs.add(dl.par0);
+                parEncs.add(dl.par1);
+                perpEncs.add(dl.perp);
+            } else if (md.localizer instanceof TwoDeadWheelLocalizer) {
+                TwoDeadWheelLocalizer dl = (TwoDeadWheelLocalizer) md.localizer;
+                parEncs.add(dl.par);
+                perpEncs.add(dl.perp);
+            } else {
+                throw new IllegalArgumentException("unknown localizer: " + md.localizer.getClass().getName());
+            }
+
+            return new DriveView(
+                    DriveType.MECANUM,
+                    MecanumDrive.PARAMS.inPerTick,
+                    MecanumDrive.PARAMS.maxWheelVel,
+                    MecanumDrive.PARAMS.minProfileAccel,
+                    MecanumDrive.PARAMS.maxProfileAccel,
+                    hardwareMap.getAll(LynxModule.class),
+                    Arrays.asList(
+                            md.leftFront,
+                            md.leftBack
+                    ),
+                    Arrays.asList(
+                            md.rightFront,
+                            md.rightBack
+                    ),
+                    leftEncs,
+                    rightEncs,
+                    parEncs,
+                    perpEncs,
+                    md.imu,
+                    md.voltageSensor,
+                    () -> new MotorFeedforward(MecanumDrive.PARAMS.kS,
+                            MecanumDrive.PARAMS.kV / MecanumDrive.PARAMS.inPerTick,
+                            MecanumDrive.PARAMS.kA / MecanumDrive.PARAMS.inPerTick)
+            );
+        };
+    }
+
     /**
      * header is an optional message at the top of the menu.
      * current is which option to make as the default.
@@ -195,7 +256,7 @@ public class RoadRunnerTuner extends LinearOpMode {
         // Everything below here is taken from ManualFeedforwardTuner::runOpMode():
         TimeProfile profile = new TimeProfile(constantProfile(
                 DISTANCE, 0.0,
-                drive.PARAMS.maxWheelVel, drive.PARAMS.minProfileAccel, drive.PARAMS.maxProfileAccel).baseProfile);
+                MecanumDrive.PARAMS.maxWheelVel, MecanumDrive.PARAMS.minProfileAccel, MecanumDrive.PARAMS.maxProfileAccel).baseProfile);
 
         boolean movingForwards = true;
         double startTs = System.nanoTime() / 1e9;
@@ -205,7 +266,7 @@ public class RoadRunnerTuner extends LinearOpMode {
 
             for (int i = 0; i < forwardEncsWrapped.size(); i++) {
                 int v = forwardEncsWrapped.get(i).getPositionAndVelocity().velocity;
-                packet.put(String.format("v%d", i), drive.PARAMS.inPerTick * v);
+                packet.put(String.format("v%d", i), MecanumDrive.PARAMS.inPerTick * v);
             }
 
             double ts = System.nanoTime() / 1e9;
@@ -268,10 +329,10 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void manualFeedbackTunerHeading(MecanumDrive drive) {
-        if (readyPrompt(String.format("The robot will attempt to rotate in place "
+        if (readyPrompt("The robot will attempt to rotate in place "
                 + "180 degrees clockwise and counterclockwise. "
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
-                + "\n\nPress A to start, B to stop", DISTANCE))) {
+                + "\n\nPress A to start, B to stop")) {
 
             while (isActive() && !buttons.cancel()) {
                 Action action = drive.actionBuilder(drive.pose)
