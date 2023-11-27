@@ -16,181 +16,97 @@ import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
-import com.acmerobotics.roadrunner.ftc.DriveType;
-import com.acmerobotics.roadrunner.ftc.DriveView;
-import com.acmerobotics.roadrunner.ftc.DriveViewFactory;
 import com.acmerobotics.roadrunner.ftc.Encoder;
-import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
 import org.firstinspires.ftc.teamcode.roadrunner.TwoDeadWheelLocalizer;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-/**
- * Wrapper for tracking button press state.
- */
-class Buttons {
-    final private Gamepad gamepad;
-    private boolean a;
-    private boolean b;
-    private boolean dpad_up;
-    private boolean dpad_down;
-    Buttons(Gamepad gamepad) {
-        this.gamepad = gamepad;
-        a = gamepad.a; // @@@
-    }
-    boolean select() {
-        boolean result = a && !gamepad.a;
-        a = gamepad.a;
-        return result;
-    }
-    boolean cancel() {
-        boolean result = b && !gamepad.b;
-        b = gamepad.b;
-        return result;
-    }
-    boolean up() {
-        boolean result = dpad_up && !gamepad.dpad_up;
-        dpad_up = gamepad.dpad_up;
-        return result;
-    }
-    boolean down() {
-        boolean result = dpad_down && !gamepad.dpad_down;
-        dpad_down = gamepad.dpad_down;
-        return result;
-    }
-}
 @TeleOp
 public class RoadRunnerTuner extends LinearOpMode {
     // Member fields referenced by every test:
-    Buttons buttons;
+    Ui ui;
     MecanumDrive drive;
-    DriveViewFactory driveViewFactory;
 
     // Constants:
     public static int DISTANCE = 96;
     final Pose2d defaultPose = new Pose2d(0, 0, 0);
 
-    /**
-     * Create a DriveViewFactory to call tuning opmodes within road-runner-ftc. Taken from
-     * TuningOpModes.register().
-     */
-    DriveViewFactory getDriveViewFactory(MecanumDrive md) {
-        return hardwareMap -> {
-            List<Encoder> leftEncs = new ArrayList<>(), rightEncs = new ArrayList<>();
-            List<Encoder> parEncs = new ArrayList<>(), perpEncs = new ArrayList<>();
-            if (md.localizer instanceof MecanumDrive.DriveLocalizer) {
-                MecanumDrive.DriveLocalizer dl = (MecanumDrive.DriveLocalizer) md.localizer;
-                leftEncs.add(dl.leftFront);
-                leftEncs.add(dl.leftBack);
-                rightEncs.add(dl.rightFront);
-                rightEncs.add(dl.rightBack);
-            } else if (md.localizer instanceof ThreeDeadWheelLocalizer) {
-                ThreeDeadWheelLocalizer dl = (ThreeDeadWheelLocalizer) md.localizer;
-                parEncs.add(dl.par0);
-                parEncs.add(dl.par1);
-                perpEncs.add(dl.perp);
-            } else if (md.localizer instanceof TwoDeadWheelLocalizer) {
-                TwoDeadWheelLocalizer dl = (TwoDeadWheelLocalizer) md.localizer;
-                parEncs.add(dl.par);
-                perpEncs.add(dl.perp);
-            } else {
-                throw new IllegalArgumentException("unknown localizer: " + md.localizer.getClass().getName());
-            }
-
-            return new DriveView(
-                    DriveType.MECANUM,
-                    MecanumDrive.PARAMS.inPerTick,
-                    MecanumDrive.PARAMS.maxWheelVel,
-                    MecanumDrive.PARAMS.minProfileAccel,
-                    MecanumDrive.PARAMS.maxProfileAccel,
-                    hardwareMap.getAll(LynxModule.class),
-                    Arrays.asList(
-                            md.leftFront,
-                            md.leftBack
-                    ),
-                    Arrays.asList(
-                            md.rightFront,
-                            md.rightBack
-                    ),
-                    leftEncs,
-                    rightEncs,
-                    parEncs,
-                    perpEncs,
-                    md.imu,
-                    md.voltageSensor,
-                    () -> new MotorFeedforward(MecanumDrive.PARAMS.kS,
-                            MecanumDrive.PARAMS.kV / MecanumDrive.PARAMS.inPerTick,
-                            MecanumDrive.PARAMS.kA / MecanumDrive.PARAMS.inPerTick)
-            );
-        };
-    }
-
-    /**
-     * Menu interface for abstracting the menu strings.
-     */
+    // Data structures for the User Interface
     interface MenuStrings {
         String getString(int i);
     }
+    class Ui {
+        // Button press state:
+        private boolean[] buttonPressed = new boolean[4];
+        private boolean buttonPress(boolean pressed, int index) {
+            boolean press = pressed && !buttonPressed[index];
+            buttonPressed[index] = pressed;
+            return press;
+        }
 
-    /**
-     * header is an optional message at the top of the menu.
-     * Returns the index of the chosen option or -1 if the cancel button was pressed.
-     */
-    int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
-        while (opModeIsActive()) {
-            if (header != null) {
-                telemetry.addLine(header);
+        // Button press status:
+        boolean select() { return buttonPress(gamepad1.a, 0); }
+        boolean cancel() { return buttonPress(gamepad1.b, 1); }
+        boolean up() { return buttonPress(gamepad1.dpad_up, 2); }
+        boolean down() { return buttonPress(gamepad1.dpad_down, 3); }
+
+        // Display the menu:
+        int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
+            while (opModeIsActive()) {
+                if (header != null) {
+                    telemetry.addLine(header);
+                }
+                for (int i = 0; i < numStrings; i++) {
+                    String cursor = (i == current) ? "➤" : "  ";
+                    telemetry.addLine(cursor + menuStrings.getString(i));
+                }
+                telemetry.update();
+                if (up()) {
+                    current--;
+                    if (current < 0)
+                        current = 0;
+                }
+                if (down()) {
+                    current++;
+                    if (current == numStrings)
+                        current = numStrings - 1;
+                }
+                if (cancel() && !topmost)
+                    return -1;
+                if (select())
+                    return current;
             }
-            for (int i = 0; i < numStrings; i++) {
-                String cursor = (i == current) ? "➤" : "  ";
-                telemetry.addLine(cursor + menuStrings.getString(i));
-            }
+            return topmost ? 0 : -1;
+        }
+
+        // Show a message:
+        void showMessage(String message) {
+            telemetry.addLine(message);
             telemetry.update();
-            if (buttons.up()) {
-                current--;
-                if (current < 0)
-                    current = 0;
-            }
-            if (buttons.down()) {
-                current++;
-                if (current == numStrings)
-                    current = numStrings - 1;
-            }
-            if (buttons.cancel() && !topmost)
-                return -1;
-            if (buttons.select())
-                return current;
         }
-        return topmost ? 0 : -1;
-    }
 
-    void showMessage(String message) {
-        telemetry.addLine(message);
-        telemetry.update();
-    }
-
-    boolean readyPrompt(String message) {
-        showMessage(message);
-        while (opModeIsActive() && !buttons.cancel()) {
-            if (buttons.select())
-                return true;
+        // Show a message and wait for A to be pressed:
+        boolean readyPrompt(String message) {
+            showMessage(message);
+            while (opModeIsActive() && !cancel()) {
+                if (select())
+                    return true;
+            }
+            return false;
         }
-        return false;
-    }
+    };
 
     void localizerTest() {
-        showMessage("Use the controller to drive the robot around. "
+        ui.showMessage("Use the controller to drive the robot around. "
                 + "Press B to return to the main menu when done.");
 
-        while (opModeIsActive() && !buttons.cancel()) {
+        while (opModeIsActive() && !ui.cancel()) {
             PoseVelocity2d powers = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
                     -gamepad1.right_stick_x);
@@ -207,7 +123,7 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void lateralInPerTickTuner() {
-        if (readyPrompt(String.format("The robot will attempt to strafe left for %d inches. "
+        if (ui.readyPrompt(String.format("The robot will attempt to strafe left for %d inches. "
             + "Measure the actual distance using a tape measure. "
             + "Multiply 'lateralInPerTick' by <distance-measured> / %d."
             + "\n\nPress A to start", DISTANCE, DISTANCE))) {
@@ -219,12 +135,10 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
-    /**
-     * This is a re-implementation of 'manualFeedforwardTuner' so that DISTANCE can be changed
-     * from its hardcoded 64".
-     */
+    // This is a re-implementation of 'manualFeedforwardTuner' so that DISTANCE can be changed
+    // from its hardcoded 64".
     void manualFeedforwardTuner() {
-        if (!readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
+        if (!ui.readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
                 + "Tune 'kV' and 'kS' using FTC Dashboard."
                 + "\n\nPress A to start, B to stop", DISTANCE)))
             return;
@@ -266,7 +180,7 @@ public class RoadRunnerTuner extends LinearOpMode {
         boolean movingForwards = true;
         double startTs = System.nanoTime() / 1e9;
 
-        while (opModeIsActive() && !buttons.cancel()) {
+        while (opModeIsActive() && !ui.cancel()) {
             TelemetryPacket packet = new TelemetryPacket();
 
             for (int i = 0; i < forwardEncsWrapped.size(); i++) {
@@ -302,11 +216,11 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void manualFeedbackTunerAxial() {
-        if (readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
+        if (ui.readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
                 + "Tune 'axialGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
-            while (opModeIsActive() && !buttons.cancel()) {
+            while (opModeIsActive() && !ui.cancel()) {
                 Action action = drive.actionBuilder(new Pose2d(0, 0, 0))
                         .lineToX(DISTANCE)
                         .lineToX(0)
@@ -318,11 +232,11 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void manualFeedbackTunerLateral() {
-        if (readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
+        if (ui.readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
                 + "Tune 'lateralGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
-            while (opModeIsActive() && !buttons.cancel()) {
+            while (opModeIsActive() && !ui.cancel()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .strafeTo(new Vector2d(0, DISTANCE))
                         .strafeTo(new Vector2d(0, 0))
@@ -334,12 +248,12 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void manualFeedbackTunerHeading() {
-        if (readyPrompt("The robot will attempt to rotate in place "
+        if (ui.readyPrompt("The robot will attempt to rotate in place "
                 + "180 degrees clockwise and counterclockwise. "
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop")) {
 
-            while (opModeIsActive() && !buttons.cancel()) {
+            while (opModeIsActive() && !ui.cancel()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .turn(Math.PI)
                         .turn(-Math.PI)
@@ -370,7 +284,7 @@ public class RoadRunnerTuner extends LinearOpMode {
 
         // Initialize member fields:
         drive = new MecanumDrive(hardwareMap, defaultPose);
-        buttons = new Buttons(gamepad1);
+        ui = new Ui();
 
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
@@ -386,7 +300,7 @@ public class RoadRunnerTuner extends LinearOpMode {
 
         int selection = 0;
         while (opModeIsActive()) {
-            selection = menu("Use Dpad to navigate, A to select\n", selection, true,
+            selection = ui.menu("Use Dpad to navigate, A to select\n", selection, true,
                     tests.size(), i -> tests.get(i).description);
 
             tests.get(selection).method.invoke();   // Invoke the chosen test
