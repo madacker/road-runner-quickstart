@@ -68,9 +68,14 @@ class Buttons {
 }
 @TeleOp
 public class RoadRunnerTuner extends LinearOpMode {
-    int DISTANCE = 96; // Default to 72 inches for every test
-    ArrayList<String> deviceNames = new ArrayList<>();
+    // Member fields referenced by every test:
     Buttons buttons;
+    MecanumDrive drive;
+    DriveViewFactory driveViewFactory;
+
+    // Constants:
+    public static int DISTANCE = 96;
+    final Pose2d defaultPose = new Pose2d(0, 0, 0);
 
     /**
      * Create a DriveViewFactory to call tuning opmodes within road-runner-ftc. Taken from
@@ -127,18 +132,19 @@ public class RoadRunnerTuner extends LinearOpMode {
         };
     }
 
+    /**
+     * Menu interface for abstracting the menu strings.
+     */
     interface MenuStrings {
         String getString(int i);
     }
 
     /**
      * header is an optional message at the top of the menu.
-     * current is which option to make as the default.
-     * options is an array of strings.
      * Returns the index of the chosen option or -1 if the cancel button was pressed.
      */
     int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
-        while (isActive()) {
+        while (opModeIsActive()) {
             if (header != null) {
                 telemetry.addLine(header);
             }
@@ -172,18 +178,14 @@ public class RoadRunnerTuner extends LinearOpMode {
 
     boolean readyPrompt(String message) {
         showMessage(message);
-        while (isActive() && !buttons.cancel()) {
+        while (opModeIsActive() && !buttons.cancel()) {
             if (buttons.select())
                 return true;
         }
         return false;
     }
 
-    boolean isActive() {
-        return opModeIsActive();
-    }
-
-    void localizerTest(MecanumDrive drive) {
+    void localizerTest() {
         showMessage("Use the controller to drive the robot around. "
                 + "Press B to return to the main menu when done.");
 
@@ -203,7 +205,7 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
-    void lateralInPerTickTuner(MecanumDrive drive) {
+    void lateralInPerTickTuner() {
         if (readyPrompt(String.format("The robot will attempt to strafe left for %d inches. "
             + "Measure the actual distance using a tape measure. "
             + "Multiply 'lateralInPerTick' by <distance-measured> / %d."
@@ -219,10 +221,8 @@ public class RoadRunnerTuner extends LinearOpMode {
     /**
      * This is a re-implementation of 'manualFeedforwardTuner' so that DISTANCE can be changed
      * from its hardcoded 64".
-     *
-     * @param drive - Mecanum drive.
      */
-    void manualFeedforwardTuner(MecanumDrive drive) {
+    void manualFeedforwardTuner() {
         if (!readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
                 + "Tune 'kV' and 'kS' using FTC Dashboard."
                 + "\n\nPress A to start, B to stop", DISTANCE)))
@@ -258,12 +258,14 @@ public class RoadRunnerTuner extends LinearOpMode {
         // Everything below here is taken from ManualFeedforwardTuner::runOpMode():
         TimeProfile profile = new TimeProfile(constantProfile(
                 DISTANCE, 0.0,
-                MecanumDrive.PARAMS.maxWheelVel, MecanumDrive.PARAMS.minProfileAccel, MecanumDrive.PARAMS.maxProfileAccel).baseProfile);
+                MecanumDrive.PARAMS.maxWheelVel,
+                MecanumDrive.PARAMS.minProfileAccel,
+                MecanumDrive.PARAMS.maxProfileAccel).baseProfile);
 
         boolean movingForwards = true;
         double startTs = System.nanoTime() / 1e9;
 
-        while (isActive() && !buttons.cancel()) {
+        while (opModeIsActive() && !buttons.cancel()) {
             TelemetryPacket packet = new TelemetryPacket();
 
             for (int i = 0; i < forwardEncsWrapped.size(); i++) {
@@ -298,7 +300,7 @@ public class RoadRunnerTuner extends LinearOpMode {
         drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
     }
 
-    void manualFeedbackTunerAxial(MecanumDrive drive) {
+    void manualFeedbackTunerAxial() {
         if (readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
                 + "Tune 'axialGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
@@ -314,12 +316,12 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
-    void manualFeedbackTunerLateral(MecanumDrive drive) {
+    void manualFeedbackTunerLateral() {
         if (readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
                 + "Tune 'lateralGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
-            while (isActive() && !buttons.cancel()) {
+            while (opModeIsActive() && !buttons.cancel()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .strafeTo(new Vector2d(0, DISTANCE))
                         .strafeTo(new Vector2d(0, 0))
@@ -330,13 +332,13 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
-    void manualFeedbackTunerHeading(MecanumDrive drive) {
+    void manualFeedbackTunerHeading() {
         if (readyPrompt("The robot will attempt to rotate in place "
                 + "180 degrees clockwise and counterclockwise. "
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop")) {
 
-            while (isActive() && !buttons.cancel()) {
+            while (opModeIsActive() && !buttons.cancel()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .turn(Math.PI)
                         .turn(-Math.PI)
@@ -347,21 +349,30 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
+    void args(int i) {
+
+    }
+
+    // Build the menu options:
+    interface MenuOption {
+        void test();
+    }
+
     @Override
     public void runOpMode() {
-
-//        class TestChoice {
-//            TestChoice(String, )
-//        }
-        Pose2d defaultPose = new Pose2d(0, 0, 0);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, defaultPose);
-
-        telemetry.addLine("Press START to see tuning menu");
+        // Initialize member fields:
+        drive = new MecanumDrive(hardwareMap, defaultPose);
         buttons = new Buttons(gamepad1);
+
+        MenuOption one = () -> localizerTest();
+        MenuOption two = () -> args(3);
+        one.test();
+
+        telemetry.addLine("Press START to begin");
         waitForStart();
 
         int selection = 0;
-        while (isActive()) {
+        while (opModeIsActive()) {
             String[] options = {
                     "Manual LocalizerTest (drive)",
                     "Manual lateral tuner (lateralInPerTick)",
@@ -374,12 +385,12 @@ public class RoadRunnerTuner extends LinearOpMode {
                     options.length, i -> options[i]);
 
             switch (selection) {
-                case 0: localizerTest(drive); break;
-                case 1: lateralInPerTickTuner(drive); break;
-                case 2: manualFeedforwardTuner(drive); break;
-                case 3: manualFeedbackTunerAxial(drive); break;
-                case 4: manualFeedbackTunerLateral(drive); break;
-                case 5: manualFeedbackTunerHeading(drive); break;
+                case 0: localizerTest(); break;
+                case 1: lateralInPerTickTuner(); break;
+                case 2: manualFeedforwardTuner(); break;
+                case 3: manualFeedbackTunerAxial(); break;
+                case 4: manualFeedbackTunerLateral(); break;
+                case 5: manualFeedbackTunerHeading(); break;
             }
             drive.pose = defaultPose; // Reset pose for next test
         }
