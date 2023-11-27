@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode.tuning;
 import static com.acmerobotics.roadrunner.Profiles.constantProfile;
 import static com.acmerobotics.roadrunner.Profiles.profile;
 
-import static java.lang.System.nanoTime;
-
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
@@ -129,20 +127,24 @@ public class RoadRunnerTuner extends LinearOpMode {
         };
     }
 
+    interface MenuStrings {
+        String getString(int i);
+    }
+
     /**
      * header is an optional message at the top of the menu.
      * current is which option to make as the default.
      * options is an array of strings.
      * Returns the index of the chosen option or -1 if the cancel button was pressed.
      */
-    int menu(String header, int current, boolean topmost, String[] options) {
+    int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
         while (isActive()) {
             if (header != null) {
                 telemetry.addLine(header);
             }
-            for (int i = 0; i < options.length; i++) {
-                String cursor = (i == current) ? "➤" : " ";
-                telemetry.addLine(cursor + options[i]);
+            for (int i = 0; i < numStrings; i++) {
+                String cursor = (i == current) ? "➤" : "  ";
+                telemetry.addLine(cursor + menuStrings.getString(i));
             }
             telemetry.update();
             if (buttons.up()) {
@@ -152,8 +154,8 @@ public class RoadRunnerTuner extends LinearOpMode {
             }
             if (buttons.down()) {
                 current++;
-                if (current == options.length)
-                    current = options.length - 1;
+                if (current == numStrings)
+                    current = numStrings - 1;
             }
             if (buttons.cancel() && !topmost)
                 return -1;
@@ -347,6 +349,10 @@ public class RoadRunnerTuner extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+
+//        class TestChoice {
+//            TestChoice(String, )
+//        }
         Pose2d defaultPose = new Pose2d(0, 0, 0);
         MecanumDrive drive = new MecanumDrive(hardwareMap, defaultPose);
 
@@ -364,7 +370,9 @@ public class RoadRunnerTuner extends LinearOpMode {
                     "ManualFeedbackTuner (lateralGain)",
                     "ManualFeedbackTuner (headingGain)",
             };
-            selection = menu("Use Dpad and A button to select test\n", selection, true, options);
+            selection = menu("Use Dpad and A button to select test\n", selection, true,
+                    options.length, i -> options[i]);
+
             switch (selection) {
                 case 0: localizerTest(drive); break;
                 case 1: lateralInPerTickTuner(drive); break;
