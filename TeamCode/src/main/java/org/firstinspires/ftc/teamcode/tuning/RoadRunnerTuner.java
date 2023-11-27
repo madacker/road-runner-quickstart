@@ -3,12 +3,17 @@ package org.firstinspires.ftc.teamcode.tuning;
 import static com.acmerobotics.roadrunner.Profiles.constantProfile;
 import static com.acmerobotics.roadrunner.Profiles.profile;
 
+import static java.lang.System.nanoTime;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.DualNum;
+import com.acmerobotics.roadrunner.MotorFeedforward;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
@@ -60,7 +65,7 @@ class Buttons {
 }
 @TeleOp
 public class RoadRunnerTuner extends LinearOpMode {
-    int DISTANCE = 72; // Default to 72 inches for every test
+    int DISTANCE = 96; // Default to 72 inches for every test
     ArrayList<String> deviceNames = new ArrayList<>();
     Buttons buttons;
     /**
@@ -75,19 +80,19 @@ public class RoadRunnerTuner extends LinearOpMode {
                 telemetry.addLine(header);
             }
             for (int i = 0; i < options.length; i++) {
-                String cursor = (i == current) ? ">" : " ";
+                String cursor = (i == current) ? "➤" : " ";
                 telemetry.addLine(cursor + options[i]);
             }
             telemetry.update();
             if (buttons.up()) {
                 current--;
                 if (current < 0)
-                    current = options.length - 1;
+                    current = 0;
             }
             if (buttons.down()) {
                 current++;
                 if (current == options.length)
-                    current = 0;
+                    current = options.length - 1;
             }
             if (buttons.cancel() && !topmost)
                 return -1;
@@ -148,9 +153,19 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
+    /**
+     * This is a re-implementation of 'manualFeedforwardTuner' so that DISTANCE can be changed
+     * from its hardcoded 64".
+     *
+     * @param drive - Mecanum drive.
+     */
     void manualFeedforwardTuner(MecanumDrive drive) {
-        // Stolen from TuningOpModes::register
+        if (!readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
+                + "Tune 'kV' and 'kS' using FTC Dashboard."
+                + "\n\nPress A to start, B to stop", DISTANCE)))
+            return;
 
+        // Taken from TuningOpModes::register:
         List<Encoder> leftEncs = new ArrayList<>(), rightEncs = new ArrayList<>();
         List<Encoder> parEncs = new ArrayList<>(), perpEncs = new ArrayList<>();
         if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
@@ -170,36 +185,78 @@ public class RoadRunnerTuner extends LinearOpMode {
             perpEncs.add(dl.perp);
         } else {
             throw new IllegalArgumentException("unknown localizer: " + drive.localizer.getClass().getName());
-        }        
-        
-        // Stolen from ManualFeedforwardTuner::runOpMode()
-        //
-        // val profile = TimeProfile(constantProfile(
-        //   DISTANCE, 0.0, view.maxVel, view.minAccel, view.maxAccel).baseProfile)
+        }
 
+        List<Encoder> forwardEncsWrapped = new ArrayList<>();
+        forwardEncsWrapped.addAll(leftEncs);
+        forwardEncsWrapped.addAll(rightEncs);
+        forwardEncsWrapped.addAll(parEncs);
+
+        // Everything below here is taken from ManualFeedforwardTuner::runOpMode():
         TimeProfile profile = new TimeProfile(constantProfile(
                 DISTANCE, 0.0,
                 drive.PARAMS.maxWheelVel, drive.PARAMS.minProfileAccel, drive.PARAMS.maxProfileAccel).baseProfile);
 
+        boolean movingForwards = true;
+        double startTs = System.nanoTime() / 1e9;
+
         while (isActive() && !buttons.cancel()) {
-            // for (i in view.forwardEncsWrapped.indices) {
-            //     val v = view.forwardEncsWrapped[i].getPositionAndVelocity().velocity
-            //     telemetry.addData("v$i", view.inPerTick * v)
-            // }
+            TelemetryPacket packet = new TelemetryPacket();
+
+            for (int i = 0; i < forwardEncsWrapped.size(); i++) {
+                int v = forwardEncsWrapped.get(i).getPositionAndVelocity().velocity;
+                packet.put(String.format("v%d", i), drive.PARAMS.inPerTick * v);
+            }
+
+            double ts = System.nanoTime() / 1e9;
+            double t = ts - startTs;
+            if (t > profile.duration) {
+                movingForwards = !movingForwards;
+                startTs = ts;
+            }
+
+            DualNum<Time> v = profile.get(t).drop(1);
+            if (!movingForwards) {
+                v = v.unaryMinus();
+            }
+            packet.put("vref", v.get(0));
+
+            MotorFeedforward feedForward = new MotorFeedforward(MecanumDrive.PARAMS.kS,
+                    MecanumDrive.PARAMS.kV / MecanumDrive.PARAMS.inPerTick,
+                    MecanumDrive.PARAMS.kA / MecanumDrive.PARAMS.inPerTick);
+
+            double power = feedForward.compute(v) / drive.voltageSensor.getVoltage();
+            drive.setDrivePowers(new PoseVelocity2d(new Vector2d(power, 0.0), 0.0));
+
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
         }
+
+        // Set power to zero before exiting:
+        drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
     }
 
     void manualFeedbackTunerAxial(MecanumDrive drive) {
+        if (readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
+                + "Tune 'axialGain' so that target and actual align (typical values between 1 and 20)."
+                + "\n\nPress A to start, B to stop", DISTANCE))) {
 
+            while (opModeIsActive() && !buttons.cancel()) {
+                Action action = drive.actionBuilder(new Pose2d(0, 0, 0))
+                        .lineToX(DISTANCE)
+                        .lineToX(0)
+                        .build();
+
+                Actions.runBlocking(action);
+            }
+        }
     }
 
     void manualFeedbackTunerLateral(MecanumDrive drive) {
         if (readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
-                + "Tune lateralGain to match (values between 1 and 20)."
+                + "Tune 'lateralGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
             while (isActive() && !buttons.cancel()) {
-
                 Action action = drive.actionBuilder(drive.pose)
                         .strafeTo(new Vector2d(0, DISTANCE))
                         .strafeTo(new Vector2d(0, 0))
@@ -211,7 +268,20 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void manualFeedbackTunerHeading(MecanumDrive drive) {
+        if (readyPrompt(String.format("The robot will attempt to rotate in place "
+                + "180 degrees clockwise and counterclockwise. "
+                + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
+                + "\n\nPress A to start, B to stop", DISTANCE))) {
 
+            while (isActive() && !buttons.cancel()) {
+                Action action = drive.actionBuilder(drive.pose)
+                        .turn(Math.PI)
+                        .turn(-Math.PI)
+                        .build();
+
+                Actions.runBlocking(action);
+            }
+        }
     }
 
     @Override
@@ -228,19 +298,19 @@ public class RoadRunnerTuner extends LinearOpMode {
             String[] options = {
                     "Manual LocalizerTest (drive)",
                     "Manual lateral tuner (lateralInPerTick)",
-//                    "ManualFeedforwardTuner (kV and kS)",
-//                    "ManualFeedbackTuner (axial PD)",
-                    "ManualFeedbackTuner (lateral PD)",
-//                    "ManualFeedbackTuner (heading PD)",
+                    "ManualFeedforwardTuner (kV and kS)",
+                    "ManualFeedbackTuner (axialGain)",
+                    "ManualFeedbackTuner (lateralGain)",
+                    "ManualFeedbackTuner (headingGain)",
             };
             selection = menu("Use Dpad and A button to select test\n", selection, true, options);
             switch (selection) {
                 case 0: localizerTest(drive); break;
                 case 1: lateralInPerTickTuner(drive); break;
-                case 99997: manualFeedforwardTuner(drive); break;
-                case 99998: manualFeedbackTunerAxial(drive); break;
-                case 2: manualFeedbackTunerLateral(drive); break;
-                case 99999: manualFeedbackTunerHeading(drive); break;
+                case 2: manualFeedforwardTuner(drive); break;
+                case 3: manualFeedbackTunerAxial(drive); break;
+                case 4: manualFeedbackTunerLateral(drive); break;
+                case 5: manualFeedbackTunerHeading(drive); break;
             }
             drive.pose = defaultPose; // Reset pose for next test
         }
