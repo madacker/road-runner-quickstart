@@ -349,13 +349,17 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
     }
 
-    void args(int i) {
-
+    // Data structures for building a table of tests:
+    interface TestMethod {
+        void invoke();
     }
-
-    // Build the menu options:
-    interface MenuOption {
-        void test();
+    class Test {
+        TestMethod method;
+        String description;
+        public Test(TestMethod method, String description) {
+            this.method = method;
+            this.description = description;
+        }
     }
 
     @Override
@@ -364,35 +368,25 @@ public class RoadRunnerTuner extends LinearOpMode {
         drive = new MecanumDrive(hardwareMap, defaultPose);
         buttons = new Buttons(gamepad1);
 
-        MenuOption one = () -> localizerTest();
-        MenuOption two = () -> args(3);
-        one.test();
+        // Dynamically build the list of tests:
+        ArrayList<Test> tests = new ArrayList<>();
+        tests.add(new Test(()->localizerTest(),             "Manual LocalizerTest (drive)"));
+        tests.add(new Test(()->lateralInPerTickTuner(),     "Manual lateral tuner (lateralInPerTick)"));
+        tests.add(new Test(()->manualFeedforwardTuner(),    "ManualFeedforwardTuner (kV and kS)"));
+        tests.add(new Test(()->manualFeedbackTunerAxial(),  "ManualFeedbackTuner (axialGain)"));
+        tests.add(new Test(()->manualFeedbackTunerLateral(),"ManualFeedbackTuner (lateralGain)"));
+        tests.add(new Test(()->manualFeedbackTunerHeading(),"ManualFeedbackTuner (headingGain)"));
 
         telemetry.addLine("Press START to begin");
         waitForStart();
 
         int selection = 0;
         while (opModeIsActive()) {
-            String[] options = {
-                    "Manual LocalizerTest (drive)",
-                    "Manual lateral tuner (lateralInPerTick)",
-                    "ManualFeedforwardTuner (kV and kS)",
-                    "ManualFeedbackTuner (axialGain)",
-                    "ManualFeedbackTuner (lateralGain)",
-                    "ManualFeedbackTuner (headingGain)",
-            };
             selection = menu("Use Dpad and A button to select test\n", selection, true,
-                    options.length, i -> options[i]);
+                    tests.size(), i -> tests.get(i).description);
 
-            switch (selection) {
-                case 0: localizerTest(); break;
-                case 1: lateralInPerTickTuner(); break;
-                case 2: manualFeedforwardTuner(); break;
-                case 3: manualFeedbackTunerAxial(); break;
-                case 4: manualFeedbackTunerLateral(); break;
-                case 5: manualFeedbackTunerHeading(); break;
-            }
-            drive.pose = defaultPose; // Reset pose for next test
+            tests.get(selection).method.invoke();   // Invoke the chosen test
+            drive.pose = defaultPose;               // Reset pose for next test
         }
     }
 }
