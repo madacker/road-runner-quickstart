@@ -5,6 +5,7 @@ import static com.acmerobotics.roadrunner.Profiles.profile;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.DualNum;
@@ -364,6 +365,9 @@ public class RoadRunnerTuner extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        // Send telemetry to both FTC Dashboard and the Driver Station:
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
         // Initialize member fields:
         drive = new MecanumDrive(hardwareMap, defaultPose);
         buttons = new Buttons(gamepad1);
@@ -382,7 +386,7 @@ public class RoadRunnerTuner extends LinearOpMode {
 
         int selection = 0;
         while (opModeIsActive()) {
-            selection = menu("Use Dpad and A button to select test\n", selection, true,
+            selection = menu("Use Dpad to navigate, A to select\n", selection, true,
                     tests.size(), i -> tests.get(i).description);
 
             tests.get(selection).method.invoke();   // Invoke the chosen test
