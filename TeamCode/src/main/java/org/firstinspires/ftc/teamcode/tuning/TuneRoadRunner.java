@@ -14,7 +14,6 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.roadrunner.ftc.Actions;
 import com.acmerobotics.roadrunner.ftc.Encoder;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -296,6 +295,24 @@ public class TuneRoadRunner extends LinearOpMode {
         }
     }
 
+    void completionTest() {
+        if (ui.readyPrompt("The robot will drive forward 48 inches using a spline. "
+                + "It needs half a tile clearance on either side. "
+                + "\n\nPress A to start, B to stop")) {
+
+            Action action = drive.actionBuilder(drive.pose)
+                    .setTangent(Math.toRadians(60))
+                    .splineToLinearHeading(new Pose2d(24, 0, Math.toRadians(90)), Math.toRadians(-60))
+                    .splineToLinearHeading(new Pose2d(48, 0, Math.toRadians(180)), Math.toRadians(60))
+                    .endTrajectory()
+                    .setTangent(Math.toRadians(-180))
+                    .splineToLinearHeading(new Pose2d(0, 0, Math.toRadians(-0.0001)), Math.toRadians(-180))
+                    .build();
+            if (!runCancelableAction(action))
+                return; // Exit when cancelled
+        }
+    }
+
     // Data structures for building a table of tests:
     interface TestMethod {
         void invoke();
@@ -337,6 +354,7 @@ public class TuneRoadRunner extends LinearOpMode {
         tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
         tests.add(new Test(this::manualFeedbackTunerLateral,"ManualFeedbackTuner (lateralGain)"));
         tests.add(new Test(this::manualFeedbackTunerHeading,"ManualFeedbackTuner (headingGain)"));
+        tests.add(new Test(this::completionTest,            "Completion test (verification)"));
 
         telemetry.addLine("Press START to begin");
         waitForStart();
@@ -348,11 +366,6 @@ public class TuneRoadRunner extends LinearOpMode {
 
             tests.get(selection).method.invoke();   // Invoke the chosen test
             drive.pose = defaultPose;               // Reset pose for next test
-
-            // Clear the telemetry on FTC Dashboard:
-            TelemetryPacket p = new TelemetryPacket();
-            p.clearLines();
-            FtcDashboard.getInstance().sendTelemetryPacket(p);
         }
     }
 }
