@@ -27,13 +27,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 @TeleOp
-public class RoadRunnerTuner extends LinearOpMode {
+public class TuneRoadRunner extends LinearOpMode {
     // Member fields referenced by every test:
     Ui ui;
     MecanumDrive drive;
 
     // Constants:
-    public static int DISTANCE = 96;
+    public static int DISTANCE = 72;
     final Pose2d defaultPose = new Pose2d(0, 0, 0);
 
     // Data structures for the User Interface
@@ -88,7 +88,7 @@ public class RoadRunnerTuner extends LinearOpMode {
                     telemetry.addLine(header);
                 }
                 for (int i = 0; i < numStrings; i++) {
-                    String cursor = (i == current) ? "➤" : "\uD83D\uDC4C ";
+                    String cursor = (i == current) ? "➤" : " ";
                     telemetry.addLine(cursor + menuStrings.getString(i));
                 }
                 telemetry.update();
@@ -106,8 +106,8 @@ public class RoadRunnerTuner extends LinearOpMode {
 
         // Show a message and wait for A to be pressed:
         boolean readyPrompt(String message) {
-            showMessage(message);
             while (opModeIsActive() && !cancel()) {
+                showMessage(message);
                 if (select())
                     return true;
             }
@@ -141,7 +141,7 @@ public class RoadRunnerTuner extends LinearOpMode {
             + "Multiply 'lateralInPerTick' by <distance-measured> / %d."
             + "\n\nPress A to start", DISTANCE, DISTANCE))) {
 
-            Actions.runBlocking(
+            runCancelableAction(
                     drive.actionBuilder(drive.pose)
                             .strafeTo(new Vector2d(0, DISTANCE))
                             .build());
@@ -228,18 +228,37 @@ public class RoadRunnerTuner extends LinearOpMode {
         drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
     }
 
+    // Run an Action but end it early if Cancel is pressed.
+    // Returns True if it ran without cancelling, False if it was cancelled.
+    boolean runCancelableAction(Action action) {
+        drive.runParallel(action);
+        while (opModeIsActive() && !ui.cancel()) {
+            TelemetryPacket packet = new TelemetryPacket();
+            ui.showMessage("Press B to stop");
+            boolean more = drive.doActionsWork(packet);
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            if (!more) {
+                // We successfully completed the Action!
+                return true; // ====>
+            }
+        }
+        // The user either pressed Cancel or End:
+        drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
+        return false;
+    }
+
     void manualFeedbackTunerAxial() {
         if (ui.readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
                 + "Tune 'axialGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
-            while (opModeIsActive() && !ui.cancel()) {
+            while (opModeIsActive()) {
                 Action action = drive.actionBuilder(new Pose2d(0, 0, 0))
                         .lineToX(DISTANCE)
                         .lineToX(0)
                         .build();
-
-                Actions.runBlocking(action);
+                if (!runCancelableAction(action))
+                    return; // Exit when cancelled
             }
         }
     }
@@ -249,13 +268,13 @@ public class RoadRunnerTuner extends LinearOpMode {
                 + "Tune 'lateralGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
 
-            while (opModeIsActive() && !ui.cancel()) {
+            while (opModeIsActive()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .strafeTo(new Vector2d(0, DISTANCE))
                         .strafeTo(new Vector2d(0, 0))
                         .build();
-
-                Actions.runBlocking(action);
+                if (!runCancelableAction(action))
+                    return; // Exit when cancelled
             }
         }
     }
@@ -266,13 +285,13 @@ public class RoadRunnerTuner extends LinearOpMode {
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop")) {
 
-            while (opModeIsActive() && !ui.cancel()) {
+            while (opModeIsActive()) {
                 Action action = drive.actionBuilder(drive.pose)
                         .turn(Math.PI)
                         .turn(-Math.PI)
                         .build();
-
-                Actions.runBlocking(action);
+                if (!runCancelableAction(action))
+                    return; // Exit when cancelled
             }
         }
     }
@@ -318,6 +337,11 @@ public class RoadRunnerTuner extends LinearOpMode {
 
             tests.get(selection).method.invoke();   // Invoke the chosen test
             drive.pose = defaultPose;               // Reset pose for next test
+
+            // Clear the telemetry on FTC Dashboard:
+            TelemetryPacket p = new TelemetryPacket();
+            p.clearLines();
+            FtcDashboard.getInstance().sendTelemetryPacket(p);
         }
     }
 }

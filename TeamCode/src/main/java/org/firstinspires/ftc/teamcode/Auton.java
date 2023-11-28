@@ -77,8 +77,8 @@ public class Auton extends LinearOpMode {
         waitForStart();
 
         if (false) {
-            drive.addAction(ledAction);
-            while (drive.runActions())
+            drive.runParallel(ledAction);
+            while (opModeIsActive() &&  drive.doActionsWork())
                 ;
         } else {
             Actions.runBlocking(autonInfo.action);

@@ -581,13 +581,18 @@ public final class MecanumDrive {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
+    // List of currently running Actions:
     LinkedList<Action> actionList = new LinkedList<>();
 
-    public void addAction(Action action) {
+    // Invoke an Action to run in parallel during TeleOp:
+    public void runParallel(Action action) {
         actionList.add(action);
     }
 
-    public boolean runActions(TelemetryPacket packet) {
+    // On every iteration of your robot loop, call 'doActionsWork'. Specify the packet
+    // if you're drawing on the graph for FTC Dashboard:
+    public boolean doActionsWork() { return doActionsWork(null); }
+    public boolean doActionsWork(TelemetryPacket packet) {
         LinkedList<Action> deletionList = new LinkedList<>();
         for (Action action: actionList) {
             // Once the Action returns false, the action is done:
@@ -598,6 +603,4 @@ public final class MecanumDrive {
         actionList.removeAll(deletionList);
         return actionList.size() != 0;
     }
-
-    public boolean runActions() { return runActions(null); }
 }
