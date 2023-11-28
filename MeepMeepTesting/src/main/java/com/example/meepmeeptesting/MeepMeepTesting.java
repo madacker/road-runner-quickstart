@@ -39,15 +39,12 @@ public class MeepMeepTesting {
                 false);
 
         if (true) {
-            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, 0))
-                    .lineToX(30)
-                    .turn(Math.toRadians(90))
-                    .lineToY(30)
-                    .turn(Math.toRadians(90))
-                    .lineToX(0)
-                    .turn(Math.toRadians(90))
-                    .lineToY(0)
-                    .turn(Math.toRadians(90))
+            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(90)))
+                    .splineToLinearHeading(new Pose2d(0, 48, Math.toRadians(-90)), Math.toRadians(90))
+                    .endTrajectory()
+                    .setTangent(Math.toRadians(-150))
+                    .splineToLinearHeading(new Pose2d(0, 24, Math.toRadians(180)), Math.toRadians(-30))
+                    .splineToLinearHeading(new Pose2d(0, 0, Math.toRadians(90)), Math.toRadians(-150))
                     .build());
         } else {
             MecanumDrive drive = new MecanumDrive(myBot.getDrive());
