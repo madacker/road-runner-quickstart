@@ -50,22 +50,26 @@ public class RoadRunnerTuner extends LinearOpMode {
         }
 
         // Button press status:
-        boolean select() { return buttonPress(gamepad1.a, 0); }
-        boolean cancel() { return buttonPress(gamepad1.b, 1); }
+        boolean select() {
+            // return buttonPress(gamepad1.a, 0);
+            boolean result = buttonPress(gamepad1.a, 0);
+            if (result)
+                System.out.println("A pressed!");
+            return result;
+        }
+        boolean cancel() {
+            // return buttonPress(gamepad1.b, 1);
+            boolean result = buttonPress(gamepad1.b, 1);
+            if (result)
+                System.out.println("B pressed!");
+            return result;
+        }
         boolean up() { return buttonPress(gamepad1.dpad_up, 2); }
         boolean down() { return buttonPress(gamepad1.dpad_down, 3); }
 
         // Display the menu:
         int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
             while (opModeIsActive()) {
-                if (header != null) {
-                    telemetry.addLine(header);
-                }
-                for (int i = 0; i < numStrings; i++) {
-                    String cursor = (i == current) ? "➤" : "  ";
-                    telemetry.addLine(cursor + menuStrings.getString(i));
-                }
-                telemetry.update();
                 if (up()) {
                     current--;
                     if (current < 0)
@@ -80,6 +84,16 @@ public class RoadRunnerTuner extends LinearOpMode {
                     return -1;
                 if (select())
                     return current;
+                if (header != null) {
+                    telemetry.addLine(header);
+                }
+                for (int i = 0; i < numStrings; i++) {
+                    String cursor = (i == current) ? "➤" : "\uD83D\uDC4C ";
+                    telemetry.addLine(cursor + menuStrings.getString(i));
+                }
+                telemetry.update();
+                // Sleep to allow other system processing (and ironically improve responsiveness):
+                sleep(10);
             }
             return topmost ? 0 : -1;
         }
@@ -102,9 +116,6 @@ public class RoadRunnerTuner extends LinearOpMode {
     }
 
     void localizerTest() {
-        ui.showMessage("Use the controller to drive the robot around. "
-                + "Press B to return to the main menu when done.");
-
         while (opModeIsActive() && !ui.cancel()) {
             PoseVelocity2d powers = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
@@ -114,6 +125,9 @@ public class RoadRunnerTuner extends LinearOpMode {
             drive.updatePoseEstimate();
 
             TelemetryPacket p = new TelemetryPacket();
+            ui.showMessage("Use the controller to drive the robot around. "
+                    + "Press B to return to the main menu when done.");
+
             Canvas c = p.fieldOverlay();
             c.setStroke("#3F51B5");
             MecanumDrive.drawRobot(c, drive.pose);
