@@ -49,20 +49,8 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         // Button press status:
-        boolean select() {
-            // return buttonPress(gamepad1.a, 0);
-            boolean result = buttonPress(gamepad1.a, 0);
-            if (result)
-                System.out.println("A pressed!");
-            return result;
-        }
-        boolean cancel() {
-            // return buttonPress(gamepad1.b, 1);
-            boolean result = buttonPress(gamepad1.b, 1);
-            if (result)
-                System.out.println("B pressed!");
-            return result;
-        }
+        boolean select() { return buttonPress(gamepad1.a, 0); }
+        boolean cancel() { return buttonPress(gamepad1.b, 1); }
         boolean up() { return buttonPress(gamepad1.dpad_up, 2); }
         boolean down() { return buttonPress(gamepad1.dpad_down, 3); }
 
@@ -308,8 +296,7 @@ public class TuneRoadRunner extends LinearOpMode {
                     .setTangent(Math.toRadians(-180))
                     .splineToLinearHeading(new Pose2d(0, 0, Math.toRadians(-0.0001)), Math.toRadians(-180))
                     .build();
-            if (!runCancelableAction(action))
-                return; // Exit when cancelled
+            runCancelableAction(action);
         }
     }
 
