@@ -314,6 +314,17 @@ public class TuneRoadRunner extends LinearOpMode {
         // Send telemetry to both FTC Dashboard and the Driver Station:
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
+        // If the Odometry constants haven't been initialized yet, set them to temporary values
+        // so that a robot pose (even if it's off) shows on FTC Dashboard's field:
+        if ((MecanumDrive.PARAMS.inPerTick == 0) ||
+            (MecanumDrive.PARAMS.lateralInPerTick == 1) ||
+            (MecanumDrive.PARAMS.trackWidthTicks == 0)) {
+
+            MecanumDrive.PARAMS.inPerTick = 0.1;
+            MecanumDrive.PARAMS.lateralInPerTick = 0.1;
+            MecanumDrive.PARAMS.trackWidthTicks = 100;
+        }
+
         // Initialize member fields:
         drive = new MecanumDrive(hardwareMap, defaultPose);
         ui = new Ui();
