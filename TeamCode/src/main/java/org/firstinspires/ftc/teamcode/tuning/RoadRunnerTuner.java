@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.tuning;
 
 import static com.acmerobotics.roadrunner.Profiles.constantProfile;
-import static com.acmerobotics.roadrunner.Profiles.profile;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
@@ -100,7 +99,7 @@ public class RoadRunnerTuner extends LinearOpMode {
             }
             return false;
         }
-    };
+    }
 
     void localizerTest() {
         ui.showMessage("Use the controller to drive the robot around. "
@@ -288,12 +287,12 @@ public class RoadRunnerTuner extends LinearOpMode {
 
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
-        tests.add(new Test(()->localizerTest(),             "Manual LocalizerTest (drive)"));
-        tests.add(new Test(()->lateralInPerTickTuner(),     "Manual lateral tuner (lateralInPerTick)"));
-        tests.add(new Test(()->manualFeedforwardTuner(),    "ManualFeedforwardTuner (kV and kS)"));
-        tests.add(new Test(()->manualFeedbackTunerAxial(),  "ManualFeedbackTuner (axialGain)"));
-        tests.add(new Test(()->manualFeedbackTunerLateral(),"ManualFeedbackTuner (lateralGain)"));
-        tests.add(new Test(()->manualFeedbackTunerHeading(),"ManualFeedbackTuner (headingGain)"));
+        tests.add(new Test(this::localizerTest,             "Manual LocalizerTest (drive)"));
+        tests.add(new Test(this::lateralInPerTickTuner,     "Manual lateral tuner (lateralInPerTick)"));
+        tests.add(new Test(this::manualFeedforwardTuner,    "ManualFeedforwardTuner (kV and kS)"));
+        tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
+        tests.add(new Test(this::manualFeedbackTunerLateral,"ManualFeedbackTuner (lateralGain)"));
+        tests.add(new Test(this::manualFeedbackTunerHeading,"ManualFeedbackTuner (headingGain)"));
 
         telemetry.addLine("Press START to begin");
         waitForStart();
