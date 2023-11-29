@@ -579,8 +579,6 @@ public final class MecanumDrive {
         );
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
     // List of currently running Actions:
     LinkedList<Action> actionList = new LinkedList<>();
 

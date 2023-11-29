@@ -4,6 +4,7 @@ import static java.lang.System.nanoTime;
 
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.noahbres.meepmeep.MeepMeep;
@@ -38,7 +39,7 @@ public class MeepMeepTesting {
                 DriveTrainType.MECANUM,
                 false);
 
-        if (true) {
+        if (false) {
 //            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(0)))
 //                    .splineToLinearHeading(new Pose2d(48, 0, Math.toRadians(-180)), Math.toRadians(0))
 //                    .endTrajectory()
@@ -164,8 +165,7 @@ class AutonDriveFactory {
         if (placePurplePixelAction != null) {
             build = build.stopAndAdd(placePurplePixelAction);
         } else {
-//            Action sleep = new SleepAction(3);
-//            build = build.stopAndAdd(sleep);
+            build = build.stopAndAdd(new SleepAction(3));
         }
 
         xformOffsetX = 0;
