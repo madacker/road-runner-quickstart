@@ -139,7 +139,7 @@ public class TuneRoadRunner extends LinearOpMode {
     // from its hardcoded 64".
     void manualFeedforwardTuner() {
         if (!ui.readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
-                + "Tune 'kV' and 'kS' using FTC Dashboard."
+                + "Tune 'kV' and 'kA' using FTC Dashboard."
                 + "\n\nPress A to start, B to stop", DISTANCE)))
             return;
 
@@ -318,17 +318,6 @@ public class TuneRoadRunner extends LinearOpMode {
         // Send telemetry to both FTC Dashboard and the Driver Station:
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
-        // If the Odometry constants haven't been initialized yet, set them to temporary values
-        // so that a robot pose (even if it's off) shows on FTC Dashboard's field:
-        if ((MecanumDrive.PARAMS.inPerTick == 0) ||
-            (MecanumDrive.PARAMS.lateralInPerTick == 1) ||
-            (MecanumDrive.PARAMS.trackWidthTicks == 0)) {
-
-            MecanumDrive.PARAMS.inPerTick = 0.1;
-            MecanumDrive.PARAMS.lateralInPerTick = 0.1;
-            MecanumDrive.PARAMS.trackWidthTicks = 100;
-        }
-
         // Initialize member fields:
         drive = new MecanumDrive(hardwareMap, defaultPose);
         ui = new Ui();
@@ -337,7 +326,7 @@ public class TuneRoadRunner extends LinearOpMode {
         ArrayList<Test> tests = new ArrayList<>();
         tests.add(new Test(this::localizerTest,             "Manual LocalizerTest (drive)"));
         tests.add(new Test(this::lateralInPerTickTuner,     "Manual lateral tuner (lateralInPerTick)"));
-        tests.add(new Test(this::manualFeedforwardTuner,    "ManualFeedforwardTuner (kV and kS)"));
+        tests.add(new Test(this::manualFeedforwardTuner,    "ManualFeedforwardTuner (kV and kA)"));
         tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
         tests.add(new Test(this::manualFeedbackTunerLateral,"ManualFeedbackTuner (lateralGain)"));
         tests.add(new Test(this::manualFeedbackTunerHeading,"ManualFeedbackTuner (headingGain)"));

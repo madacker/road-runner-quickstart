@@ -238,13 +238,23 @@ public final class MecanumDrive {
             module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
         }
 
-        leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
-        leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
-        rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
-        rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+        if (isDevBot) {
+            leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
+            leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
+            rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
+            rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
 
-        leftFront.setDirection(DcMotorEx.Direction.REVERSE);
-        leftBack.setDirection(DcMotorEx.Direction.REVERSE);
+            leftFront.setDirection(DcMotorEx.Direction.REVERSE);
+            leftBack.setDirection(DcMotorEx.Direction.REVERSE);
+        } else {
+            leftFront = hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder");
+            leftBack = hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder");
+            rightBack = hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder");
+            rightFront = hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder");
+
+            leftBack.setDirection(DcMotorEx.Direction.REVERSE);
+            rightBack.setDirection(DcMotorEx.Direction.REVERSE);
+        }
 
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -252,15 +262,27 @@ public final class MecanumDrive {
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         imu = hardwareMap.get(IMU.class, "imu");
-        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+        IMU.Parameters parameters;
+        if (isDevBot) {
+            parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+                    RevHubOrientationOnRobot.LogoFacingDirection.UP,
+                    RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+        } else {
+            parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+                    RevHubOrientationOnRobot.LogoFacingDirection.DOWN,
+                    RevHubOrientationOnRobot.UsbFacingDirection.BACKWARD));
+        }
         imu.initialize(parameters);
 
         voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
-        localizer = new DriveLocalizer();
-        localizer2 = new DriveLocalizer();
+        if (isDevBot) {
+            localizer = new DriveLocalizer();
+            localizer2 = new DriveLocalizer();
+        } else {
+            localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
+            localizer2 = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
+        }
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
     }
