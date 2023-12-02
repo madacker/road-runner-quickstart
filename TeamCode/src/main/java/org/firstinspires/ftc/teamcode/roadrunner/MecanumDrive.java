@@ -112,9 +112,9 @@ public final class MecanumDrive {
                 kA = 0;
 
                 // path controller gains
-                axialGain = 0.0;
-                lateralGain = 0.0;
-                headingGain = 0.0; // shared with turn
+                axialGain = 10.0;
+                lateralGain = 6.0;
+                headingGain = 2.0; // shared with turn
             }
 
             // path profile parameters (in inches)
