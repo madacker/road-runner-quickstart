@@ -103,7 +103,7 @@ public final class MecanumDrive {
             } else { // Homebot
                 // drive model parameters
                 inPerTick = 0.000543924757075271254143176860534; // 96 / 176495
-                lateralInPerTick = 0.000543924757075271254143176860534; // @@@
+                lateralInPerTick = 0.0004651536802430201;
                 trackWidthTicks = 26810.36979257466;
 
                 // feedforward parameters (in tick units)

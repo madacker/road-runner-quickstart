@@ -16,7 +16,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
-    boolean USE_BACK_ENCODER = false;
+    final public boolean USE_BACK_ENCODER = true;
 
     public static class Params {
         public double par0YTicks = -7503.0095770759635; // y position of the first parallel encoder (in tick units)
@@ -34,7 +34,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
 
     public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
         // Turning loopiness caused by:
-        //   o Perpendicular wheel is reversed (when fixed, perpXTicks because positive)
+        //   o Direction of perpendicular wheel and sign of "perpXTicks" are inconsistent
         if (USE_BACK_ENCODER) {
             // We:
             //  o Flipped right and left encoders
@@ -71,6 +71,8 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         int par1PosDelta = par1PosVel.position - lastPar1Pos;
         int perpPosDelta = perpPosVel.position - lastPerpPos;
 
+        double angleSign = (USE_BACK_ENCODER) ? -1.0 : 1.0;
+
         Twist2dDual<Time> twist = new Twist2dDual<>(
                 new Vector2dDual<>(
                         new DualNum<Time>(new double[] {
@@ -83,8 +85,8 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
                         }).times(inPerTick)
                 ),
                 new DualNum<>(new double[] {
-                        (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                        (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                        angleSign * (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                        angleSign * (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
                 })
         );
 
