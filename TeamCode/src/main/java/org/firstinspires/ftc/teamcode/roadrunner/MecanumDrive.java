@@ -100,11 +100,11 @@ public final class MecanumDrive {
                 axialGain = 20.0;
                 lateralGain = 8.0;
                 headingGain = 8.0; // shared with turn
-            } else {
+            } else { // Homebot
                 // drive model parameters
-                inPerTick = 0;
-                lateralInPerTick = 1;
-                trackWidthTicks = 0;
+                inPerTick = 0.000543924757075271254143176860534; // 96 / 176495
+                lateralInPerTick = 0.000543924757075271254143176860534; // @@@
+                trackWidthTicks = 10; // @@@
 
                 // feedforward parameters (in tick units)
                 kS = 0;

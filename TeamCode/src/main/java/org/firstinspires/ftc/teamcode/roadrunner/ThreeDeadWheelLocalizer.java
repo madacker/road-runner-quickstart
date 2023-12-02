@@ -17,8 +17,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
     public static class Params {
-        public double par0YTicks = 10000.0; // y position of the first parallel encoder (in tick units)
-        public double par1YTicks = -10000.0; // y position of the second parallel encoder (in tick units)
+        public double par0YTicks = -10000.0; // y position of the first parallel encoder (in tick units)
+        public double par1YTicks = 10000.0; // y position of the second parallel encoder (in tick units)
         public double perpXTicks = 10000.0; // x position of the perpendicular encoder (in tick units)
     }
 
@@ -31,11 +31,23 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
     private int lastPar0Pos, lastPar1Pos, lastPerpPos;
 
     public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
-        par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
-        par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-        perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder")));
-
-        par0.setDirection(DcMotorSimple.Direction.REVERSE);
+        boolean USE_BACK_ENCODER = true;
+        if (USE_BACK_ENCODER) {
+            // We:
+            //  o Flipped right and left encoders
+            //  o Reversed the *other* parallel encoder
+            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
+            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+            par0.setDirection(DcMotorSimple.Direction.REVERSE);
+        } else {
+            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
+            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+            // Road Runner wants the left and right encoders to return negative ticks in the raw view when moving forward!
+            // The perpendicular increases as expected though
+            par1.setDirection(DcMotorSimple.Direction.REVERSE);
+        }
 
         lastPar0Pos = par0.getPositionAndVelocity().position;
         lastPar1Pos = par1.getPositionAndVelocity().position;
