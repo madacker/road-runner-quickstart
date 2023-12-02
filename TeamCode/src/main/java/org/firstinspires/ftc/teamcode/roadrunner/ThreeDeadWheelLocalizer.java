@@ -16,10 +16,12 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
+    boolean USE_BACK_ENCODER = false;
+
     public static class Params {
-        public double par0YTicks = -10000.0; // y position of the first parallel encoder (in tick units)
-        public double par1YTicks = 10000.0; // y position of the second parallel encoder (in tick units)
-        public double perpXTicks = 10000.0; // x position of the perpendicular encoder (in tick units)
+        public double par0YTicks = -7503.0095770759635; // y position of the first parallel encoder (in tick units)
+        public double par1YTicks = 7314.3664886289025; // y position of the second parallel encoder (in tick units)
+        public double perpXTicks = 11199.62940916759; // x position of the perpendicular encoder (in tick units)
     }
 
     public static Params PARAMS = new Params();
@@ -31,7 +33,8 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
     private int lastPar0Pos, lastPar1Pos, lastPerpPos;
 
     public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
-        boolean USE_BACK_ENCODER = true;
+        // Turning loopiness caused by:
+        //   o Perpendicular wheel is reversed (when fixed, perpXTicks because positive)
         if (USE_BACK_ENCODER) {
             // We:
             //  o Flipped right and left encoders
@@ -47,6 +50,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
             // Road Runner wants the left and right encoders to return negative ticks in the raw view when moving forward!
             // The perpendicular increases as expected though
             par1.setDirection(DcMotorSimple.Direction.REVERSE);
+            perp.setDirection(DcMotorSimple.Direction.REVERSE);
         }
 
         lastPar0Pos = par0.getPositionAndVelocity().position;
