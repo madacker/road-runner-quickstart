@@ -77,9 +77,7 @@ class AutoParker {
 
 class Wall {
     final double WALL_Y = 48;
-    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, TelemetryPacket packet) {
-        Canvas canvas = packet.fieldOverlay();
-
+    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, TelemetryPacket packet, Canvas canvas) {
         double distanceToWall = WALL_Y - drive.pose.position.y;
 
         // Calculate the maximum speed directly towards the wall assuming constant
@@ -95,10 +93,13 @@ class Wall {
         // Counteract the excess approach speed:
         Vector2d counterVelocity = new Vector2d(0, -excessApproachSpeed);
 
-        packet.put("excessSpeed", excessApproachSpeed); // @@@
-        packet.put("counterVelocity", counterVelocity); // @@@
+        packet.put("distanceToWall", distanceToWall);
+        packet.put("velocity", drive.poseVelocity.linearVel.y);
+        packet.put("maxApproachSpeed", maxApproachSpeed); // @@@
+        packet.put("excessApproachSpeed", excessApproachSpeed); // @@@
 
-        drive.setDrivePowers(manualPower, null, null);
+        // drive.setDrivePowers(manualPower, null, null);
+        drive.setDrivePowers(manualPower, new PoseVelocity2d(new Vector2d(0, -2), 0), null);
         // drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
 
         // Draw the wall if it's been activated:
@@ -126,7 +127,7 @@ public class Driver extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
-        AutoParker park = new AutoParker();
+        AutoParker parker = new AutoParker();
         Wall wall = new Wall();
         startupTime.endSplit();
 
@@ -152,10 +153,10 @@ public class Driver extends LinearOpMode {
             // park.park(drive, packet, canvas); // @@@
 
             if (gamepad1.a) {
-                park.park(drive, packet, canvas);
+                parker.park(drive, packet, canvas);
             } else {
-                drive.setDrivePowers(manualPower);
-                // wall.setDrivePowers(drive, manualPower, packet);
+                // drive.setDrivePowers(manualPower);
+                wall.setDrivePowers(drive, manualPower, packet, canvas);
             }
 
             // Draw the uncorrected reference pose:
