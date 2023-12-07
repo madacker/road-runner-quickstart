@@ -76,7 +76,7 @@ class AutoParker {
 }
 
 class Wall {
-    final double WALL_Y = 48;
+    final double WALL_Y = 24;
     void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, TelemetryPacket packet, Canvas canvas) {
         double distanceToWall = WALL_Y - drive.pose.position.y;
 
@@ -87,20 +87,23 @@ class Wall {
         double maxApproachSpeed = Math.signum(distanceToWall)
                 * Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel * distanceToWall));
 
+        // Convert the velocity to be field-relative:
+        PoseVelocity2d poseVelocity = drive.pose.times(drive.poseVelocity);
+
         // Compute how much faster it's going toward the wall than it should:
-        double excessApproachSpeed = Math.max(drive.poseVelocity.linearVel.y - maxApproachSpeed, 0);
+        double excessApproachSpeed = Math.max(poseVelocity.linearVel.y - maxApproachSpeed, 0);
 
         // Counteract the excess approach speed:
         Vector2d counterVelocity = new Vector2d(0, -excessApproachSpeed);
 
         packet.put("distanceToWall", distanceToWall);
-        packet.put("velocity", drive.poseVelocity.linearVel.y);
+        packet.put("velocity", poseVelocity.linearVel.y);
         packet.put("maxApproachSpeed", maxApproachSpeed); // @@@
         packet.put("excessApproachSpeed", excessApproachSpeed); // @@@
 
         // drive.setDrivePowers(manualPower, null, null);
-        drive.setDrivePowers(manualPower, new PoseVelocity2d(new Vector2d(0, -2), 0), null);
-        // drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
+        // drive.setDrivePowers(manualPower, new PoseVelocity2d(new Vector2d(0, -2), 0), null);
+        drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
 
         // Draw the wall if it's been activated:
         if (excessApproachSpeed > 0) {
