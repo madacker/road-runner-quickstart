@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
@@ -27,7 +28,7 @@ class AutoParker {
         return velocity.times(speed / vectorMagnitude);
     }
 
-    void park(MecanumDrive drive, TelemetryPacket packet, Canvas canvas) {
+    void park(MecanumDrive drive, double deltaT, TelemetryPacket packet, Canvas canvas) {
         // @@@ Need to figure out stopping
 
         // Calculate the vector from the current position to the target:
@@ -56,22 +57,31 @@ class AutoParker {
         // Calculate the perpendicular velocity vector (velocity tangent to our target):
         Vector2d perpVelocity = poseVelocity.linearVel.minus(radialVelocity);
 
+        packet.put("perpVelocity before", perpVelocity);
+        packet.put("radialVelocit beforey", radialVelocity);
+
         // Subtract velocity from the perpendicular velocity vector and add it to the
         // radial vector:
-        perpVelocity = addVelocity(perpVelocity, drive.PARAMS.minProfileAccel, 0, approachSpeed);
-        radialVelocity = addVelocity(radialVelocity, drive.PARAMS.maxProfileAccel, -drive.PARAMS.maxWheelVel, approachSpeed);
+        perpVelocity = addVelocity(perpVelocity, drive.PARAMS.minProfileAccel * deltaT, 0, approachSpeed);
+        radialVelocity = addVelocity(radialVelocity, drive.PARAMS.maxProfileAccel * deltaT, -drive.PARAMS.maxWheelVel, approachSpeed);
 
         // Add the component vectors to get our new velocity vector:
         Vector2d driveVelocity = perpVelocity.plus(radialVelocity);
 
         // TODO: Supply acceleration to improve feedforward approximation
-        // @@@ drive.setDrivePowers(null, new PoseVelocity2d(driveVelocity, 0), null);
+        drive.setDrivePowers(null, new PoseVelocity2d(driveVelocity, 0), null);
 
         // Draw the perpendicular vector in red, the radial vector in green:
+        canvas.setStrokeWidth(1);
         canvas.setStroke("#FF0000");
-        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, perpVelocity.x, perpVelocity.y);
+        if (!Double.isNaN(perpVelocity.x) && !Double.isNaN(perpVelocity.y))
+            canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, perpVelocity.x, perpVelocity.y);
         canvas.setStroke("#00FF00");
-        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
+        if (!Double.isNaN(radialVelocity.x) && !Double.isNaN(radialVelocity.y))
+            canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
+
+        packet.put("perpVelocity after", perpVelocity);
+        packet.put("radialVelocity after", radialVelocity);
     }
 }
 
@@ -133,10 +143,12 @@ public class Driver extends LinearOpMode {
         AutoParker parker = new AutoParker();
         Wall wall = new Wall();
         startupTime.endSplit();
+        double lastTime = Actions.now();
 
         waitForStart();
 
         while (opModeIsActive()) {
+
             loopTime.startSplit();
 
             // Update the telemetry pose and update the LED loop:
@@ -147,19 +159,22 @@ public class Driver extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket();
             Canvas canvas = packet.fieldOverlay();
 
-            // Handle input:
+            // Calculate delta-t:
+            double newTime = Actions.now();
+            double deltaT = newTime - lastTime;
+            lastTime = newTime;
 
+
+            // Handle input:
             PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
                     stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
                     stickShaper(-gamepad1.right_stick_x));
 
-            // park.park(drive, packet, canvas); // @@@
-
             if (gamepad1.a) {
-                parker.park(drive, packet, canvas);
+                parker.park(drive, deltaT, packet, canvas);
             } else {
-                // drive.setDrivePowers(manualPower);
-                wall.setDrivePowers(drive, manualPower, packet, canvas);
+                drive.setDrivePowers(manualPower);
+                // wall.setDrivePowers(drive, manualPower, packet, canvas);
             }
 
             // Draw the uncorrected reference pose:
