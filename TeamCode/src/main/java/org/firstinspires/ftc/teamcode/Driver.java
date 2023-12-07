@@ -75,6 +75,27 @@ class AutoPark {
     }
 }
 
+class Wall {
+    final double WALL_Y = 48;
+    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, Canvas canvas) {
+        double distanceToWall = WALL_Y - drive.pose.position.y;
+        // @@@ Gotta handle negative distance:
+        double maxApproachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distanceToWall);
+        double excessApproachSpeed = Math.max(drive.poseVelocity.linearVel.y - maxApproachSpeed, 0);
+
+        // Counteract the excess approach speed:
+        Vector2d counterVelocity = new Vector2d(0, -excessApproachSpeed);
+
+        drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
+
+        // Draw the wall if it's been activated:
+        if (excessApproachSpeed > 0) {
+            canvas.setStroke("#0000FF");
+            canvas.strokeLine(-72, WALL_Y, 72, WALL_Y);
+        }
+    }
+}
+
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
     // Provide more precision for slight stick movements:
@@ -93,6 +114,7 @@ public class Driver extends LinearOpMode {
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
         AutoPark park = new AutoPark();
+        Wall wall = new Wall();
         startupTime.endSplit();
 
         waitForStart();
@@ -110,18 +132,17 @@ public class Driver extends LinearOpMode {
 
             // Handle input:
 
+            PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
+                    stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
+                    stickShaper(-gamepad1.right_stick_x));
+
             park.park(drive, canvas); // @@@
 
             if (gamepad1.a) {
                 // park.park(drive, canvas);
             } else {
-                drive.setDrivePowers(new PoseVelocity2d(
-                        new Vector2d(
-                                stickShaper(-gamepad1.left_stick_y),
-                                stickShaper(-gamepad1.left_stick_x)
-                        ),
-                        stickShaper(-gamepad1.right_stick_x)
-                ));
+                // drive.setDrivePowers(manualPower);
+                wall.setDrivePowers(drive, manualPower, canvas);
             }
 
             // Draw the uncorrected reference pose:
