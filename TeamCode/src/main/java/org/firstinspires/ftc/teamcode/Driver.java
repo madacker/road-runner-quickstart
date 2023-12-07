@@ -12,7 +12,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
-class AutoPark {
+class AutoParker {
     // Target pose:
     final Pose2d target = new Pose2d(0, 0, 0);
 
@@ -27,7 +27,7 @@ class AutoPark {
         return velocity.times(speed / vectorMagnitude);
     }
 
-    void park(MecanumDrive drive, Canvas canvas) {
+    void park(MecanumDrive drive, TelemetryPacket packet, Canvas canvas) {
         // @@@ Need to figure out stopping
 
         // Calculate the vector from the current position to the target:
@@ -77,16 +77,29 @@ class AutoPark {
 
 class Wall {
     final double WALL_Y = 48;
-    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, Canvas canvas) {
+    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, TelemetryPacket packet) {
+        Canvas canvas = packet.fieldOverlay();
+
         double distanceToWall = WALL_Y - drive.pose.position.y;
-        // @@@ Gotta handle negative distance:
-        double maxApproachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distanceToWall);
+
+        // Calculate the maximum speed directly towards the wall assuming constant
+        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
+        // current velocity, u is the initial velocity, a is the acceleration, s is distance
+        // traveled. Handle negative distances:
+        double maxApproachSpeed = Math.signum(distanceToWall)
+                * Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel * distanceToWall));
+
+        // Compute how much faster it's going toward the wall than it should:
         double excessApproachSpeed = Math.max(drive.poseVelocity.linearVel.y - maxApproachSpeed, 0);
 
         // Counteract the excess approach speed:
         Vector2d counterVelocity = new Vector2d(0, -excessApproachSpeed);
 
-        drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
+        packet.put("excessSpeed", excessApproachSpeed); // @@@
+        packet.put("counterVelocity", counterVelocity); // @@@
+
+        drive.setDrivePowers(manualPower, null, null);
+        // drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
 
         // Draw the wall if it's been activated:
         if (excessApproachSpeed > 0) {
@@ -113,7 +126,7 @@ public class Driver extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
-        AutoPark park = new AutoPark();
+        AutoParker park = new AutoParker();
         Wall wall = new Wall();
         startupTime.endSplit();
 
@@ -136,13 +149,13 @@ public class Driver extends LinearOpMode {
                     stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
                     stickShaper(-gamepad1.right_stick_x));
 
-            park.park(drive, canvas); // @@@
+            // park.park(drive, packet, canvas); // @@@
 
             if (gamepad1.a) {
-                // park.park(drive, canvas);
+                park.park(drive, packet, canvas);
             } else {
-                // drive.setDrivePowers(manualPower);
-                wall.setDrivePowers(drive, manualPower, canvas);
+                drive.setDrivePowers(manualPower);
+                // wall.setDrivePowers(drive, manualPower, packet);
             }
 
             // Draw the uncorrected reference pose:
