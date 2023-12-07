@@ -9,6 +9,7 @@ import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
@@ -58,7 +59,7 @@ class Mechanisms {
     }
 }
 
-@TeleOp(name="Auton", group="Aardvark")
+@Autonomous(name="Auton", group="Aardvark")
 public class Auton extends LinearOpMode {
 
     @Override
@@ -66,23 +67,19 @@ public class Auton extends LinearOpMode {
         // The pose given here is a placeholder until we reset it below:
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
-        Mechanisms mechanisms = new Mechanisms(hardwareMap);
-        Action ledAction = mechanisms.getLedAction();
-
-        AutonDriveFactory auton = new AutonDriveFactory(drive);
-        AutonDriveFactory.AutonDriveInfo autonInfo = auton.get(true, true,
-                AutonDriveFactory.PROP_POSITION.LEFT, null, null); //  ledAction, ledAction);
-        drive.pose = autonInfo.startPose; // Reset the pose here
-
         waitForStart();
 
-        if (false) {
-            drive.runParallel(ledAction);
-            while (opModeIsActive() &&  drive.doActionsWork())
-                ;
-        } else {
-            Actions.runBlocking(autonInfo.action);
-        }
+        Pose2d startPose1 = new Pose2d(-36, -60, Math.toRadians(90));
+        Pose2d startPose2 = new Pose2d(-36, -60, Math.toRadians(90));
+        Pose2d startPose3 = new Pose2d(-36, -60, Math.toRadians(90));
+
+        drive.pose = startPose1;
+        Actions.runBlocking(drive.actionBuilder(startPose2)
+                .splineToLinearHeading(new Pose2d(-39, -36, Math.toRadians(90)), Math.toRadians(90))
+                .turn(Math.toRadians(360))
+                .setTangent(Math.toRadians(-90))
+                .splineToLinearHeading(startPose3, Math.toRadians(-90))
+                .build());
     }
 }
 

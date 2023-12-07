@@ -22,8 +22,8 @@ public class LocalizationTest extends LinearOpMode {
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
                     -gamepad1.right_stick_x);
 
-            drive.setDrivePowers(powers);
             drive.updatePoseEstimate();
+            drive.setDrivePowers(powers);
 
             telemetry.addData("x", drive.pose.position.x);
             telemetry.addData("y", drive.pose.position.y);

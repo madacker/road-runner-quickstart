@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.roadrunner;
 
+import static java.lang.Math.max;
+
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -41,6 +43,7 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.inspection.InspectionState;
 
@@ -155,7 +158,9 @@ public final class MecanumDrive {
 
     public final Localizer localizer;
     public final Localizer localizer2;
+
     public Pose2d pose;
+    public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
     public Pose2d pose2;
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
@@ -293,7 +298,7 @@ public final class MecanumDrive {
 
         double maxPowerMag = 1;
         for (DualNum<Time> power : wheelVels.all()) {
-            maxPowerMag = Math.max(maxPowerMag, power.value());
+            maxPowerMag = max(maxPowerMag, power.value());
         }
 
         leftFront.setPower(wheelVels.leftFront.get(0) / maxPowerMag);
@@ -301,6 +306,72 @@ public final class MecanumDrive {
         rightBack.setPower(wheelVels.rightBack.get(0) / maxPowerMag);
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
+
+    public void setDrivePowers(
+            PoseVelocity2d manualPowers, // Can be null
+            PoseVelocity2d assistVelocity, // Can be null
+            PoseVelocity2d assistAcceleration) { // Yes it's abusing 'PoseVelocity2d' for acceleration
+
+        if (manualPowers == null)
+            manualPowers = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        if (assistVelocity == null)
+            assistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        if (assistAcceleration == null)
+            assistAcceleration = new PoseVelocity2d(new Vector2d(0, 0), 0);
+
+        // Compute the wheel powers for the manual contribution:
+        MecanumKinematics.WheelVelocities<Time> manualVels = new MecanumKinematics(1).inverse(
+                PoseVelocity2dDual.constant(manualPowers, 1));
+
+        double leftFrontPower = manualVels.leftFront.get(0);
+        double leftBackPower = manualVels.leftBack.get(0);
+        double rightBackPower = manualVels.rightBack.get(0);
+        double rightFrontPower = manualVels.rightFront.get(0);
+
+        // Compute the wheel powers for the assist:
+        double[] x = { pose.position.x, assistVelocity.linearVel.x, assistAcceleration.linearVel.x };
+        double[] y = { pose.position.y, assistVelocity.linearVel.y, assistAcceleration.linearVel.y };
+        double[] angular = { pose.heading.log(), assistVelocity.angVel, assistAcceleration.angVel };
+
+        Pose2dDual<Time> assistDualPose = new Pose2dDual<>(
+                new Vector2dDual<>(new DualNum<>(x), new DualNum<>(y)),
+                Rotation2dDual.exp(new DualNum<>(angular))
+        );
+
+        // Disable the PID part of the PIDF for the assist:
+        PoseVelocity2dDual<Time> command = new HolonomicController(0, 0, 0)
+                .compute(assistDualPose, pose, poseVelocity);
+
+        MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
+        double voltage = voltageSensor.getVoltage();
+        final MotorFeedforward feedforward = new MotorFeedforward(
+                PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
+        );
+
+        // Check for zero velocities and accelerations to avoid adding 'kS'. Arguably these
+        // should be epsilon compares but equality is fine for checking when the assist is
+        // disabled:
+        if ((assistVels.leftFront.get(0) != 0) || (assistVels.leftFront.get(1) != 0))
+            leftFrontPower += feedforward.compute(assistVels.leftFront) / voltage;
+
+        if ((assistVels.leftBack.get(0) != 0) || (assistVels.leftBack.get(1) != 0))
+            leftBackPower += feedforward.compute(assistVels.leftBack) / voltage;
+
+        if ((assistVels.rightBack.get(0) != 0) || (assistVels.rightBack.get(1) != 0))
+            rightBackPower += feedforward.compute(assistVels.rightBack) / voltage;
+
+        if ((assistVels.rightFront.get(0) != 0) || (assistVels.rightFront.get(0) != 0))
+            rightFrontPower += feedforward.compute(assistVels.rightFront) / voltage;
+
+        // Normalize if any powers are more than 1:
+        double maxPower = max(max(max(max(1, leftFrontPower), leftBackPower), rightBackPower), rightFrontPower);
+
+        leftFront.setPower(leftFrontPower / maxPower);
+        leftBack.setPower(leftBackPower / maxPower);
+        rightBack.setPower(rightBackPower / maxPower);
+        rightFront.setPower(rightFrontPower / maxPower);
+    }
+
 
     /**
      * Set the drive motor powers according to both user input and automated assist.
@@ -311,7 +382,10 @@ public final class MecanumDrive {
      * @param assist - Velocities as specified by automation. It's in ft/s and radians/s and
      *                 in field-relative coordinates.
      */
-    public void setAssistedDrivePowersAndUpdatePose(Telemetry telemetry, PoseVelocity2d manual, PoseVelocity2d assist)
+    public void setAssistedDrivePowersAndUpdatePose(
+            Telemetry telemetry,
+            PoseVelocity2d manual,
+            PoseVelocity2d assist)
     {
         // First calculate the motor voltages considering only the user input. This code is
         // derived from 'setDrivePowers':
@@ -320,7 +394,7 @@ public final class MecanumDrive {
 
         double maxPowerMag = 1;
         for (DualNum<Time> power : wheelVels.all()) {
-            maxPowerMag = Math.max(maxPowerMag, power.value());
+            maxPowerMag = max(maxPowerMag, power.value());
         }
 
         // @@@ Move this normalization to the combined version
@@ -381,7 +455,7 @@ public final class MecanumDrive {
 
             List<Double> disps = com.acmerobotics.roadrunner.Math.range(
                     0, t.path.length(),
-                    Math.max(2, (int) Math.ceil(t.path.length() / 2)));
+                    max(2, (int) Math.ceil(t.path.length() / 2)));
             xPoints = new double[disps.size()];
             yPoints = new double[disps.size()];
             for (int i = 0; i < disps.size(); i++) {
@@ -555,7 +629,8 @@ public final class MecanumDrive {
 
         FlightRecorder.write("ESTIMATED_POSE", new PoseMessage(pose));
 
-        return twist.velocity().value();
+        poseVelocity = twist.velocity().value();
+        return poseVelocity;
     }
 
     private void drawPoseHistory(Canvas c) {

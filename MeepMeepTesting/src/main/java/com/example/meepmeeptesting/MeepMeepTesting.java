@@ -39,22 +39,13 @@ public class MeepMeepTesting {
                 DriveTrainType.MECANUM,
                 false);
 
-        if (false) {
-//            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(0)))
-//                    .splineToLinearHeading(new Pose2d(48, 0, Math.toRadians(-180)), Math.toRadians(0))
-//                    .endTrajectory()
-//                    .setTangent(Math.toRadians(-240))
-//                    .splineToLinearHeading(new Pose2d(24, 0, Math.toRadians(90)), Math.toRadians(-120))
-//                    .splineToLinearHeading(new Pose2d(0, 0, Math.toRadians(0)), Math.toRadians(-240))
-//                    .build());
-
-            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(0)))
-                    .setTangent(Math.toRadians(60))
-                    .splineToLinearHeading(new Pose2d(24, 0, Math.toRadians(90)), Math.toRadians(-60))
-                    .splineToLinearHeading(new Pose2d(48, 0, Math.toRadians(180)), Math.toRadians(60))
-                    .endTrajectory()
-                    .setTangent(Math.toRadians(-180))
-                    .splineToLinearHeading(new Pose2d(0, 0, Math.toRadians(-0.0001)), Math.toRadians(-180))
+        if (true) {
+            Pose2d startPose = new Pose2d(-36, -60, Math.toRadians(90));
+            myBot.runAction(myBot.getDrive().actionBuilder(startPose)
+                    .splineToLinearHeading(new Pose2d(-39, -36, Math.toRadians(90)), Math.toRadians(90))
+                    .turn(Math.toRadians(360))
+                    .setTangent(Math.toRadians(-90))
+                    .splineToLinearHeading(startPose, Math.toRadians(-90))
                     .build());
 
         } else {
