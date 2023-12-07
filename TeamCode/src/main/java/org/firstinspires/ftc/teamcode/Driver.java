@@ -16,7 +16,7 @@ class AutoPark {
     // Target pose:
     final Pose2d target = new Pose2d(0, 0, 0);
 
-    // Increase a velocity vector by a specified acceleration amount, capping it to a range:
+    // Increase a velocity vector by a specified acceleration amount, clamping it to a range:
     Vector2d addVelocity(Vector2d velocity, double acceleration, double minSpeed, double maxSpeed) {
         double vectorMagnitude = Math.sqrt(velocity.sqrNorm());
         double speed = vectorMagnitude + acceleration;
@@ -28,6 +28,8 @@ class AutoPark {
     }
 
     void park(MecanumDrive drive, Canvas canvas) {
+        // @@@ Need to figure out stopping
+
         // Calculate the vector from the current position to the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
 
@@ -35,40 +37,41 @@ class AutoPark {
         double distanceToTarget = Math.sqrt(radialVector.sqrNorm());
 
         // Calculate the maximum speed directly towards the target assuming constant
-        // deceleration:
-        double approachSpeed = Math.sqrt(2*Math.abs(drive.PARAMS.minProfileAccel)*distanceToTarget);
+        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
+        // current velocity, u is the initial velocity, a is the acceleration, s is distance
+        // traveled. We apply it in reverse:
+        double approachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distanceToTarget);
 
         // Clamp the approach speed to the maximum speed:
-        if (approachSpeed > drive.PARAMS.maxWheelVel)
-            approachSpeed = drive.PARAMS.maxWheelVel;
+        approachSpeed = Math.min(approachSpeed, drive.PARAMS.maxWheelVel);
 
         // Convert the velocity to be field-relative:
         PoseVelocity2d poseVelocity = drive.pose.times(drive.poseVelocity);
 
         // Compute the radial vector component of the current velocity (projection of
         // 'poseVelocity.linearVel' onto 'radialVector'):
-        Vector2d radialVelocity = radialVector.times(poseVelocity.linearVel.dot(radialVector)
-                                / radialVector.sqrNorm());
+        Vector2d radialVelocity = radialVector.times(
+                poseVelocity.linearVel.dot(radialVector) / radialVector.sqrNorm());
 
         // Calculate the perpendicular velocity vector (velocity tangent to our target):
         Vector2d perpVelocity = poseVelocity.linearVel.minus(radialVelocity);
 
-        perpVelocity = addVelocity(
-                perpVelocity,
-                drive.PARAMS.minProfileAccel,
-                0,
-                approachSpeed);
-        radialVelocity = addVelocity(
-                radialVelocity,
-                drive.PARAMS.maxProfileAccel,
-                -drive.PARAMS.maxWheelVel,
-                approachSpeed);
+        // Subtract velocity from the perpendicular velocity vector and add it to the
+        // radial vector:
+        perpVelocity = addVelocity(perpVelocity, drive.PARAMS.minProfileAccel, 0, approachSpeed);
+        radialVelocity = addVelocity(radialVelocity, drive.PARAMS.maxProfileAccel, -drive.PARAMS.maxWheelVel, approachSpeed);
 
         // Add the component vectors to get our new velocity vector:
         Vector2d driveVelocity = perpVelocity.plus(radialVelocity);
 
-        // @@@ Need to supply acceleration
-        drive.setDrivePowers(null, new PoseVelocity2d(driveVelocity, 0), null);
+        // TODO: Supply acceleration to improve feedforward approximation
+        // @@@ drive.setDrivePowers(null, new PoseVelocity2d(driveVelocity, 0), null);
+
+        // Draw the perpendicular vector in red, the radial vector in green:
+        canvas.setStroke("#FF0000");
+        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, perpVelocity.x, perpVelocity.y);
+        canvas.setStroke("#00FF00");
+        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
     }
 }
 
@@ -106,8 +109,11 @@ public class Driver extends LinearOpMode {
             Canvas canvas = packet.fieldOverlay();
 
             // Handle input:
+
+            park.park(drive, canvas); // @@@
+
             if (gamepad1.a) {
-                park.park(drive, canvas);
+                // park.park(drive, canvas);
             } else {
                 drive.setDrivePowers(new PoseVelocity2d(
                         new Vector2d(
