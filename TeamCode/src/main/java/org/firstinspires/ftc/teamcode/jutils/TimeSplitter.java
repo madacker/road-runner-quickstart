@@ -50,6 +50,7 @@ public class TimeSplitter {
         return x / (1000.0 * 1000.0);
     }
     String description;
+    boolean log;
     int n;
     int startGcCount;
     int totalGcCount;
@@ -68,8 +69,9 @@ public class TimeSplitter {
      * @param description of this time-split. This is private and for internal use only. Call
      *                    the public (and static) create() function from external code.
      */
-    private TimeSplitter(String description) {
+    private TimeSplitter(String description, boolean log) {
         this.description = description;
+        this.log = log;
     }
     /**
      * Debug.getThreadGcInvocationCount() and Debug.startAllocCounting() were deprecated in API
@@ -126,8 +128,10 @@ public class TimeSplitter {
     }
     // Log the results:
     private void logResult(TelemetryPacket packet) {
-        Log.d("TimeSplitter", this.description + " " + getResult());
-        packet.put(this.description, getResult());
+        if (log) {
+            Log.d("TimeSplitter", this.description + " " + getResult());
+            packet.put(this.description, getResult());
+        }
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Static methods
@@ -138,7 +142,10 @@ public class TimeSplitter {
      * @return TimeSplitter object.
      */
     synchronized public static TimeSplitter create(String description) {
-        TimeSplitter self = new TimeSplitter(description);
+        return create(description, true);
+    }
+    synchronized public static TimeSplitter create(String description, boolean log) {
+        TimeSplitter self = new TimeSplitter(description, log);
         TimeSplitter.list.add(self);
         return self;
     }

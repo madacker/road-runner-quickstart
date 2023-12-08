@@ -43,7 +43,6 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.inspection.InspectionState;
 
@@ -157,15 +156,10 @@ public final class MecanumDrive {
     public final IMU imu;
 
     public final Localizer localizer;
-    public final Localizer localizer2;
-
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
-
-    public TimeSplitter loopTime = TimeSplitter.create("Loop time");
-    public TimeSplitter localizerTime = TimeSplitter.create("Localizer time");
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -282,10 +276,8 @@ public final class MecanumDrive {
 
         if (isDevBot) {
             localizer = new DriveLocalizer();
-            localizer2 = new DriveLocalizer();
         } else {
             localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
-            localizer2 = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
         }
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
@@ -305,6 +297,9 @@ public final class MecanumDrive {
         rightBack.setPower(wheelVels.rightBack.get(0) / maxPowerMag);
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
+
+    TimeSplitter voltageTime = TimeSplitter.create("> getVoltage");
+    TimeSplitter powerTime = TimeSplitter.create("> setPower");
 
     public void setDrivePowers(
             PoseVelocity2d manualPowers, // Can be null
@@ -342,7 +337,11 @@ public final class MecanumDrive {
                 .compute(assistDualPose, pose, poseVelocity);
 
         MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
+
+        voltageTime.startSplit();
         double voltage = voltageSensor.getVoltage();
+        voltageTime.endSplit();
+
         final MotorFeedforward feedforward = new MotorFeedforward(
                 PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
         );
@@ -366,10 +365,12 @@ public final class MecanumDrive {
         double maxPower = max(max(max(max(1, leftFrontPower), leftBackPower), rightBackPower), rightFrontPower);
 
         // Set the power to the motors:
+        powerTime.startSplit();
         leftFront.setPower(leftFrontPower / maxPower);
         leftBack.setPower(leftBackPower / maxPower);
         rightBack.setPower(rightBackPower / maxPower);
         rightFront.setPower(rightFrontPower / maxPower);
+        powerTime.endSplit();
     }
 
 
@@ -601,13 +602,8 @@ public final class MecanumDrive {
     }
 
     public PoseVelocity2d updatePoseEstimate() {
-        loopTime.endSplit();
-        loopTime.startSplit();
-
-        localizerTime.startSplit();
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
-        localizerTime.endSplit();
 
         poseHistory.add(pose);
         while (poseHistory.size() > 100) {

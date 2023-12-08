@@ -7,6 +7,7 @@ import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -21,6 +22,9 @@ class AutoParker {
     Vector2d tangentVector;          // Normalized version of original tangent vector
     double radialSpeed;              // Inches/s, can be negative
     double tangentSpeed;             // Inches/s, can be negative
+
+    TimeSplitter parkTime = TimeSplitter.create("> Park");
+    TimeSplitter parkPowerTime = TimeSplitter.create("> Park Power");
 
     AutoParker(MecanumDrive drive, Pose2d target) {
         this.drive = drive;
@@ -58,7 +62,9 @@ class AutoParker {
 
     // Returns true when parked, false when not parked yet:
     boolean park(TelemetryPacket packet) {
-        Canvas canvas = packet.fieldOverlay();
+        parkTime.startSplit();
+
+//        Canvas canvas = packet.fieldOverlay();
 
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
@@ -72,7 +78,7 @@ class AutoParker {
         double now = Actions.now();
         double deltaT = now - previousTime;
 
-        packet.put("deltaT", deltaT);
+//        packet.put("deltaT", deltaT);
 
         // Decrease the magnitude of the tangent speed with a minimum value of zero:
         double tangentMagnitude = Math.max(0,
@@ -109,27 +115,31 @@ class AutoParker {
                 velocity.linearVel.y - previousVelocity.linearVel.y),
                 velocity.angVel - previousVelocity.angVel);
 
+        parkPowerTime.startSplit();
         drive.setDrivePowers(null, velocity, acceleration);
+        parkPowerTime.endSplit();
 
         // Remember stuff for the next iteration:
         previousVelocity = velocity;
         previousTime = now;
 
         // Draw the perpendicular vector in red, the radial vector in green:
-        canvas.setStrokeWidth(1);
-        canvas.setStroke("#FF0000");
-        canvas.strokeLine(
-                drive.pose.position.x,
-                drive.pose.position.y,
-                drive.pose.position.x + tangentVelocity.x,
-                drive.pose.position.y + tangentVelocity.y);
+//        canvas.setStrokeWidth(1);
+//        canvas.setStroke("#FF0000");
+//        canvas.strokeLine(
+//                drive.pose.position.x,
+//                drive.pose.position.y,
+//                drive.pose.position.x + tangentVelocity.x,
+//                drive.pose.position.y + tangentVelocity.y);
+//
+//        canvas.setStroke("#00FF00");
+//        canvas.strokeLine(
+//                drive.pose.position.x,
+//                drive.pose.position.y,
+//                drive.pose.position.x + radialVelocity.x,
+//                drive.pose.position.y + radialVelocity.y);
 
-        canvas.setStroke("#00FF00");
-        canvas.strokeLine(
-                drive.pose.position.x,
-                drive.pose.position.y,
-                drive.pose.position.x + radialVelocity.x,
-                drive.pose.position.y + radialVelocity.y);
+        parkTime.endSplit();
 
         return true;
     }
@@ -144,8 +154,14 @@ public class Driver extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        TimeSplitter startupTime = TimeSplitter.create("Startup time");
-        TimeSplitter loopTime = TimeSplitter.create("Loop time");
+        TimeSplitter startupTime = TimeSplitter.create("> Startup", false);
+        TimeSplitter endTime = TimeSplitter.create("> End", false);
+        TimeSplitter loopTime = TimeSplitter.create("> Loop");
+        TimeSplitter poseTime = TimeSplitter.create("> Pose");
+        TimeSplitter refineTime = TimeSplitter.create("> Refine");
+        TimeSplitter driveTime = TimeSplitter.create("> Drive");
+        TimeSplitter autoTime = TimeSplitter.create("> Auto");
+        TimeSplitter ledTime = TimeSplitter.create("> Led");
 
         startupTime.startSplit();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
@@ -154,15 +170,28 @@ public class Driver extends LinearOpMode {
         startupTime.endSplit();
         AutoParker parker = null;
 
+        // for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+        //     module.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        // }
+
         waitForStart();
 
         while (opModeIsActive()) {
 
+            // for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+            //     module.clearBulkCache();
+            // }
+
             loopTime.startSplit();
 
             // Update the telemetry pose and update the LED loop:
+            poseTime.startSplit();
             drive.updatePoseEstimate();
+            poseTime.endSplit();
+
+            ledTime.startSplit();
             led.update();
+            ledTime.endSplit();
 
             // Set up for visualizations:
             TelemetryPacket packet = new TelemetryPacket();
@@ -179,25 +208,35 @@ public class Driver extends LinearOpMode {
             else {
                 if (parker == null)
                     parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+
+                autoTime.startSplit();
                 autoActivated = parker.park(packet);
+                autoTime.endSplit();
             }
 
-            if (!autoActivated)
+            if (!autoActivated) {
+                driveTime.startSplit();
                 drive.setDrivePowers(manualPower);
+                driveTime.endSplit();
+            }
 
             // Draw AprilTag poses and refine them:
+            refineTime.startSplit();
             Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
             if (refinedPose != null) {
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
                 drive.pose = refinedPose;
             }
+            refineTime.endSplit();
 
             // Draw the best estimate pose:
+            endTime.startSplit();
             canvas.setStroke("#3F51B5");
             MecanumDrive.drawRobot(canvas, drive.pose);
-
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            endTime.endSplit();
+
             loopTime.endSplit();
         }
 
