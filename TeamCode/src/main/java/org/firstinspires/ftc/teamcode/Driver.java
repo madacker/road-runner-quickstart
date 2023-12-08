@@ -17,19 +17,34 @@ class AutoParker {
     // Target pose:
     final Pose2d target = new Pose2d(0, 0, 0);
 
+    // Our current velocity:
+    PoseVelocity2d velocity;
+
+    // @@@ Debugging only:
+    boolean busted = false;
+
     // Increase a velocity vector by a specified acceleration amount, clamping it to a range:
-    Vector2d addVelocity(Vector2d velocity, double acceleration, double minSpeed, double maxSpeed) {
-        double vectorMagnitude = Math.sqrt(velocity.sqrNorm());
-        double speed = vectorMagnitude + acceleration;
+    Vector2d addVelocity(Vector2d direction, Vector2d velocity, double acceleration, double minSpeed, double maxSpeed) {
+        double speed = velocity.norm() + acceleration;
         if (speed < minSpeed)
             speed = minSpeed;
         if (speed > maxSpeed)
             speed = maxSpeed;
-        return velocity.times(speed / vectorMagnitude);
+        double directionLength = direction.norm();
+        if (directionLength == 0)
+            return new Vector2d(0, 0);
+        else
+            return direction.div(directionLength).times(speed);
+    }
+
+    void dontPark() {
+        velocity = null;
     }
 
     void park(MecanumDrive drive, double deltaT, TelemetryPacket packet, Canvas canvas) {
         // @@@ Need to figure out stopping
+        if (busted)
+            return; // @@@
 
         // Calculate the vector from the current position to the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
@@ -46,42 +61,54 @@ class AutoParker {
         // Clamp the approach speed to the maximum speed:
         approachSpeed = Math.min(approachSpeed, drive.PARAMS.maxWheelVel);
 
-        // Convert the velocity to be field-relative:
-        PoseVelocity2d poseVelocity = drive.pose.times(drive.poseVelocity);
+        // When starting to park, inherit the velocity vector from the driver. Convert it
+        // to be field-relative:
+        if (velocity == null) {
+            velocity = drive.pose.times(drive.poseVelocity);
+        }
 
         // Compute the radial vector component of the current velocity (projection of
         // 'poseVelocity.linearVel' onto 'radialVector'):
         Vector2d radialVelocity = radialVector.times(
-                poseVelocity.linearVel.dot(radialVector) / radialVector.sqrNorm());
+                velocity.linearVel.dot(radialVector) / radialVector.sqrNorm());
 
         // Calculate the perpendicular velocity vector (velocity tangent to our target):
-        Vector2d perpVelocity = poseVelocity.linearVel.minus(radialVelocity);
-
-        packet.put("perpVelocity before", perpVelocity);
-        packet.put("radialVelocit beforey", radialVelocity);
+        Vector2d perpVelocity = velocity.linearVel.minus(radialVelocity);
 
         // Subtract velocity from the perpendicular velocity vector and add it to the
         // radial vector:
-        perpVelocity = addVelocity(perpVelocity, drive.PARAMS.minProfileAccel * deltaT, 0, approachSpeed);
-        radialVelocity = addVelocity(radialVelocity, drive.PARAMS.maxProfileAccel * deltaT, -drive.PARAMS.maxWheelVel, approachSpeed);
+        perpVelocity = addVelocity(perpVelocity, perpVelocity, drive.PARAMS.minProfileAccel * deltaT, 0, approachSpeed);
+
+        // @@@ Fix radial direction?
+        radialVelocity = addVelocity(radialVector, radialVelocity, drive.PARAMS.maxProfileAccel * deltaT, -drive.PARAMS.maxWheelVel, approachSpeed);
+
+        packet.put("distanceToTarget", distanceToTarget);
+        packet.put("approachSpeed", approachSpeed);
+        packet.put("radialVelocity", radialVelocity.norm());
+        packet.put("deltaT", deltaT);
 
         // Add the component vectors to get our new velocity vector:
-        Vector2d driveVelocity = perpVelocity.plus(radialVelocity);
+        PoseVelocity2d thisVelocity = new PoseVelocity2d(perpVelocity.plus(radialVelocity), 0);
 
         // TODO: Supply acceleration to improve feedforward approximation
-        drive.setDrivePowers(null, new PoseVelocity2d(driveVelocity, 0), null);
+        drive.setDrivePowers(null, thisVelocity, null);
 
         // Draw the perpendicular vector in red, the radial vector in green:
         canvas.setStrokeWidth(1);
         canvas.setStroke("#FF0000");
         if (!Double.isNaN(perpVelocity.x) && !Double.isNaN(perpVelocity.y))
             canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, perpVelocity.x, perpVelocity.y);
+        else
+            busted = true;
+
         canvas.setStroke("#00FF00");
         if (!Double.isNaN(radialVelocity.x) && !Double.isNaN(radialVelocity.y))
             canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
+        else
+            busted = true;
 
-        packet.put("perpVelocity after", perpVelocity);
-        packet.put("radialVelocity after", radialVelocity);
+        if (!Double.isNaN(thisVelocity.linearVel.x) && !Double.isNaN(thisVelocity.linearVel.y))
+            velocity = thisVelocity;
     }
 }
 
@@ -173,6 +200,7 @@ public class Driver extends LinearOpMode {
             if (gamepad1.a) {
                 parker.park(drive, deltaT, packet, canvas);
             } else {
+                parker.dontPark();
                 drive.setDrivePowers(manualPower);
                 // wall.setDrivePowers(drive, manualPower, packet, canvas);
             }
