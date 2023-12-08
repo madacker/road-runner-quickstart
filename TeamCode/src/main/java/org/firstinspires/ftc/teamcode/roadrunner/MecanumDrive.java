@@ -307,26 +307,17 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
-    class PoseAcceleration2d {
-        Vector2d linearAcc;
-        double angAcc;
-        public PoseAcceleration2d(Vector2d linearAcc, double angAcc) {
-            this.linearAcc = linearAcc;
-            this.angAcc = angAcc;
-        }
-    }
-
     public void setDrivePowers(
             PoseVelocity2d manualPowers, // Can be null
             PoseVelocity2d assistVelocity, // Can be null
-            PoseAcceleration2d assistAcceleration) { // Can be null
+            PoseVelocity2d assistAcceleration) { // Can be null
 
         if (manualPowers == null)
             manualPowers = new PoseVelocity2d(new Vector2d(0, 0), 0);
         if (assistVelocity == null)
             assistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
         if (assistAcceleration == null)
-            assistAcceleration = new PoseAcceleration2d(new Vector2d(0, 0), 0);
+            assistAcceleration = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
         // Compute the wheel powers for the manual contribution:
         MecanumKinematics.WheelVelocities<Time> manualVels = new MecanumKinematics(1).inverse(
@@ -338,9 +329,9 @@ public final class MecanumDrive {
         double rightFrontPower = manualVels.rightFront.get(0);
 
         // Compute the wheel powers for the assist:
-        double[] x = { pose.position.x, assistVelocity.linearVel.x, assistAcceleration.linearAcc.x };
-        double[] y = { pose.position.y, assistVelocity.linearVel.y, assistAcceleration.linearAcc.y };
-        double[] angular = { pose.heading.log(), assistVelocity.angVel, assistAcceleration.angAcc };
+        double[] x = { pose.position.x, assistVelocity.linearVel.x, assistAcceleration.linearVel.x };
+        double[] y = { pose.position.y, assistVelocity.linearVel.y, assistAcceleration.linearVel.y };
+        double[] angular = { pose.heading.log(), assistVelocity.angVel, assistAcceleration.angVel };
 
         Pose2dDual<Time> assistDualPose = new Pose2dDual<>(
                 new Vector2dDual<>(new DualNum<>(x), new DualNum<>(y)),

@@ -14,6 +14,130 @@ import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 class AutoParker {
+    MecanumDrive drive;              // Used to get pose and poseVelocity and set the motors
+    Pose2d target;                   // Target pose
+    double previousTime;             // Previous time in seconds
+    PoseVelocity2d previousVelocity; // Previous velocity
+    Vector2d tangentVector;          // Normalized version of original tangent vector
+    double radialSpeed;              // Inches/s, can be negative
+    double tangentSpeed;             // Inches/s, can be negative
+
+    AutoParker(MecanumDrive drive, Pose2d target) {
+        this.drive = drive;
+        this.target = target;
+
+        // Remember the time:
+        this.previousTime = Actions.now();
+
+        // Radial vector towards the target:
+        Vector2d radialVector = target.position.minus(drive.pose.position);
+
+        // Tangent vector -90 degrees from radial:
+        tangentVector = new Vector2d(radialVector.y, -radialVector.x);
+
+        // Normalize the tangent:
+        tangentVector = tangentVector.div(tangentVector.norm());
+
+        // Convert the velocity to field-relative coordinates:
+        PoseVelocity2d velocity = drive.pose.times(drive.poseVelocity);
+
+        // Remember it:
+        previousVelocity = velocity;
+
+        // Compute the current speed:
+        double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
+
+        // Compute the angle from the current velocity direction to the target:
+        double theta = Math.atan2(target.position.y, target.position.x)
+                     - Math.atan2(tangentVector.y, tangentVector.x);
+
+        // Compute the component speeds:
+        tangentSpeed = Math.sin(theta) * speed;
+        radialSpeed = Math.cos(theta) * speed;
+
+        // If the radial velocity is current away from the robot, negate it:
+        if (theta > Math.PI)
+            theta -= 2*Math.PI;
+        if (Math.abs(theta) > Math.PI/2)
+            radialSpeed = -radialSpeed;
+    }
+
+    // Returns true when parked, false when not parked yet:
+    boolean park(TelemetryPacket packet, Canvas canvas) {
+        double now = Actions.now();
+        double deltaT = now - previousTime;
+
+        // Radial vector towards the target:
+        Vector2d radialVector = target.position.minus(drive.pose.position);
+        double radialDistance = radialVector.norm();
+
+        // Decrease the magnitude of the tangent speed with a minimum value of zero:
+        double tangentMagnitude = Math.max(0,
+                Math.abs(tangentSpeed) + drive.PARAMS.minProfileAccel * deltaT);
+
+        // Convert to the signed tangent speed:
+        tangentSpeed = Math.signum(tangentSpeed) * tangentMagnitude;
+
+        // Increase the speed towards the target:
+        double increasingRadialSpeed = radialSpeed + drive.PARAMS.maxProfileAccel * deltaT;
+
+        // Compute the maximum possible speed towards the target, accounting for the speed along
+        // the tangent:
+        double maxRadialSpeed = Math.hypot(tangentSpeed, drive.PARAMS.maxWheelVel);
+
+        // Calculate the maximum speed directly towards the target assuming constant
+        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
+        // current velocity, u is the initial velocity, a is the acceleration, s is distance
+        // traveled. We apply it in reverse:
+        double approachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * radialDistance);
+
+        // Set the new radial speed as the minimum of the three:
+        radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), approachSpeed);
+
+        Vector2d radialVelocity = radialVector.div(radialVector.norm()).times(radialSpeed);
+        Vector2d tangentVelocity = tangentVector.times(tangentSpeed);
+
+        // Add the component velocities to get our new velocity:
+        PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), 0);
+
+        // Compute the new accelerations from the velocities:
+        PoseVelocity2d acceleration = new PoseVelocity2d(new Vector2d(
+                velocity.linearVel.x - previousVelocity.linearVel.x,
+                velocity.linearVel.y - previousVelocity.linearVel.y),
+                velocity.angVel - previousVelocity.angVel);
+
+        // @@@ drive.setDrivePowers(null, velocity, acceleration);
+
+        // Remember stuff for the next iteration:
+        previousVelocity = velocity;
+        previousTime = now;
+
+        // Draw the perpendicular vector in red, the radial vector in green:
+        canvas.setStrokeWidth(1);
+        canvas.setStroke("#FF0000");
+        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, tangentVelocity.x, tangentVelocity.y);
+
+        canvas.setStroke("#00FF00");
+        canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
+
+        packet.put("tangentSpeed", tangentSpeed);
+        packet.put("radialSpeed", radialSpeed);
+
+        return false; // @@@
+    }
+}
+
+//class AutoBackdrop extends AutoParker {
+//    AutoBackdrop(MecanumDrive drive, Pose2d offsetPose, Pose2d placementPose) {
+//        super(drive, offsetPose);
+//    }
+//
+//    boolean iterate(TelemetryPacket packet, Canvas canvas) {
+//        return super.park(packet, canvas);
+//    }
+//}
+
+class AutoParkerOld {
     // Target pose:
     final Pose2d target = new Pose2d(0, 0, 0);
 
@@ -112,44 +236,6 @@ class AutoParker {
     }
 }
 
-class Wall {
-    final double WALL_Y = 24;
-    void setDrivePowers(MecanumDrive drive, PoseVelocity2d manualPower, TelemetryPacket packet, Canvas canvas) {
-        double distanceToWall = WALL_Y - drive.pose.position.y;
-
-        // Calculate the maximum speed directly towards the wall assuming constant
-        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
-        // current velocity, u is the initial velocity, a is the acceleration, s is distance
-        // traveled. Handle negative distances:
-        double maxApproachSpeed = Math.signum(distanceToWall)
-                * Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel * distanceToWall));
-
-        // Convert the velocity to be field-relative:
-        PoseVelocity2d poseVelocity = drive.pose.times(drive.poseVelocity);
-
-        // Compute how much faster it's going toward the wall than it should:
-        double excessApproachSpeed = Math.max(poseVelocity.linearVel.y - maxApproachSpeed, 0);
-
-        // Counteract the excess approach speed:
-        Vector2d counterVelocity = new Vector2d(0, -excessApproachSpeed);
-
-        packet.put("distanceToWall", distanceToWall);
-        packet.put("velocity", poseVelocity.linearVel.y);
-        packet.put("maxApproachSpeed", maxApproachSpeed); // @@@
-        packet.put("excessApproachSpeed", excessApproachSpeed); // @@@
-
-        // drive.setDrivePowers(manualPower, null, null);
-        // drive.setDrivePowers(manualPower, new PoseVelocity2d(new Vector2d(0, -2), 0), null);
-        drive.setDrivePowers(manualPower, new PoseVelocity2d(counterVelocity, 0), null);
-
-        // Draw the wall if it's been activated:
-        if (excessApproachSpeed > 0) {
-            canvas.setStroke("#0000FF");
-            canvas.strokeLine(-72, WALL_Y, 72, WALL_Y);
-        }
-    }
-}
-
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
     // Provide more precision for slight stick movements:
@@ -167,10 +253,9 @@ public class Driver extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
-        AutoParker parker = new AutoParker();
-        Wall wall = new Wall();
         startupTime.endSplit();
         double lastTime = Actions.now();
+        AutoParker parker = null;
 
         waitForStart();
 
@@ -191,19 +276,21 @@ public class Driver extends LinearOpMode {
             double deltaT = newTime - lastTime;
             lastTime = newTime;
 
-
             // Handle input:
             PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
                     stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
                     stickShaper(-gamepad1.right_stick_x));
 
-            if (gamepad1.a) {
-                parker.park(drive, deltaT, packet, canvas);
-            } else {
-                parker.dontPark();
-                drive.setDrivePowers(manualPower);
-                // wall.setDrivePowers(drive, manualPower, packet, canvas);
+            boolean onAuto = false;
+            if ((gamepad1.a) && (parker == null))
+                parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+            if (parker != null) {
+                onAuto = parker.park(packet, canvas);
+                if (!onAuto)
+                    parker = null;
             }
+            // @@@ Check if 'onAuto'
+            drive.setDrivePowers(manualPower);
 
             // Draw the uncorrected reference pose:
             canvas.setStroke("#a0a0a0");
