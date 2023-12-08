@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import static java.lang.Double.MAX_VALUE;
 import static java.lang.System.nanoTime;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+
 /**
  * Incremental standard deviation courtesy of
  * <a href="https://stackoverflow.com/questions/1174984/how-to-efficiently-calculate-a-running-standard-deviation">StackOverflow</a>.
@@ -122,8 +125,9 @@ public class TimeSplitter {
         }
     }
     // Log the results:
-    private void logResult() {
+    private void logResult(TelemetryPacket packet) {
         Log.d("TimeSplitter", this.description + " " + getResult());
+        packet.put(this.description, getResult());
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Static methods
@@ -142,9 +146,11 @@ public class TimeSplitter {
      * Log the results for *all* TimeSplitter objects that were created.
      */
     synchronized public static void logAllResults() {
+        TelemetryPacket packet = new TelemetryPacket();
         for (TimeSplitter t: TimeSplitter.list) {
-            t.logResult();
+            t.logResult(packet);
         }
+        FtcDashboard.getInstance().sendTelemetryPacket(packet);
     }
 }
 

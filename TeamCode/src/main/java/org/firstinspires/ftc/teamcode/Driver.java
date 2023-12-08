@@ -79,6 +79,8 @@ class AutoParker {
         double now = Actions.now();
         double deltaT = now - previousTime;
 
+        packet.put("deltaT", deltaT);
+
         // Decrease the magnitude of the tangent speed with a minimum value of zero:
         double tangentMagnitude = Math.max(0,
                 Math.abs(tangentSpeed) + drive.PARAMS.minProfileAccel * deltaT);
@@ -136,121 +138,9 @@ class AutoParker {
                 drive.pose.position.x + radialVelocity.x,
                 drive.pose.position.y + radialVelocity.y);
 
-        packet.put("tangentSpeed", tangentSpeed);
-        packet.put("radialSpeed", radialSpeed);
-
-        return true; // @@@
+        return true;
     }
 }
-
-//class AutoBackdrop extends AutoParker {
-//    AutoBackdrop(MecanumDrive drive, Pose2d offsetPose, Pose2d placementPose) {
-//        super(drive, offsetPose);
-//    }
-//
-//    boolean iterate(TelemetryPacket packet, Canvas canvas) {
-//        return super.park(packet, canvas);
-//    }
-//}
-
-//class AutoParkerOld {
-//    // Target pose:
-//    final Pose2d target = new Pose2d(0, 0, 0);
-//
-//    // Our current velocity:
-//    PoseVelocity2d velocity;
-//
-//    // @@@ Debugging only:
-//    boolean busted = false;
-//
-//    // Increase a velocity vector by a specified acceleration amount, clamping it to a range:
-//    Vector2d addVelocity(Vector2d direction, Vector2d velocity, double acceleration, double minSpeed, double maxSpeed) {
-//        double speed = velocity.norm() + acceleration;
-//        if (speed < minSpeed)
-//            speed = minSpeed;
-//        if (speed > maxSpeed)
-//            speed = maxSpeed;
-//        double directionLength = direction.norm();
-//        if (directionLength == 0)
-//            return new Vector2d(0, 0);
-//        else
-//            return direction.div(directionLength).times(speed);
-//    }
-//
-//    void dontPark() {
-//        velocity = null;
-//    }
-//
-//    void park(MecanumDrive drive, double deltaT, TelemetryPacket packet, Canvas canvas) {
-//        // @@@ Need to figure out stopping
-//        if (busted)
-//            return; // @@@
-//
-//        // Calculate the vector from the current position to the target:
-//        Vector2d radialVector = target.position.minus(drive.pose.position);
-//
-//        // Calculate distance to the target:
-//        double distanceToTarget = Math.sqrt(radialVector.sqrNorm());
-//
-//        // Calculate the maximum speed directly towards the target assuming constant
-//        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
-//        // current velocity, u is the initial velocity, a is the acceleration, s is distance
-//        // traveled. We apply it in reverse:
-//        double approachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distanceToTarget);
-//
-//        // Clamp the approach speed to the maximum speed:
-//        approachSpeed = Math.min(approachSpeed, drive.PARAMS.maxWheelVel);
-//
-//        // When starting to park, inherit the velocity vector from the driver. Convert it
-//        // to be field-relative:
-//        if (velocity == null) {
-//            velocity = drive.pose.times(drive.poseVelocity);
-//        }
-//
-//        // Compute the radial vector component of the current velocity (projection of
-//        // 'poseVelocity.linearVel' onto 'radialVector'):
-//        Vector2d radialVelocity = radialVector.times(
-//                velocity.linearVel.dot(radialVector) / radialVector.sqrNorm());
-//
-//        // Calculate the perpendicular velocity vector (velocity tangent to our target):
-//        Vector2d perpVelocity = velocity.linearVel.minus(radialVelocity);
-//
-//        // Subtract velocity from the perpendicular velocity vector and add it to the
-//        // radial vector:
-//        perpVelocity = addVelocity(perpVelocity, perpVelocity, drive.PARAMS.minProfileAccel * deltaT, 0, approachSpeed);
-//
-//        // @@@ Fix radial direction?
-//        radialVelocity = addVelocity(radialVector, radialVelocity, drive.PARAMS.maxProfileAccel * deltaT, -drive.PARAMS.maxWheelVel, approachSpeed);
-//
-//        packet.put("distanceToTarget", distanceToTarget);
-//        packet.put("approachSpeed", approachSpeed);
-//        packet.put("radialVelocity", radialVelocity.norm());
-//        packet.put("deltaT", deltaT);
-//
-//        // Add the component vectors to get our new velocity vector:
-//        PoseVelocity2d thisVelocity = new PoseVelocity2d(perpVelocity.plus(radialVelocity), 0);
-//
-//        // TODO: Supply acceleration to improve feedforward approximation
-//        drive.setDrivePowers(null, thisVelocity, null);
-//
-//        // Draw the perpendicular vector in red, the radial vector in green:
-//        canvas.setStrokeWidth(1);
-//        canvas.setStroke("#FF0000");
-//        if (!Double.isNaN(perpVelocity.x) && !Double.isNaN(perpVelocity.y))
-//            canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, perpVelocity.x, perpVelocity.y);
-//        else
-//            busted = true;
-//
-//        canvas.setStroke("#00FF00");
-//        if (!Double.isNaN(radialVelocity.x) && !Double.isNaN(radialVelocity.y))
-//            canvas.strokeLine(drive.pose.position.x, drive.pose.position.y, radialVelocity.x, radialVelocity.y);
-//        else
-//            busted = true;
-//
-//        if (!Double.isNaN(thisVelocity.linearVel.x) && !Double.isNaN(thisVelocity.linearVel.y))
-//            velocity = thisVelocity;
-//    }
-//}
 
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
@@ -263,7 +153,6 @@ public class Driver extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         TimeSplitter startupTime = TimeSplitter.create("Startup time");
         TimeSplitter loopTime = TimeSplitter.create("Loop time");
-        boolean initializedPose = false;
 
         startupTime.startSplit();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
@@ -291,10 +180,6 @@ public class Driver extends LinearOpMode {
                     stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
                     stickShaper(-gamepad1.right_stick_x));
 
-//            parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
-//            parker.park(packet, canvas);
-//            parker = null;
-
             boolean autoActivated = false;
             if (!gamepad1.a)
                 parker = null;
@@ -307,24 +192,12 @@ public class Driver extends LinearOpMode {
             if (!autoActivated)
                 drive.setDrivePowers(manualPower);
 
-            // Draw the uncorrected reference pose:
-            canvas.setStroke("#a0a0a0");
-            MecanumDrive.drawRobot(canvas, drive.pose2);
-
             // Draw AprilTag poses and refine them:
             Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
             if (refinedPose != null) {
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
                 drive.pose = refinedPose;
-
-                // Pose2 is used to evaluate drift over the course of a driving session.
-                // It starts the same as the initial pose set but is never again updated
-                // by the pose refinement:
-                if (!initializedPose) {
-                    drive.pose2 = refinedPose;
-                    initializedPose = true;
-                }
             }
 
             // Draw the best estimate pose:

@@ -161,11 +161,11 @@ public final class MecanumDrive {
 
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
-    public Pose2d pose2;
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
 
     public TimeSplitter loopTime = TimeSplitter.create("Loop time");
+    public TimeSplitter localizerTime = TimeSplitter.create("Localizer time");
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -235,7 +235,6 @@ public final class MecanumDrive {
 
     public MecanumDrive(HardwareMap hardwareMap, Pose2d pose) {
         this.pose = pose;
-        this.pose2 = pose;
 
         LynxFirmware.throwIfModulesAreOutdated(hardwareMap);
 
@@ -506,21 +505,9 @@ public final class MecanumDrive {
 
             FlightRecorder.write("TARGET_POSE", new PoseMessage(txWorldTarget.value()));
 
-            p.put("x", pose.position.x);
-            p.put("y", pose.position.y);
-            p.put("heading (deg)", Math.toDegrees(pose.heading.log()));
-
-            Pose2d error = txWorldTarget.value().minusExp(pose);
-            p.put("xError", error.position.x);
-            p.put("yError", error.position.y);
-            p.put("headingError (deg)", Math.toDegrees(error.heading.log()));
-
             // only draw when active; only one drive action should be active at a time
             Canvas c = p.fieldOverlay();
             drawPoseHistory(c);
-
-            c.setStroke("#404040");
-            drawRobot(c, pose2, 4); // Draw pure odometry pose
 
             c.setStroke("#4CAF50");
             drawRobot(c, txWorldTarget.value()); // Draw target pose
@@ -617,11 +604,10 @@ public final class MecanumDrive {
         loopTime.endSplit();
         loopTime.startSplit();
 
+        localizerTime.startSplit();
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
-
-        Twist2dDual<Time> twist2 = localizer2.update(); // Update pure odometry pose
-        pose2 = pose2.plus(twist2.value());
+        localizerTime.endSplit();
 
         poseHistory.add(pose);
         while (poseHistory.size() > 100) {
