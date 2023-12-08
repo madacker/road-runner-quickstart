@@ -47,22 +47,21 @@ class AutoParker {
         // Compute the current speed:
         double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
 
-        // Compute the angle from the current radial direction to the target:
+        // Compute the angle from the robot's current direction to the target:
         double theta = Math.atan2(radialVector.y, radialVector.x)
-                     - Math.atan2(tangentVector.y, tangentVector.x);
+                     - Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
+
+        if (Double.isNaN(theta)) {
+            packet.put("!!!!!!!!!! Bad theta!", 1);
+            theta = 0;
+        }
 
         // Compute the component speeds:
         tangentSpeed = Math.sin(theta) * speed;
         radialSpeed = Math.cos(theta) * speed;
 
-        // If the radial velocity is current away from the robot, negate it:
-        if (theta > Math.PI)
-            theta -= 2*Math.PI;
-        if (Math.abs(theta) > Math.PI/2)
-            radialSpeed = -radialSpeed;
-
         packet.put("theta", Math.toDegrees(theta));
-        packet.put("initial radialSpeed", radialSpeed);
+        packet.put("fixed radialSpeed", radialSpeed);
         packet.put("initial tangentSpeed", tangentSpeed);
     }
 
@@ -80,7 +79,6 @@ class AutoParker {
 
         double now = Actions.now();
         double deltaT = now - previousTime;
-
 
         // Decrease the magnitude of the tangent speed with a minimum value of zero:
         double tangentMagnitude = Math.max(0,
