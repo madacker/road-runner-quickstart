@@ -22,7 +22,7 @@ class AutoParker {
     double radialSpeed;              // Inches/s, can be negative
     double tangentSpeed;             // Inches/s, can be negative
 
-    AutoParker(MecanumDrive drive, Pose2d target, TelemetryPacket packet) {
+    AutoParker(MecanumDrive drive, Pose2d target) {
         this.drive = drive;
         this.target = target;
 
@@ -51,22 +51,15 @@ class AutoParker {
         double theta = Math.atan2(radialVector.y, radialVector.x)
                      - Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
 
-        if (Double.isNaN(theta)) {
-            packet.put("!!!!!!!!!! Bad theta!", 1);
-            theta = 0;
-        }
-
         // Compute the component speeds:
         tangentSpeed = Math.sin(theta) * speed;
         radialSpeed = Math.cos(theta) * speed;
-
-        packet.put("theta", Math.toDegrees(theta));
-        packet.put("fixed radialSpeed", radialSpeed);
-        packet.put("initial tangentSpeed", tangentSpeed);
     }
 
     // Returns true when parked, false when not parked yet:
-    boolean park(TelemetryPacket packet, Canvas canvas) {
+    boolean park(TelemetryPacket packet) {
+        Canvas canvas = packet.fieldOverlay();
+
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
         double radialDistance = radialVector.norm();
@@ -185,8 +178,8 @@ public class Driver extends LinearOpMode {
                 parker = null;
             else {
                 if (parker == null)
-                    parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
-                autoActivated = parker.park(packet, canvas);
+                    parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+                autoActivated = parker.park(packet);
             }
 
             if (!autoActivated)
