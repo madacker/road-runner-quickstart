@@ -67,15 +67,14 @@ class AutoParker {
 
     // Returns true when parked, false when not parked yet:
     boolean park(TelemetryPacket packet, Canvas canvas) {
-        // @@@ If with epsilon, return false!
-
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
         double radialDistance = radialVector.norm();
 
         // We're done if the distance is small enough!
-        if (radialDistance == 0)
-            return false; // @@@
+        // @@@ Check heading too
+        if (radialDistance < 0.5)
+            return false;
 
         double now = Actions.now();
         double deltaT = now - previousTime;
@@ -115,7 +114,7 @@ class AutoParker {
                 velocity.linearVel.y - previousVelocity.linearVel.y),
                 velocity.angVel - previousVelocity.angVel);
 
-        // @@@ drive.setDrivePowers(null, velocity, acceleration);
+        drive.setDrivePowers(null, velocity, acceleration);
 
         // Remember stuff for the next iteration:
         previousVelocity = velocity;
@@ -140,7 +139,7 @@ class AutoParker {
         packet.put("tangentSpeed", tangentSpeed);
         packet.put("radialSpeed", radialSpeed);
 
-        return false; // @@@
+        return true; // @@@
     }
 }
 
@@ -292,21 +291,21 @@ public class Driver extends LinearOpMode {
                     stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
                     stickShaper(-gamepad1.right_stick_x));
 
-            parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
-            parker.park(packet, canvas);
-            parker = null;
+//            parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
+//            parker.park(packet, canvas);
+//            parker = null;
 
-//            boolean onAuto = false;
-//            if (!gamepad1.a)
-//                parker = null;
-//            else {
-//                if (parker == null)
-//                    parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
-//                onAuto = parker.park(packet, canvas);
-//            }
+            boolean autoActivated = false;
+            if (!gamepad1.a)
+                parker = null;
+            else {
+                if (parker == null)
+                    parker = new AutoParker(drive, new Pose2d(0, 0, 0), packet);
+                autoActivated = parker.park(packet, canvas);
+            }
 
-            // @@@ Check if 'onAuto'
-            drive.setDrivePowers(manualPower);
+            if (!autoActivated)
+                drive.setDrivePowers(manualPower);
 
             // Draw the uncorrected reference pose:
             canvas.setStroke("#a0a0a0");
