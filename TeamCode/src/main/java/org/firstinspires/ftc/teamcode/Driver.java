@@ -91,7 +91,7 @@ class AutoParker {
         double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
 
         // We're done if the distance is small enough!
-        if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(0))) // @@@
+        if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
             return false;
 
         double now = Actions.now();
@@ -129,25 +129,16 @@ class AutoParker {
 
         // Calculate the angular velocity as a positive magnitude:
         if (angularDelta < 0) {
-//            double increasingAngularSpeed = angularSpeed + drive.PARAMS.maxAngAccel * deltaT;
-//            double maxAngularSpeed = drive.PARAMS.maxAngVel;
-//            double angularApproach = Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
-//            angularSpeed = Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
-//
-//            packet.put("angularDelta", Math.toDegrees(angularDelta));
-//            packet.put("angularSpeed", Math.toDegrees(angularSpeed));
-//            packet.put("angularApproach", Math.toDegrees(angularApproach));
+            double increasingAngularSpeed = angularSpeed - drive.PARAMS.maxAngAccel * deltaT;
+            double maxAngularSpeed = -drive.PARAMS.maxAngVel;
+            double angularApproach = -Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
+            angularSpeed = Math.max(Math.max(increasingAngularSpeed, maxAngularSpeed), angularApproach);
         } else {
             double increasingAngularSpeed = angularSpeed + drive.PARAMS.maxAngAccel * deltaT;
             double maxAngularSpeed = drive.PARAMS.maxAngVel;
             double angularApproach = Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
             angularSpeed = Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
-
-            packet.put("angularDelta", Math.toDegrees(angularDelta));
-            packet.put("angularSpeed", Math.toDegrees(angularSpeed));
-            packet.put("angularApproach", Math.toDegrees(angularApproach));
         }
-
 
         // Combine ---------------------------------------------------------------------------------
 
