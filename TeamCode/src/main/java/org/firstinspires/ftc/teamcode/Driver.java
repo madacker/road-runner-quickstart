@@ -22,9 +22,18 @@ class AutoParker {
     Vector2d tangentVector;          // Normalized version of original tangent vector
     double radialSpeed;              // Inches/s, can be negative
     double tangentSpeed;             // Inches/s, can be negative
+    double angularSpeed;             // Radians/s, can be negative
 
     TimeSplitter parkTime = TimeSplitter.create("> Park");
     TimeSplitter parkPowerTime = TimeSplitter.create("> Park Power");
+
+    double normalizeAngle(double angle) {
+        while (angle > Math.PI)
+            angle -= 2*Math.PI;
+        while (angle < -Math.PI)
+            angle += 2*Math.PI;
+        return angle;
+    }
 
     AutoParker(MecanumDrive drive, Pose2d target) {
         this.drive = drive;
@@ -33,14 +42,18 @@ class AutoParker {
         // Remember the time:
         this.previousTime = Actions.now();
 
+        // Position --------------------------------------------------------------------------------
+
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
 
         // Tangent vector -90 degrees from radial:
         tangentVector = new Vector2d(radialVector.y, -radialVector.x);
 
-        // Normalize the tangent:
-        tangentVector = tangentVector.div(tangentVector.norm());
+        // Normalize the tangent, being careful to protect against divide-by-zero:
+        double tangentLength = tangentVector.norm();
+        if (tangentLength != 0)
+            tangentVector = tangentVector.div(tangentLength);
 
         // Convert the velocity to field-relative coordinates:
         PoseVelocity2d velocity = drive.pose.times(drive.poseVelocity);
@@ -58,27 +71,28 @@ class AutoParker {
         // Compute the component speeds:
         tangentSpeed = Math.sin(theta) * speed;
         radialSpeed = Math.cos(theta) * speed;
+
+        // Handle heading:
+        angularSpeed = target.heading.log() - drive.pose.heading.log();
     }
 
     // Returns true when parked, false when not parked yet:
     boolean park(TelemetryPacket packet) {
         parkTime.startSplit();
 
-//        Canvas canvas = packet.fieldOverlay();
-
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
-        double radialDistance = radialVector.norm();
+        double radialLength = radialVector.norm();
 
         // We're done if the distance is small enough!
         // @@@ Check heading too
-        if (radialDistance < 0.5)
+        if (radialLength < 0.5)
             return false;
 
         double now = Actions.now();
         double deltaT = now - previousTime;
 
-//        packet.put("deltaT", deltaT);
+        // Position --------------------------------------------------------------------------------
 
         // Decrease the magnitude of the tangent speed with a minimum value of zero:
         double tangentMagnitude = Math.max(0,
@@ -98,16 +112,33 @@ class AutoParker {
         // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
         // current velocity, u is the initial velocity, a is the acceleration, s is distance
         // traveled. We apply it in reverse:
-        double approachSpeed = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * radialDistance);
+        double radialApproach = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * radialLength);
 
         // Set the new radial speed as the minimum of the three:
-        radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), approachSpeed);
+        radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), radialApproach);
 
-        Vector2d radialVelocity = radialVector.div(radialVector.norm()).times(radialSpeed);
+        Vector2d radialVelocity = radialVector.div(radialLength).times(radialSpeed);
         Vector2d tangentVelocity = tangentVector.times(tangentSpeed);
 
+        // Heading ---------------------------------------------------------------------------------
+
+        // Angular distance to the target:
+        double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
+
+        // Calculate the angular velocity as a positive magnitude:
+        double increasingAngularSpeed = Math.abs(angularSpeed) + drive.PARAMS.maxAngAccel * deltaT;
+        double maxAngularSpeed = drive.PARAMS.maxAngVel;
+        double angularApproach = Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
+
+        // @@@ Change 'speed' to 'velocity':
+        // Calculate the angular velocity:
+        angularSpeed = -Math.signum(angularDelta) *
+            Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
+
+        // Combine ---------------------------------------------------------------------------------
+
         // Add the component velocities to get our new velocity:
-        PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), 0);
+        PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), angularSpeed);
 
         // Compute the new accelerations from the velocities:
         PoseVelocity2d acceleration = new PoseVelocity2d(new Vector2d(
@@ -123,7 +154,9 @@ class AutoParker {
         previousVelocity = velocity;
         previousTime = now;
 
-        // Draw the perpendicular vector in red, the radial vector in green:
+//        Canvas canvas = packet.fieldOverlay();
+//
+//        // Draw the perpendicular vector in red, the radial vector in green:
 //        canvas.setStrokeWidth(1);
 //        canvas.setStroke("#FF0000");
 //        canvas.strokeLine(
