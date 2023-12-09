@@ -35,7 +35,7 @@ class AutoParker {
         return angle;
     }
 
-    AutoParker(MecanumDrive drive, Pose2d target) {
+    AutoParker(MecanumDrive drive, TelemetryPacket packet, Pose2d target) {
         this.drive = drive;
         this.target = target;
 
@@ -73,7 +73,10 @@ class AutoParker {
         radialSpeed = Math.cos(theta) * speed;
 
         // Handle heading:
-        angularSpeed = target.heading.log() - drive.pose.heading.log();
+        angularSpeed = velocity.angVel;
+
+        packet.put("initial angularSpeed", Math.toDegrees(angularSpeed));
+        packet.put("initial angle", normalizeAngle(target.heading.log() - drive.pose.heading.log()));
     }
 
     // Returns true when parked, false when not parked yet:
@@ -84,9 +87,11 @@ class AutoParker {
         Vector2d radialVector = target.position.minus(drive.pose.position);
         double radialLength = radialVector.norm();
 
+        // Angular distance to the target:
+        double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
+
         // We're done if the distance is small enough!
-        // @@@ Check heading too
-        if (radialLength < 0.5)
+        if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(0))) // @@@
             return false;
 
         double now = Actions.now();
@@ -122,9 +127,6 @@ class AutoParker {
 
         // Heading ---------------------------------------------------------------------------------
 
-        // Angular distance to the target:
-        double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
-
         // Calculate the angular velocity as a positive magnitude:
         double increasingAngularSpeed = Math.abs(angularSpeed) + drive.PARAMS.maxAngAccel * deltaT;
         double maxAngularSpeed = drive.PARAMS.maxAngVel;
@@ -132,8 +134,12 @@ class AutoParker {
 
         // @@@ Change 'speed' to 'velocity':
         // Calculate the angular velocity:
-        angularSpeed = -Math.signum(angularDelta) *
+        angularSpeed = Math.signum(angularDelta) *
             Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
+
+        packet.put("angularDelta", Math.toDegrees(angularDelta));
+        packet.put("angularSpeed", Math.toDegrees(angularSpeed));
+        packet.put("angularApproach", Math.toDegrees(angularApproach));
 
         // Combine ---------------------------------------------------------------------------------
 
@@ -240,7 +246,7 @@ public class Driver extends LinearOpMode {
                 parker = null;
             else {
                 if (parker == null)
-                    parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+                    parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
 
                 autoTime.startSplit();
                 autoActivated = parker.park(packet);
