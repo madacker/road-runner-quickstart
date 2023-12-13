@@ -24,9 +24,6 @@ class AutoParker {
     double tangentSpeed;             // Inches/s, can be negative
     double angularSpeed;             // Radians/s, can be negative
 
-    TimeSplitter parkTime = TimeSplitter.create("> Park");
-    TimeSplitter parkPowerTime = TimeSplitter.create("> Park Power");
-
     double normalizeAngle(double angle) {
         while (angle > Math.PI)
             angle -= 2*Math.PI;
@@ -186,14 +183,7 @@ public class Driver extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        TimeSplitter startupTime = TimeSplitter.create("> Startup", false);
-        TimeSplitter endTime = TimeSplitter.create("> End", false);
         TimeSplitter loopTime = TimeSplitter.create("> Loop");
-        TimeSplitter poseTime = TimeSplitter.create("> Pose");
-        TimeSplitter refineTime = TimeSplitter.create("> Refine");
-        TimeSplitter driveTime = TimeSplitter.create("> Drive");
-        TimeSplitter autoTime = TimeSplitter.create("> Auto");
-        TimeSplitter ledTime = TimeSplitter.create("> Led");
 
         double maxLinearAcceleration = 0;
         double minLinearDeceleration = 0;
@@ -209,9 +199,10 @@ public class Driver extends LinearOpMode {
         Led led = new Led(hardwareMap);
         AutoParker parker = null;
 
-        // for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
-        //     module.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
-        // }
+        // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
+        double maxTheoreticalSpeed
+                = ((drive.voltageSensor.getVoltage() - drive.PARAMS.kS) / drive.PARAMS.kV)
+                * drive.PARAMS.inPerTick;
 
         waitForStart();
 
@@ -220,7 +211,6 @@ public class Driver extends LinearOpMode {
 
             // Update the telemetry pose and update the LED loop:
             drive.updatePoseEstimate();
-
             led.update();
 
             // Set up for visualizations:
@@ -228,17 +218,16 @@ public class Driver extends LinearOpMode {
             Canvas canvas = packet.fieldOverlay();
 
             // Handle input:
-
             boolean autoActivated = false;
             if (!gamepad1.a)
                 parker = null;
             else {
                 if (parker == null)
                     parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
-
                 autoActivated = parker.park(packet);
             }
 
+            // Manually drive:
             if (!autoActivated) {
                 if (false) {
                     double lateralFactor = drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
@@ -293,6 +282,7 @@ public class Driver extends LinearOpMode {
 
             packet.put("Linear speed", linearSpeed);
             packet.put("Linear delta", linearSpeedDelta);
+            packet.put("Linear theoretical", maxTheoreticalSpeed);
             packet.put("Angular speed", angularSpeed);
             packet.put("Angular delta", angularSpeedDelta);
 
@@ -308,9 +298,9 @@ public class Driver extends LinearOpMode {
 
         // Output summary:
         TelemetryPacket packet = new TelemetryPacket();
-        packet.addLine(String.format("Linear - speed: %.1f, accel: %.1f, decel: %.1f",
-                maxLinearSpeed, maxLinearAcceleration, minLinearDeceleration));
-        packet.addLine(String.format("Angular - speed: %.1f, accel: %.1f, decel: %.1f",
+        packet.addLine(String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
+                maxLinearSpeed, maxTheoreticalSpeed, maxLinearAcceleration, minLinearDeceleration));
+        packet.addLine(String.format("Angular: top-speed: %.2f, accel: %.2f, decel: %.2f",
                 maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration));
         FtcDashboard.getInstance().sendTelemetryPacket(packet);
     }

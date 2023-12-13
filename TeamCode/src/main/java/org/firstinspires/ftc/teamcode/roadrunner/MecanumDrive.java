@@ -298,9 +298,6 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
-    TimeSplitter voltageTime = TimeSplitter.create("> getVoltage");
-    TimeSplitter powerTime = TimeSplitter.create("> setPower");
-
     public void setDrivePowers(
             PoseVelocity2d manualPowers, // Can be null
             PoseVelocity2d assistVelocity, // Can be null
@@ -338,10 +335,7 @@ public final class MecanumDrive {
 
         MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
 
-        voltageTime.startSplit();
         double voltage = voltageSensor.getVoltage();
-        voltageTime.endSplit();
-
         final MotorFeedforward feedforward = new MotorFeedforward(
                 PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
         );
@@ -365,12 +359,10 @@ public final class MecanumDrive {
         double maxPower = max(max(max(max(1, leftFrontPower), leftBackPower), rightBackPower), rightFrontPower);
 
         // Set the power to the motors:
-        powerTime.startSplit();
         leftFront.setPower(leftFrontPower / maxPower);
         leftBack.setPower(leftBackPower / maxPower);
         rightBack.setPower(rightBackPower / maxPower);
         rightFront.setPower(rightFrontPower / maxPower);
-        powerTime.endSplit();
     }
 
 
