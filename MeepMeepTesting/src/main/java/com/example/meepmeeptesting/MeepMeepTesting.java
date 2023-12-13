@@ -42,11 +42,8 @@ public class MeepMeepTesting {
         if (true) {
 
             myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(12, 63, Math.toRadians(-90)))
-                    .lineToY(30)
-                            .endTrajectory()
-                            .lineToY(34)
                             .lineToY(60)
-                            .turnTo(Math.toRadians(180))
+                            .turnTo(Math.toRadians(45))
                             .build());
 
 // THIS HANGS*****

@@ -81,8 +81,6 @@ class AutoParker {
 
     // Returns true when parked, false when not parked yet:
     boolean park(TelemetryPacket packet) {
-        parkTime.startSplit();
-
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
         double radialLength = radialVector.norm();
@@ -151,9 +149,7 @@ class AutoParker {
                 velocity.linearVel.y - previousVelocity.linearVel.y),
                 velocity.angVel - previousVelocity.angVel);
 
-        parkPowerTime.startSplit();
         drive.setDrivePowers(null, velocity, acceleration);
-        parkPowerTime.endSplit();
 
         // Remember stuff for the next iteration:
         previousVelocity = velocity;
@@ -177,8 +173,6 @@ class AutoParker {
 //                drive.pose.position.x + radialVelocity.x,
 //                drive.pose.position.y + radialVelocity.y);
 
-        parkTime.endSplit();
-
         return true;
     }
 }
@@ -201,11 +195,18 @@ public class Driver extends LinearOpMode {
         TimeSplitter autoTime = TimeSplitter.create("> Auto");
         TimeSplitter ledTime = TimeSplitter.create("> Led");
 
-        startupTime.startSplit();
+        double maxLinearAcceleration = 0;
+        double minLinearDeceleration = 0;
+        double maxLinearSpeed = 0;
+        double previousLinearSpeed = 0;
+        double maxAngularAcceleration = 0;
+        double minAngularDeceleration = 0;
+        double maxAngularSpeed = 0;
+        double previousAngularSpeed = 0;
+
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
-        startupTime.endSplit();
         AutoParker parker = null;
 
         // for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
@@ -215,30 +216,18 @@ public class Driver extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-
-            // for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
-            //     module.clearBulkCache();
-            // }
-
             loopTime.startSplit();
 
             // Update the telemetry pose and update the LED loop:
-            poseTime.startSplit();
             drive.updatePoseEstimate();
-            poseTime.endSplit();
 
-            ledTime.startSplit();
             led.update();
-            ledTime.endSplit();
 
             // Set up for visualizations:
             TelemetryPacket packet = new TelemetryPacket();
             Canvas canvas = packet.fieldOverlay();
 
             // Handle input:
-            PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
-                    stickShaper(-gamepad1.left_stick_y), stickShaper(-gamepad1.left_stick_x)),
-                    stickShaper(-gamepad1.right_stick_x));
 
             boolean autoActivated = false;
             if (!gamepad1.a)
@@ -247,34 +236,68 @@ public class Driver extends LinearOpMode {
                 if (parker == null)
                     parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
 
-                autoTime.startSplit();
                 autoActivated = parker.park(packet);
-                autoTime.endSplit();
             }
 
             if (!autoActivated) {
-                driveTime.startSplit();
-                drive.setDrivePowers(manualPower);
-                driveTime.endSplit();
+                if (false) {
+                    double lateralFactor = drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
+                    PoseVelocity2d manualVelocity = new PoseVelocity2d(new Vector2d(
+                            stickShaper(-gamepad1.left_stick_y) * drive.PARAMS.maxWheelVel,
+                            stickShaper(-gamepad1.left_stick_x) * drive.PARAMS.maxWheelVel * lateralFactor),
+                            stickShaper(-gamepad1.right_stick_x) * drive.PARAMS.maxAngVel);
+
+                    // @@@ Calculate acceleration:
+                    drive.setDrivePowers(null, manualVelocity, null);
+                } else {
+                    PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
+                            stickShaper(-gamepad1.left_stick_y),
+                            stickShaper(-gamepad1.left_stick_x)),
+                            stickShaper(-gamepad1.right_stick_x));
+                    drive.setDrivePowers(manualPower);
+                }
             }
 
             // Draw AprilTag poses and refine them:
-            refineTime.startSplit();
             Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
             if (refinedPose != null) {
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
                 drive.pose = refinedPose;
             }
-            refineTime.endSplit();
 
             // Draw the best estimate pose:
-            endTime.startSplit();
             canvas.setStroke("#3F51B5");
             MecanumDrive.drawRobot(canvas, drive.pose);
-            FtcDashboard.getInstance().sendTelemetryPacket(packet);
-            endTime.endSplit();
 
+            // Log interesting data:
+            double linearSpeed = Math.hypot(drive.poseVelocity.linearVel.x, drive.poseVelocity.linearVel.y);
+            double linearSpeedDelta = linearSpeed - previousLinearSpeed;
+            if (linearSpeedDelta > 0) {
+                maxLinearAcceleration = Math.max(linearSpeedDelta, maxLinearAcceleration);
+            } else {
+                minLinearDeceleration = Math.min(linearSpeedDelta, minLinearDeceleration);
+            }
+            previousLinearSpeed = linearSpeed;
+            maxLinearSpeed = Math.max(linearSpeed, maxLinearSpeed);
+
+            double angularSpeed = Math.abs(drive.poseVelocity.angVel);
+            double angularSpeedDelta = angularSpeed - previousAngularSpeed;
+            if (angularSpeedDelta > 0) {
+                maxAngularAcceleration = Math.max(angularSpeedDelta, maxAngularAcceleration);
+            } else {
+                minAngularDeceleration = Math.min(angularSpeedDelta, minAngularDeceleration);
+            }
+            previousAngularSpeed = angularSpeed;
+            maxAngularSpeed = Math.max(angularSpeedDelta, maxAngularSpeed);
+
+            packet.put("Linear speed", linearSpeed);
+            packet.put("Linear delta", linearSpeedDelta);
+            packet.put("Angular speed", angularSpeed);
+            packet.put("Angular delta", angularSpeedDelta);
+
+            // Finish up:
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
             loopTime.endSplit();
         }
 
@@ -282,6 +305,14 @@ public class Driver extends LinearOpMode {
         refiner.close();
         TimeSplitter.logAllResults();
         led.setSteadyColor(Led.Color.OFF);
+
+        // Output summary:
+        TelemetryPacket packet = new TelemetryPacket();
+        packet.addLine(String.format("Linear - speed: %.1f, accel: %.1f, decel: %.1f",
+                maxLinearSpeed, maxLinearAcceleration, minLinearDeceleration));
+        packet.addLine(String.format("Angular - speed: %.1f, accel: %.1f, decel: %.1f",
+                maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration));
+        FtcDashboard.getInstance().sendTelemetryPacket(packet);
     }
 }
 

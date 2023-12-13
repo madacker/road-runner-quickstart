@@ -65,20 +65,13 @@ public class Auton extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         // The pose given here is a placeholder until we reset it below:
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(12, 63, Math.toRadians(-90)));
 
         waitForStart();
 
-        Pose2d startPose1 = new Pose2d(-36, -60, Math.toRadians(90));
-        Pose2d startPose2 = new Pose2d(-36, -60, Math.toRadians(90));
-        Pose2d startPose3 = new Pose2d(-36, -60, Math.toRadians(90));
-
-        drive.pose = startPose1;
-        Actions.runBlocking(drive.actionBuilder(startPose2)
-                .splineToLinearHeading(new Pose2d(-39, -36, Math.toRadians(90)), Math.toRadians(90))
-                .turn(Math.toRadians(360))
-                .setTangent(Math.toRadians(-90))
-                .splineToLinearHeading(startPose3, Math.toRadians(-90))
+        Actions.runBlocking(drive.actionBuilder(new Pose2d(12, 63, Math.toRadians(-90)))
+                .lineToY(60)
+                .turnTo(Math.toRadians(45))
                 .build());
     }
 }
