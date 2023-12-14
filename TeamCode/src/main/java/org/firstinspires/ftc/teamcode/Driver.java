@@ -161,6 +161,71 @@ class AutoParker {
     }
 }
 
+class Wall {
+    MecanumDrive drive;
+    Vector2d wallPoint;
+    Vector2d wallVector;
+
+    // The wall will repulse any robot approaching from the left of the vector.
+    Wall(MecanumDrive drive, Vector2d point, Vector2d vector) {
+        this.drive = drive;
+        wallPoint = point;
+        wallVector = vector;
+    }
+
+    // The velocity must be calibrated inches/s and radians/s:
+    PoseVelocity2d repulse(PoseVelocity2d velocity, TelemetryPacket packet) {
+        // Length of the velocity vector:
+        double velocityMagnitude = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
+        if (velocityMagnitude == 0)
+            return velocity;
+
+        // Vector that's normal to the wall, pointing towards the wall from the robot:
+        double normalAngle = Math.atan2(wallVector.y, wallVector.x) - Math.PI/2;
+
+        // Direction of the velocity vector:
+        double velocityAngle = Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
+
+        // Break the velocity vector into constituent towards and along the wall:
+        double towardWallAngle = normalAngle - velocityAngle;
+        double towardWallVelocity = Math.cos(towardWallAngle) * velocityMagnitude;
+        double alongWallVelocity = Math.sin(towardWallAngle) * velocityMagnitude;
+
+        // Compute the distance to the wall:
+        double dx = wallPoint.x - drive.pose.position.x;
+        double dy = wallPoint.y - drive.pose.position.y;
+        double pointToPointDistance = Math.hypot(dy, dx);
+        double pointToPointAngle = Math.atan2(dy, dx);
+        double distance = Math.cos(pointToPointAngle - towardWallAngle) * pointToPointDistance;
+
+packet.put("Distance to wall", distance);
+packet.put("Wall approach velocity", towardWallVelocity);
+
+        // Calculate the maximum speed directly towards the target assuming constant
+        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
+        // current velocity, u is the initial velocity, a is the acceleration, s is distance
+        // traveled. We apply it in reverse:
+        double maxApproachVelocity = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distance);
+        towardWallVelocity = Math.min(towardWallVelocity, maxApproachVelocity);
+
+packet.put("Max approach", maxApproachVelocity);
+
+        // Constitute the revised velocity's component vectors:
+        Vector2d towardWallVector = new Vector2d(
+                Math.cos(normalAngle) * towardWallVelocity,
+                Math.sin(normalAngle) * towardWallVelocity);
+        Vector2d alongWallVector = new Vector2d(
+                Math.cos(normalAngle + Math.PI/2) * alongWallVelocity,
+                Math.sin(normalAngle + Math.PI/2) * alongWallVelocity);
+
+        // Return the new velocity's aggregate result:
+        return new PoseVelocity2d(new Vector2d(
+                towardWallVector.x + alongWallVector.x,
+                towardWallVector.y + alongWallVector.y),
+                velocity.angVel);
+    }
+}
+
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
     // Shape the stick input for more precision at slow speeds:
@@ -199,6 +264,7 @@ public class Driver extends LinearOpMode {
         Refiner refiner = new Refiner(hardwareMap);
         Led led = new Led(hardwareMap);
         AutoParker parker = null;
+        Wall wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
         double fullAxialSpeed
@@ -241,6 +307,9 @@ public class Driver extends LinearOpMode {
                             scaleStick(-gamepad1.left_stick_y, fullAxialSpeed),
                             scaleStick(-gamepad1.left_stick_x, fullLateralSpeed)),
                             scaleStick(-gamepad1.right_stick_x, fullAngularSpeed));
+
+                    wall.repulse(calibratedVelocity, packet); // @@@
+
                     drive.setDrivePowers(null, calibratedVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
