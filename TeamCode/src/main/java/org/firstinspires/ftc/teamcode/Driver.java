@@ -187,7 +187,7 @@ class Wall {
         double velocityAngle = Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
 
         // Break the velocity vector into constituent towards and along the wall:
-        double towardWallAngle = normalAngle - velocityAngle;
+        double towardWallAngle = velocityAngle - normalAngle;
         double towardWallVelocity = Math.cos(towardWallAngle) * velocityMagnitude;
         double alongWallVelocity = Math.sin(towardWallAngle) * velocityMagnitude;
 
