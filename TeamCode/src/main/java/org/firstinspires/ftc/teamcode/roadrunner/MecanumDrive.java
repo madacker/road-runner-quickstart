@@ -43,7 +43,6 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
@@ -298,21 +297,46 @@ public final class MecanumDrive {
         rightFront.setPower(wheelVels.rightFront.get(0) / maxPowerMag);
     }
 
-    public void setDrivePowers(
-            PoseVelocity2d manualPowers, // Can be null
-            PoseVelocity2d assistVelocity, // Can be null
-            PoseVelocity2d assistAcceleration) { // Can be null
+    // Used by setDrivePowers to calculate acceleration:
+    PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
-        if (manualPowers == null)
-            manualPowers = new PoseVelocity2d(new Vector2d(0, 0), 0);
+    /**
+     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
+     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
+     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
+     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
+     * at the same time in which case the velocities are added together (to allow assist and stick
+     * control to blend together, for example).
+     *
+     * It's also possible to map the controller input to inches/s and radians/s instead of the
+     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
+     * .maxAngVel to determine the range to specify. Note however that the robot can actually
+     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
+     * robot down.
+     */
+    public void setDrivePowers(
+            PoseVelocity2d stickVelocity, // Can be null, normalized voltage from -1 to 1
+            PoseVelocity2d assistVelocity) // Can be null, inches/s and radians/s
+    {
+        if (stickVelocity == null)
+            stickVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
         if (assistVelocity == null)
             assistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
-        if (assistAcceleration == null)
-            assistAcceleration = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
-        // Compute the wheel powers for the manual contribution:
+        // Compute the target acceleration as the difference between the new target velocity
+        // and the old:
+        PoseVelocity2d targetAcceleration = new PoseVelocity2d(new Vector2d(
+                assistVelocity.linearVel.x - previousAssistVelocity.linearVel.x,
+                assistVelocity.linearVel.y - previousAssistVelocity.linearVel.y),
+                assistVelocity.angVel - previousAssistVelocity.angVel);
+
+        // Remember the current velocity for next time:
+        previousAssistVelocity = new PoseVelocity2d(new Vector2d(
+                assistVelocity.linearVel.x,assistVelocity.linearVel.y), assistVelocity.angVel);
+
+        // Compute the wheel powers for the stick contribution:
         MecanumKinematics.WheelVelocities<Time> manualVels = new MecanumKinematics(1).inverse(
-                PoseVelocity2dDual.constant(manualPowers, 1));
+                PoseVelocity2dDual.constant(stickVelocity, 1));
 
         double leftFrontPower = manualVels.leftFront.get(0);
         double leftBackPower = manualVels.leftBack.get(0);
@@ -320,25 +344,23 @@ public final class MecanumDrive {
         double rightFrontPower = manualVels.rightFront.get(0);
 
         // Compute the wheel powers for the assist:
-        double[] x = { pose.position.x, assistVelocity.linearVel.x, assistAcceleration.linearVel.x };
-        double[] y = { pose.position.y, assistVelocity.linearVel.y, assistAcceleration.linearVel.y };
-        double[] angular = { pose.heading.log(), assistVelocity.angVel, assistAcceleration.angVel };
+        double[] x = { pose.position.x, assistVelocity.linearVel.x, targetAcceleration.linearVel.x };
+        double[] y = { pose.position.y, assistVelocity.linearVel.y, targetAcceleration.linearVel.y };
+        double[] angular = { pose.heading.log(), assistVelocity.angVel, targetAcceleration.angVel };
 
-        Pose2dDual<Time> assistDualPose = new Pose2dDual<>(
+        Pose2dDual<Time> computedDualPose = new Pose2dDual<>(
                 new Vector2dDual<>(new DualNum<>(x), new DualNum<>(y)),
-                Rotation2dDual.exp(new DualNum<>(angular))
-        );
+                Rotation2dDual.exp(new DualNum<>(angular)));
 
-        // Compute the feedforward for the assist while disabling the PID part of the PIDF:
+        // Compute the feedforward for the assist while disabling the PID portion of the PIDF:
         PoseVelocity2dDual<Time> command = new HolonomicController(0, 0, 0)
-                .compute(assistDualPose, pose, poseVelocity);
+                .compute(computedDualPose, pose, poseVelocity);
 
         MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
 
         double voltage = voltageSensor.getVoltage();
         final MotorFeedforward feedforward = new MotorFeedforward(
-                PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
-        );
+                PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick);
 
         // Check for zero velocities and accelerations to avoid adding 'kS'. Arguably these
         // should be epsilon compares but equality is fine for checking when the assist is
@@ -363,78 +385,6 @@ public final class MecanumDrive {
         leftBack.setPower(leftBackPower / maxPower);
         rightBack.setPower(rightBackPower / maxPower);
         rightFront.setPower(rightFrontPower / maxPower);
-    }
-
-
-    /**
-     * Set the drive motor powers according to both user input and automated assist.
-     *
-     * @param telemetry - For debug spew.
-     * @param manual - Motor power as specified by controller input. It's raw power in the range
-     *                 of [-1, 1] and in robot-relative coordinates.
-     * @param assist - Velocities as specified by automation. It's in ft/s and radians/s and
-     *                 in field-relative coordinates.
-     */
-    public void setAssistedDrivePowersAndUpdatePose(
-            Telemetry telemetry,
-            PoseVelocity2d manual,
-            PoseVelocity2d assist)
-    {
-//        // First calculate the motor voltages considering only the user input. This code is
-//        // derived from 'setDrivePowers':
-//        MecanumKinematics.WheelVelocities<Time> wheelVels = new MecanumKinematics(1).inverse(
-//                PoseVelocity2dDual.constant(manual, 1));
-//
-//        double maxPowerMag = 1;
-//        for (DualNum<Time> power : wheelVels.all()) {
-//            maxPowerMag = max(maxPowerMag, power.value());
-//        }
-//
-//        // @@@ Move this normalization to the combined version
-//        double userLeftFrontV = wheelVels.leftFront.get(0) / maxPowerMag;
-//        double userLeftBackV = wheelVels.leftBack.get(0) / maxPowerMag;
-//        double userRightBackV = wheelVels.rightBack.get(0) / maxPowerMag;
-//        double userRightFrontV = wheelVels.rightFront.get(0) / maxPowerMag;
-//
-//        // Now calculate the motor voltages as desired by automation. This code is derived
-//        // from 'FollowTrajectoryAction::run'.
-//        PoseVelocity2d robotVelRobot = updatePoseEstimate(); // @@@ Move this out so that it can be used?
-//
-//        double[] xPositionAndVelocity = { pose.position.x, assist.linearVel.x, 0 };
-//        double[] yPositionAndVelocity = { pose.position.y, assist.linearVel.y, 0 };
-//        double[] angularHeadingAndVelocity = { pose.heading.log(), assist.angVel, 0 };
-//
-//        Pose2dDual<Time> targetAutoPose = new Pose2dDual<>(
-//            new Vector2dDual<>(new DualNum<>(xPositionAndVelocity), new DualNum<>(yPositionAndVelocity)),
-//            Rotation2dDual.exp(new DualNum<>(angularHeadingAndVelocity))
-//        );
-//        PoseVelocity2dDual<Time> command = new HolonomicController(0, 0, 0)
-//                .compute(targetAutoPose, pose, robotVelRobot);
-//
-//        wheelVels = kinematics.inverse(command);
-//        double voltage = voltageSensor.getVoltage();
-//
-//        final MotorFeedforward feedforward = new MotorFeedforward(
-//                // @@@ Need to fix 'kS' handling to handle zero velocities!
-//                // PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
-//                0, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick
-//        );
-//        double autoLeftFrontV = feedforward.compute(wheelVels.leftFront) / voltage;
-//        double autoLeftBackV = feedforward.compute(wheelVels.leftBack) / voltage;
-//        double autoRightBackV = feedforward.compute(wheelVels.rightBack) / voltage;
-//        double autoRightFrontV = feedforward.compute(wheelVels.rightFront) / voltage;
-//
-//        // Set the motors to the combined power:
-//        leftFront.setPower(userLeftFrontV + autoLeftFrontV);
-//        leftBack.setPower(userLeftBackV + autoLeftBackV);
-//        rightBack.setPower(userRightBackV + autoRightBackV);
-//        rightFront.setPower(userRightFrontV + autoRightFrontV);
-//
-//        // Some debugging:
-//        telemetry.addData("Assist X", assist.linearVel.x);
-//        telemetry.addData("Assist Y", assist.linearVel.y);
-//        telemetry.addData("User left-front V", userLeftFrontV);
-//        telemetry.addData("Auto left-front V", autoLeftFrontV);
     }
 
     public final class FollowTrajectoryAction implements Action {

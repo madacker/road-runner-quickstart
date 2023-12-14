@@ -7,7 +7,6 @@ import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -18,7 +17,6 @@ class AutoParker {
     MecanumDrive drive;              // Used to get pose and poseVelocity and set the motors
     Pose2d target;                   // Target pose
     double previousTime;             // Previous time in seconds
-    PoseVelocity2d previousVelocity; // Previous velocity
     Vector2d tangentVector;          // Normalized version of original tangent vector
     double radialSpeed;              // Inches/s, can be negative
     double tangentSpeed;             // Inches/s, can be negative
@@ -54,9 +52,6 @@ class AutoParker {
 
         // Convert the velocity to field-relative coordinates:
         PoseVelocity2d velocity = drive.pose.times(drive.poseVelocity);
-
-        // Remember it:
-        previousVelocity = velocity;
 
         // Compute the current speed:
         double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
@@ -139,17 +134,9 @@ class AutoParker {
 
         // Add the component velocities to get our new velocity:
         PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), angularSpeed);
-
-        // Compute the new accelerations from the velocities:
-        PoseVelocity2d acceleration = new PoseVelocity2d(new Vector2d(
-                velocity.linearVel.x - previousVelocity.linearVel.x,
-                velocity.linearVel.y - previousVelocity.linearVel.y),
-                velocity.angVel - previousVelocity.angVel);
-
-        drive.setDrivePowers(null, velocity, acceleration);
+        drive.setDrivePowers(null, velocity);
 
         // Remember stuff for the next iteration:
-        previousVelocity = velocity;
         previousTime = now;
 
 //        Canvas canvas = packet.fieldOverlay();
@@ -176,9 +163,23 @@ class AutoParker {
 
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
-    // Provide more precision for slight stick movements:
-    public double stickShaper(double stickValue) {
+    // Shape the stick input for more precision at slow speeds:
+    public double shapeStick(double stickValue) {
         return Math.signum(stickValue) * Math.pow(stickValue, 2.0);
+    }
+
+    // Scale the stick input to a shaped result that accounts for the dead zone:
+    public double scaleStick(double stickValue, double scale) {
+        final double DEAD_ZONE = 0.15; // Assume 15%, not forgetting that the range is [-1, 1]
+        if (Math.abs(stickValue) <= DEAD_ZONE)
+            return 0;
+
+        // Shape the result:
+        stickValue = shapeStick(stickValue);
+        // Push away from the dead zone:
+        stickValue = (1.0 - DEAD_ZONE) * stickValue + Math.signum(stickValue) * DEAD_ZONE;
+        // Return the scaled result:
+        return stickValue * scale;
     }
 
     @Override
@@ -200,9 +201,15 @@ public class Driver extends LinearOpMode {
         AutoParker parker = null;
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
-        double maxTheoreticalSpeed
+        double fullAxialSpeed
                 = ((drive.voltageSensor.getVoltage() - drive.PARAMS.kS) / drive.PARAMS.kV)
                 * drive.PARAMS.inPerTick;
+        double fullLateralSpeed
+                = fullAxialSpeed * drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
+        // Rotations/s = fullAxialSpeed / (pi * wheelbase)
+        double fullAngularSpeed
+                = fullAxialSpeed
+                / (2 * Math.pow(Math.PI, 2) * drive.PARAMS.trackWidthTicks * drive.PARAMS.inPerTick);
 
         waitForStart();
 
@@ -230,19 +237,16 @@ public class Driver extends LinearOpMode {
             // Manually drive:
             if (!autoActivated) {
                 if (false) {
-                    double lateralFactor = drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
-                    PoseVelocity2d manualVelocity = new PoseVelocity2d(new Vector2d(
-                            stickShaper(-gamepad1.left_stick_y) * drive.PARAMS.maxWheelVel,
-                            stickShaper(-gamepad1.left_stick_x) * drive.PARAMS.maxWheelVel * lateralFactor),
-                            stickShaper(-gamepad1.right_stick_x) * drive.PARAMS.maxAngVel);
-
-                    // @@@ Calculate acceleration:
-                    drive.setDrivePowers(null, manualVelocity, null);
+                    PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
+                            scaleStick(-gamepad1.left_stick_y, fullAxialSpeed),
+                            scaleStick(-gamepad1.left_stick_x, fullLateralSpeed)),
+                            scaleStick(-gamepad1.right_stick_x, fullAngularSpeed));
+                    drive.setDrivePowers(null, calibratedVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
-                            stickShaper(-gamepad1.left_stick_y),
-                            stickShaper(-gamepad1.left_stick_x)),
-                            stickShaper(-gamepad1.right_stick_x));
+                            shapeStick(-gamepad1.left_stick_y),
+                            shapeStick(-gamepad1.left_stick_x)),
+                            shapeStick(-gamepad1.right_stick_x));
                     drive.setDrivePowers(manualPower);
                 }
             }
@@ -282,9 +286,10 @@ public class Driver extends LinearOpMode {
 
             packet.put("Linear speed", linearSpeed);
             packet.put("Linear delta", linearSpeedDelta);
-            packet.put("Linear theoretical", maxTheoreticalSpeed);
+            packet.put("Linear theoretical", fullAxialSpeed);
             packet.put("Angular speed", angularSpeed);
             packet.put("Angular delta", angularSpeedDelta);
+            packet.put("Angular theoretical", fullAngularSpeed);
 
             // Finish up:
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
@@ -299,7 +304,7 @@ public class Driver extends LinearOpMode {
         // Output summary:
         TelemetryPacket packet = new TelemetryPacket();
         packet.addLine(String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
-                maxLinearSpeed, maxTheoreticalSpeed, maxLinearAcceleration, minLinearDeceleration));
+                maxLinearSpeed, fullAxialSpeed, maxLinearAcceleration, minLinearDeceleration));
         packet.addLine(String.format("Angular: top-speed: %.2f, accel: %.2f, decel: %.2f",
                 maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration));
         FtcDashboard.getInstance().sendTelemetryPacket(packet);
