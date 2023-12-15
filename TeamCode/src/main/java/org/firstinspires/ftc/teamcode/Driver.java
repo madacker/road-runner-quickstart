@@ -173,20 +173,24 @@ class Wall {
         wallVector = vector;
     }
 
-    // The velocity must be calibrated inches/s and radians/s:
-    PoseVelocity2d repulse(PoseVelocity2d velocity, TelemetryPacket packet) {
+    // The velocity must be robot-relative, calibrated inches/s and radians/s:
+    PoseVelocity2d repulse(PoseVelocity2d robotVelocity, TelemetryPacket packet) {
+
+        // Convert velocity from robot-relative to field-relative:
+        PoseVelocity2d velocity = drive.pose.times(robotVelocity);
+
         // Length of the velocity vector:
         double velocityMagnitude = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
         if (velocityMagnitude == 0)
             return velocity;
 
-        // Vector that's normal to the wall, pointing towards the wall from the robot:
+        // Direction that's normal to the wall, pointing towards the wall from the robot:
         double normalAngle = Math.atan2(wallVector.y, wallVector.x) - Math.PI/2;
 
         // Direction of the velocity vector:
         double velocityAngle = Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
 
-        // Break the velocity vector into constituent towards and along the wall:
+        // Break the velocity vector into constituent velocities towards and along the wall:
         double towardWallAngle = velocityAngle - normalAngle;
         double towardWallVelocity = Math.cos(towardWallAngle) * velocityMagnitude;
         double alongWallVelocity = Math.sin(towardWallAngle) * velocityMagnitude;
