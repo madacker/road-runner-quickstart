@@ -327,7 +327,9 @@ public class Driver extends LinearOpMode {
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
 
-                drive.setPose(refinedPose);
+                // Set the new pose and record it:
+                drive.pose = refinedPose;
+                drive.recordPose(refinedPose, 1);
             }
 
             // Draw the pose history:

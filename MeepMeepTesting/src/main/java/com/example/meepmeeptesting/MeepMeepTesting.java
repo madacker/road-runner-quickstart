@@ -6,12 +6,15 @@ import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
+import com.acmerobotics.roadrunner.TurnConstraints;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.noahbres.meepmeep.MeepMeep;
 import com.noahbres.meepmeep.roadrunner.Constraints;
 import com.noahbres.meepmeep.roadrunner.DriveShim;
 import com.noahbres.meepmeep.roadrunner.DriveTrainType;
 import com.noahbres.meepmeep.roadrunner.entity.RoadRunnerBotEntity;
+
+import kotlin.jvm.JvmField;
 
 class MecanumDrive {
     DriveShim shim;
@@ -40,10 +43,10 @@ public class MeepMeepTesting {
                 false);
 
         if (true) {
-
-            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(12, 63, Math.toRadians(-90)))
-                            .lineToY(60)
-                            .turnTo(Math.toRadians(45))
+            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(0)))
+                            .turn(Math.toRadians(-30))
+                            .turn(Math.toRadians(60), new TurnConstraints(0.3, -3.14, 3.14))
+                            .turn(Math.toRadians(-30))
                             .build());
 
 // THIS HANGS*****

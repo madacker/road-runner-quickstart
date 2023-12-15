@@ -60,7 +60,7 @@ public class Refiner {
             new AprilTagLocation(10, -72,  43.0, 0, true),   // Blue audience wall, large
     };
 
-    Refiner(HardwareMap hardwareMap) {
+    public Refiner(HardwareMap hardwareMap) {
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
@@ -162,7 +162,7 @@ public class Refiner {
         return new Pose2d(new Vector2d(x, y), Math.PI - theta);
     }
 
-    Pose2d refinePose(Pose2d odometryPose, Canvas canvas) {
+    public Pose2d refinePose(Pose2d odometryPose, Canvas canvas) {
         processDistance(odometryPose, canvas);
 
         Pose2d result = null;
@@ -173,12 +173,12 @@ public class Refiner {
                 if (tag != null) {
                     Pose2d pose = computePose(detection, tag);
 
-                    if (canvas != null) {
-                        canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
-                        MecanumDrive.drawRobot(canvas, pose, 7);
-                    }
+//                    if (canvas != null) {
+//                        canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
+//                        MecanumDrive.drawRobot(canvas, pose, 7);
+//                    }
 
-                    if (tag.large) {
+                    if (!tag.large) {
                         result = pose;
                     }
                 }
