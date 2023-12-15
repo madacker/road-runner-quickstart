@@ -66,9 +66,6 @@ class AutoParker {
 
         // Handle heading:
         angularSpeed = velocity.angVel;
-
-        packet.put("initial angularSpeed", Math.toDegrees(angularSpeed));
-        packet.put("initial angle", normalizeAngle(target.heading.log() - drive.pose.heading.log()));
     }
 
     // Returns true when parked, false when not parked yet:
@@ -173,18 +170,16 @@ class Wall {
         wallVector = vector;
     }
 
-    // The velocity must be robot-relative, calibrated inches/s and radians/s:
-    PoseVelocity2d repulse(PoseVelocity2d robotVelocity, TelemetryPacket packet) {
-
-        // Convert velocity from robot-relative to field-relative:
-        PoseVelocity2d velocity = drive.pose.times(robotVelocity);
+    // The velocity must be field-relative, calibrated inches/s and radians/s:
+    PoseVelocity2d repulse(PoseVelocity2d velocity, TelemetryPacket packet) {
 
         // Length of the velocity vector:
         double velocityMagnitude = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
         if (velocityMagnitude == 0)
             return velocity;
 
-        // Direction that's normal to the wall, pointing towards the wall from the robot:
+        // Direction that's normal to the wall, pointing towards the wall from the robot's
+        // perspective:
         double normalAngle = Math.atan2(wallVector.y, wallVector.x) - Math.PI/2;
 
         // Direction of the velocity vector:
@@ -277,9 +272,9 @@ public class Driver extends LinearOpMode {
         double fullLateralSpeed
                 = fullAxialSpeed * drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
         // Rotations/s = fullAxialSpeed / (pi * wheelbase)
+        // Radians/s = 2 * pi * rotations/s
         double fullAngularSpeed
-                = fullAxialSpeed
-                / (2 * Math.pow(Math.PI, 2) * drive.PARAMS.trackWidthTicks * drive.PARAMS.inPerTick);
+                = 2 * fullAxialSpeed / (drive.PARAMS.trackWidthTicks * drive.PARAMS.inPerTick);
 
         waitForStart();
 
@@ -306,15 +301,17 @@ public class Driver extends LinearOpMode {
 
             // Manually drive:
             if (!autoActivated) {
-                if (false) {
+                if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
                             scaleStick(-gamepad1.left_stick_y, fullAxialSpeed),
                             scaleStick(-gamepad1.left_stick_x, fullLateralSpeed)),
                             scaleStick(-gamepad1.right_stick_x, fullAngularSpeed));
 
-                    wall.repulse(calibratedVelocity, packet); // @@@
+                    PoseVelocity2d fieldVelocity = drive.pose.times(calibratedVelocity);
 
-                    drive.setDrivePowers(null, calibratedVelocity);
+                    wall.repulse(fieldVelocity, packet); // @@@
+
+                    drive.setDrivePowers(null, fieldVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
                             shapeStick(-gamepad1.left_stick_y),
@@ -324,13 +321,19 @@ public class Driver extends LinearOpMode {
                 }
             }
 
-            // Draw AprilTag poses and refine them:
+            // Refine the pose estimate using AprilTags:
             Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
             if (refinedPose != null) {
                 led.setSteadyColor(Led.Color.GREEN);
                 led.setPulseColor(Led.Color.RED, 0.25);
-                drive.pose = refinedPose;
+
+                drive.setPose(refinedPose);
             }
+
+            // Draw the pose history:
+            drive.drawPoseHistory(canvas);
+
+            // Draw the refinement history:
 
             // Draw the best estimate pose:
             canvas.setStroke("#3F51B5");
@@ -355,14 +358,14 @@ public class Driver extends LinearOpMode {
                 minAngularDeceleration = Math.min(angularSpeedDelta, minAngularDeceleration);
             }
             previousAngularSpeed = angularSpeed;
-            maxAngularSpeed = Math.max(angularSpeedDelta, maxAngularSpeed);
+            maxAngularSpeed = Math.max(angularSpeed, maxAngularSpeed);
 
-            packet.put("Linear speed", linearSpeed);
-            packet.put("Linear delta", linearSpeedDelta);
-            packet.put("Linear theoretical", fullAxialSpeed);
-            packet.put("Angular speed", angularSpeed);
-            packet.put("Angular delta", angularSpeedDelta);
-            packet.put("Angular theoretical", fullAngularSpeed);
+//            packet.put("Linear speed", linearSpeed);
+//            packet.put("Linear delta", linearSpeedDelta);
+//            packet.put("Linear theoretical", fullAxialSpeed);
+//            packet.put("Angular speed", angularSpeed);
+//            packet.put("Angular delta", angularSpeedDelta);
+//            packet.put("Angular theoretical", fullAngularSpeed);
 
             // Finish up:
             FtcDashboard.getInstance().sendTelemetryPacket(packet);

@@ -53,6 +53,15 @@ import java.util.List;
 @Config
 public final class MecanumDrive {
 
+    public class PoseNode {
+        Pose2d pose;
+        int flags;
+        public PoseNode(Pose2d pose, int flags) {
+            this.pose = pose;
+            this.flags = flags;
+        }
+    }
+
     public static String getBotName() {
         InspectionState inspection=new InspectionState();
         inspection.initializeLocal();
@@ -158,7 +167,7 @@ public final class MecanumDrive {
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
 
-    private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
+    public final LinkedList<PoseNode> poseHistory = new LinkedList<>();
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -547,7 +556,7 @@ public final class MecanumDrive {
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
 
-        poseHistory.add(pose);
+        poseHistory.add(new PoseNode(pose, 0));
         while (poseHistory.size() > 100) {
             poseHistory.removeFirst();
         }
@@ -558,21 +567,37 @@ public final class MecanumDrive {
         return poseVelocity;
     }
 
-    private void drawPoseHistory(Canvas c) {
+    public void drawPoseHistory(Canvas c) {
         double[] xPoints = new double[poseHistory.size()];
         double[] yPoints = new double[poseHistory.size()];
 
         int i = 0;
-        for (Pose2d t : poseHistory) {
-            xPoints[i] = t.position.x;
-            yPoints[i] = t.position.y;
-
+        for (PoseNode t : poseHistory) {
+            xPoints[i] = t.pose.position.x;
+            yPoints[i] = t.pose.position.y;
             i++;
         }
 
         c.setStrokeWidth(1);
         c.setStroke("#3F51B5");
         c.strokePolyline(xPoints, yPoints);
+
+        // Draw pose corrections in red:
+        c.setStroke("#FF0000");
+        for (i = 1; i < poseHistory.size(); i++) {
+            if (poseHistory.get(i).flags != 0) {
+                c.strokeLine(poseHistory.get(i-1).pose.position.x,
+                             poseHistory.get(i-1).pose.position.y,
+                             poseHistory.get(i).pose.position.x,
+                             poseHistory.get(i).pose.position.y);
+            }
+        }
+    }
+
+    // Set the new pose, marking it in the pose history as a discontinuity:
+    public void setPose(Pose2d pose) {
+        this.pose = pose;
+        poseHistory.add(new PoseNode(pose, 1));
     }
 
     public static void drawRobot(Canvas c, Pose2d t, double robotRadius) {
