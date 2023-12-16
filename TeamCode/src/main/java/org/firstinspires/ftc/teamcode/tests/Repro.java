@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.tests;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -151,11 +152,13 @@ public class Repro extends LinearOpMode {
         telemetry.addLine("Initializing repro...");
         telemetry.update();
 
+        WebcamName camera = hardwareMap.get(WebcamName.class, "webcam");
+
         ////////////////////////////////////////////////////////////////////////////////////////////
         // OpenCV
 
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-        robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "webcam"), cameraMonitorViewId);
+        robotCamera = OpenCvCameraFactory.getInstance().createWebcam(camera, cameraMonitorViewId);
 
         // OR...  Do Not Activate the Camera Monitor View
         // robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "RobotCamera"));
@@ -192,7 +195,7 @@ public class Repro extends LinearOpMode {
         aprilTag = new AprilTagProcessor.Builder().build();
         aprilTag.setDecimation(1);
         VisionPortal.Builder builder = new VisionPortal.Builder();
-        builder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
+        builder.setCamera(camera);
         builder.setCameraResolution(new android.util.Size(640, 480));
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
