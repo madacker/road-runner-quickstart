@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import org.opencv.core.Core;
@@ -145,6 +146,7 @@ public class Repro extends LinearOpMode {
         AprilTagProcessor aprilTag;
         VisionPortal visionPortal;
         OpenCvCamera robotCamera;
+        TimeSplitter aprilInitializeTime = TimeSplitter.create("AprilTags initialization");
 
         telemetry.addLine("Initializing repro...");
         telemetry.update();
@@ -174,9 +176,11 @@ public class Repro extends LinearOpMode {
             }
         });
 
+        waitForStart(); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
         // robotCamera.pauseViewport();
         if (!CRASH) {
-            sleep(5000);
+            sleep(100);
             robotCamera.stopStreaming();
             robotCamera.closeCameraDevice();
         }
@@ -184,6 +188,7 @@ public class Repro extends LinearOpMode {
         ////////////////////////////////////////////////////////////////////////////////////////////
         // AprilTag
 
+        aprilInitializeTime.startSplit();
         aprilTag = new AprilTagProcessor.Builder().build();
         aprilTag.setDecimation(1);
         VisionPortal.Builder builder = new VisionPortal.Builder();
@@ -203,11 +208,10 @@ public class Repro extends LinearOpMode {
 
         builder.addProcessor(aprilTag);
         visionPortal = builder.build();
+        aprilInitializeTime.endSplit();
 
         telemetry.addLine("Done initialization!");
         telemetry.update();
-
-        waitForStart(); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         if (CRASH) {
             robotCamera.stopStreaming();
@@ -216,6 +220,7 @@ public class Repro extends LinearOpMode {
 
         visionPortal.close();
 
+        TimeSplitter.logAllResults();
         telemetry.addLine("All done, terminating now!");
         telemetry.update();
     }
