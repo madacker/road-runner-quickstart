@@ -47,10 +47,6 @@ class Constants {
 }
 
 class ColorDetectPipeline extends OpenCvPipeline {
-
-
-    boolean viewportPaused = false;
-
     // matrices in the processing pipeline
     Mat roiMat = new Mat();
     Mat blurredMat = new Mat();
@@ -136,90 +132,87 @@ class ColorDetectPipeline extends OpenCvPipeline {
 
     @Override
     public void onViewportTapped() {
-        viewportPaused = !viewportPaused;
-
-        if (viewportPaused) {
             // @@@@@@@@@@@@@@@ robotCamera.pauseViewport();
-        } else {
             // @@@@@@@@@@@@@@@ robotCamera.resumeViewport();
-        }
     }
 }
 
 @Autonomous(name = "Repro")
 public class Repro extends LinearOpMode {
+    final boolean CRASH = false;
+
     public void runOpMode() {
         AprilTagProcessor aprilTag;
         VisionPortal visionPortal;
         OpenCvCamera robotCamera;
 
-        // initializeAuto();
-        {
-            telemetry.addLine("Initializing with a sleep...");
-            telemetry.update();
+        telemetry.addLine("Initializing repro...");
+        telemetry.update();
 
-            // myColorDetection = new OpenCvColorDetection(this);
-            // myColorDetection.init();
-            {
-                int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-                robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "webcam"), cameraMonitorViewId);
+        ////////////////////////////////////////////////////////////////////////////////////////////
+        // OpenCV
 
-                // OR...  Do Not Activate the Camera Monitor View
-                // robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "RobotCamera"));
-                // OR... use internal phone camera
-                // phoneCam = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK);
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "webcam"), cameraMonitorViewId);
 
-                robotCamera.setPipeline(new ColorDetectPipeline());
+        // OR...  Do Not Activate the Camera Monitor View
+        // robotCamera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "RobotCamera"));
+        // OR... use internal phone camera
+        // phoneCam = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK);
 
-                robotCamera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
-                    @Override
-                    public void onOpened() {
-                        // startStreaming();
-                        robotCamera.startStreaming(640, 480, OpenCvCameraRotation.UPRIGHT);
-                    }
+        robotCamera.setPipeline(new ColorDetectPipeline());
 
-                    @Override
-                    public void onError(int errorCode) {
-                    }
-                });
-
+        robotCamera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                // startStreaming();
+                robotCamera.startStreaming(640, 480, OpenCvCameraRotation.UPRIGHT);
             }
 
-            // initializeHardware();
-            // drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-            // myAprilTagPoseEstimator = new AprilTagPoseEstimator(hardwareMap);
+            @Override
+            public void onError(int errorCode) {
+            }
+        });
 
-            aprilTag = new AprilTagProcessor.Builder().build();
-            aprilTag.setDecimation(1);
-            VisionPortal.Builder builder = new VisionPortal.Builder();
-            builder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
-            builder.setCameraResolution(new android.util.Size(1920, 1080));
-
-            // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
-            //builder.enableLiveView(true);
-
-            // Set the stream format; MJPEG uses less bandwidth than default YUY2.
-            //builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
-
-            // Choose whether or not LiveView stops if no processors are enabled.
-            // If set "true", monitor shows solid orange screen if no processors enabled.
-            // If set "false", monitor shows camera view without annotations.
-            //builder.setAutoStopLiveView(false);
-
-            builder.addProcessor(aprilTag);
-            visionPortal = builder.build();
-
+        // robotCamera.pauseViewport();
+        if (!CRASH) {
             sleep(5000);
-
-            telemetry.addLine("Done initialization!");
-            telemetry.update();
+            robotCamera.stopStreaming();
+            robotCamera.closeCameraDevice();
         }
 
-        waitForStart();
+        ////////////////////////////////////////////////////////////////////////////////////////////
+        // AprilTag
 
-        // @@@ robotCamera.pauseViewport()?!?
-        robotCamera.stopStreaming();
-        robotCamera.closeCameraDevice();
+        aprilTag = new AprilTagProcessor.Builder().build();
+        aprilTag.setDecimation(1);
+        VisionPortal.Builder builder = new VisionPortal.Builder();
+        builder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
+        builder.setCameraResolution(new android.util.Size(640, 480));
+
+        // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
+        //builder.enableLiveView(true);
+
+        // Set the stream format; MJPEG uses less bandwidth than default YUY2.
+        //builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
+
+        // Choose whether or not LiveView stops if no processors are enabled.
+        // If set "true", monitor shows solid orange screen if no processors enabled.
+        // If set "false", monitor shows camera view without annotations.
+        //builder.setAutoStopLiveView(false);
+
+        builder.addProcessor(aprilTag);
+        visionPortal = builder.build();
+
+        telemetry.addLine("Done initialization!");
+        telemetry.update();
+
+        waitForStart(); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        if (CRASH) {
+            robotCamera.stopStreaming();
+            robotCamera.closeCameraDevice();
+        }
 
         visionPortal.close();
 
