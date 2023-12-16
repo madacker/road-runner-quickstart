@@ -324,8 +324,8 @@ public final class MecanumDrive {
      * robot down.
      */
     public void setDrivePowers(
-            PoseVelocity2d stickVelocity, // Can be null, normalized voltage from -1 to 1
-            PoseVelocity2d assistVelocity) // Can be null, inches/s and radians/s
+            PoseVelocity2d stickVelocity, // Can be null, normalized voltage from -1 to 1, robot-relative coordinates
+            PoseVelocity2d assistVelocity) // Can be null, inches/s and radians/s, field-relative coordinates
     {
         if (stickVelocity == null)
             stickVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
