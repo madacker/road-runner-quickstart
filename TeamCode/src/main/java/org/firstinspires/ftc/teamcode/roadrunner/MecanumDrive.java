@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.roadrunner;
 
 import static java.lang.Math.max;
+import static java.lang.System.nanoTime;
 
 import android.util.Log;
 
@@ -41,7 +42,6 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
-import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.inspection.InspectionState;
 
@@ -308,6 +308,7 @@ public final class MecanumDrive {
 
     // Used by setDrivePowers to calculate acceleration:
     PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+    double previousAssistSeconds = 0; // Previous call's nanoTime() in seconds
 
     /**
      * Power the motors according to the specified velocities. 'stickVelocity' is for controller
@@ -324,20 +325,28 @@ public final class MecanumDrive {
      * robot down.
      */
     public void setDrivePowers(
-            PoseVelocity2d stickVelocity, // Can be null, normalized voltage from -1 to 1, robot-relative coordinates
-            PoseVelocity2d assistVelocity) // Can be null, inches/s and radians/s, field-relative coordinates
+            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
+            PoseVelocity2d stickVelocity,
+            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
+            PoseVelocity2d assistVelocity)
     {
         if (stickVelocity == null)
             stickVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
         if (assistVelocity == null)
             assistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
-        // Compute the target acceleration as the difference between the new target velocity
-        // and the old:
-        PoseVelocity2d targetAcceleration = new PoseVelocity2d(new Vector2d(
-                assistVelocity.linearVel.x - previousAssistVelocity.linearVel.x,
-                assistVelocity.linearVel.y - previousAssistVelocity.linearVel.y),
-                assistVelocity.angVel - previousAssistVelocity.angVel);
+        // Compute the assist acceleration as the difference between the new assist velocity
+        // and the old divided by delta-t:
+        double currentSeconds = nanoTime() * 1e-9;
+        PoseVelocity2d assistAcceleration = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        if (previousAssistSeconds != 0) {
+            double deltaT = currentSeconds - previousAssistSeconds;
+            assistAcceleration = new PoseVelocity2d(new Vector2d(
+                    (assistVelocity.linearVel.x - previousAssistVelocity.linearVel.x) / deltaT,
+                    (assistVelocity.linearVel.y - previousAssistVelocity.linearVel.y) / deltaT),
+                    (assistVelocity.angVel - previousAssistVelocity.angVel) / deltaT);
+        }
+        previousAssistSeconds = currentSeconds;
 
         // Remember the current velocity for next time:
         previousAssistVelocity = new PoseVelocity2d(new Vector2d(
@@ -353,9 +362,9 @@ public final class MecanumDrive {
         double rightFrontPower = manualVels.rightFront.get(0);
 
         // Compute the wheel powers for the assist:
-        double[] x = { pose.position.x, assistVelocity.linearVel.x, targetAcceleration.linearVel.x };
-        double[] y = { pose.position.y, assistVelocity.linearVel.y, targetAcceleration.linearVel.y };
-        double[] angular = { pose.heading.log(), assistVelocity.angVel, targetAcceleration.angVel };
+        double[] x = { pose.position.x, assistVelocity.linearVel.x, assistAcceleration.linearVel.x };
+        double[] y = { pose.position.y, assistVelocity.linearVel.y, assistAcceleration.linearVel.y };
+        double[] angular = { pose.heading.log(), assistVelocity.angVel, assistAcceleration.angVel };
 
         Pose2dDual<Time> computedDualPose = new Pose2dDual<>(
                 new Vector2dDual<>(new DualNum<>(x), new DualNum<>(y)),

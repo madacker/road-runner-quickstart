@@ -35,12 +35,16 @@ package org.firstinspires.ftc.teamcode.tuning;
 
 import android.util.Size;
 
+import com.acmerobotics.dashboard.FtcDashboard;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.vision.VisionPortal;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvWebcam;
 
 import java.util.Locale;
 
@@ -78,22 +82,15 @@ public class UtilityCameraFrameCapture extends LinearOpMode
     @Override
     public void runOpMode()
     {
-        VisionPortal portal;
-
-        if (USING_WEBCAM)
-        {
-            portal = new VisionPortal.Builder()
+        VisionPortal portal = new VisionPortal.Builder()
                     .setCamera(hardwareMap.get(WebcamName.class, WEBCAM_NAME))
                     .setCameraResolution(new Size(RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
                     .build();
-        }
-        else
-        {
-            portal = new VisionPortal.Builder()
-                    .setCamera(INTERNAL_CAM_DIR)
-                    .setCameraResolution(new Size(RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
-                    .build();
-        }
+
+        WebcamName camera = hardwareMap.get(WebcamName.class, WEBCAM_NAME);
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        OpenCvCamera robotCamera = OpenCvCameraFactory.getInstance().createWebcam(camera, cameraMonitorViewId);
+        FtcDashboard.getInstance().startCameraStream(robotCamera, 0);
 
         while (!isStopRequested())
         {
@@ -114,7 +111,7 @@ public class UtilityCameraFrameCapture extends LinearOpMode
 
             if (capReqTime != 0)
             {
-                telemetry.addLine("\nCaptured Frame!");
+                telemetry.addLine(String.format("\nCaptured Frame %d!", frameCount));
             }
 
             if (capReqTime != 0 && System.currentTimeMillis() - capReqTime > 1000)
