@@ -36,6 +36,8 @@ package org.firstinspires.ftc.teamcode.tuning;
 import android.util.Size;
 
 import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.ftccommon.SoundPlayer;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -82,15 +84,12 @@ public class UtilityCameraFrameCapture extends LinearOpMode
     @Override
     public void runOpMode()
     {
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
         VisionPortal portal = new VisionPortal.Builder()
                     .setCamera(hardwareMap.get(WebcamName.class, WEBCAM_NAME))
                     .setCameraResolution(new Size(RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
                     .build();
-
-        WebcamName camera = hardwareMap.get(WebcamName.class, WEBCAM_NAME);
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-        OpenCvCamera robotCamera = OpenCvCameraFactory.getInstance().createWebcam(camera, cameraMonitorViewId);
-        FtcDashboard.getInstance().startCameraStream(robotCamera, 0);
 
         while (!isStopRequested())
         {

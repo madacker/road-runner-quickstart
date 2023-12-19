@@ -173,7 +173,9 @@ public class AprilTagTest extends LinearOpMode {
             //.setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
             // ... these parameters are fx, fy, cx, cy.
 
-            .build();
+                // fx="906.940247073" fy="906.940247073" cx="670.833056673" cy="355.34234068"
+                .setLensIntrinsics(906.940247073, 906.940247073, 670.833056673, 355.34234068)
+                .build();
 
         // Adjust Image Decimation to trade-off detection-range for detection-rate.
         // eg: Some typical detection data using a Logitech C920 WebCam
