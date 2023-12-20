@@ -10,40 +10,29 @@ import com.example.uitesting.ui.Telemetry;
 /**
  * This class is a bit of glue to run your menu program. Don't change this!
  */
-public class MenuTest {
+public class UiTest {
     public static void main(String[] args) {
         Telemetry telemetry = new Telemetry();
         Gamepad gamepad = new Gamepad();
 
-        Menu menu = new Menu(telemetry, gamepad);
-        menu.run();
+        // Invoke the menu:
+        Config config = new Config();
+        config.menu(telemetry, gamepad);
     }
 }
 /**
  * This is a very simple template for a menu class. You can copy and paste this class to
  * and from your actual robot code.
  */
-class Menu {
-    // The resulting menu state after the menu is run:
-    boolean isRed;
-
-    // Internal state:
-    private Telemetry telemetry;
-    private Gamepad gamepad;
-
-    /**
-     * On the robot, pass the real 'telemetry' and 'gamepad1' variables here. When running on
-     * the PC, this constructor will be called with fake Telemetry and Gamepad classes.
-     */
-    Menu(Telemetry telemetry, Gamepad gamepad) {
-        this.telemetry = telemetry;
-        this.gamepad = gamepad;
-    }
+class Config {
+    // Put config state that's set by the menu here. Make these 'static' so that they can be read
+    // from both Auton and TeleOp:
+    static boolean isRed;
 
     /**
      * Run the menu. The resulting state can be found in the public fields of this class.
      */
-    void run() {
+    void menu(Telemetry telemetry, Gamepad gamepad) {
         telemetry.addLine("Press A for red, B for blue");
         telemetry.update();
 
@@ -51,6 +40,7 @@ class Menu {
             ;
 
         isRed = gamepad.a;
+
         telemetry.addLine(String.format(" Result isRed: %s", isRed));
         telemetry.update();
     }
