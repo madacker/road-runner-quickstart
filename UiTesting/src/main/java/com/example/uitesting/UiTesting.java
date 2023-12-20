@@ -6,8 +6,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.Scanner;
 
-import javax.swing.*;
-
 class KeyDispatcher implements KeyEventDispatcher {
     @Override
     public boolean dispatchKeyEvent(KeyEvent keyEvent) {
@@ -25,16 +23,21 @@ class KeyDispatcher implements KeyEventDispatcher {
     }
 }
 
-class Ui {
+class Gamepad {
+    Gamepad() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyDispatcher());
+    }
+
+}
+
+class Telemetry {
     WindowFrame windowFrame;
     Canvas canvas;
-    Scanner keyboard;
 
-    Ui() {
+    Telemetry() {
         windowFrame = new WindowFrame("UI", 800);
         windowFrame.setVisible(true);
 
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyDispatcher());
     }
     void render() {
         canvas = windowFrame.getCanvas();
@@ -50,8 +53,10 @@ class Ui {
 
 public class UiTesting {
     public static void main(String[] args) {
-        Ui ui = new Ui();
+        Telemetry telemetry = new Telemetry();
+        Gamepad gamepad = new Gamepad();
+
         while (true)
-            ui.render();
+            telemetry.render();
     }
 }
