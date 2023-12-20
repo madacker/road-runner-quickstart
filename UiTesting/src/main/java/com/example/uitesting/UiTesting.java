@@ -1,108 +1,57 @@
+/**
+ *  This file is a handy place to test your robot's menu logic without needing a robot to
+ *  test on.
+ */
 package com.example.uitesting;
 
-import com.example.uitesting.ui.WindowFrame;
+import com.example.uitesting.ui.Gamepad;
+import com.example.uitesting.ui.Telemetry;
 
-import java.awt.*;
-import java.awt.event.*;
-import java.util.ArrayList;
-import java.util.Scanner;
-
-class KeyDispatcher implements KeyEventDispatcher {
-    private Gamepad gamepad;
-    public KeyDispatcher(Gamepad gamepad) {
-        this.gamepad = gamepad;
-    }
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent keyEvent) {
-        int code = keyEvent.getKeyCode();
-        boolean isPressed = (keyEvent.getID() != KeyEvent.KEY_RELEASED);
-        System.out.println(String.format("ID: %d", keyEvent.getID()));
-
-        switch (code) {
-            case KeyEvent.VK_UP: gamepad.dpad_up = isPressed; break;
-            case KeyEvent.VK_DOWN: gamepad.dpad_down = isPressed; break;
-            case KeyEvent.VK_A: gamepad.a = isPressed; break;
-            case KeyEvent.VK_B: gamepad.b = isPressed; break;
-            case KeyEvent.VK_X: gamepad.x = isPressed; break;
-            case KeyEvent.VK_Y: gamepad.y = isPressed; break;
-        }
-        return true;
-    }
-}
-
-class Gamepad {
-    public boolean dpad_down;
-    public boolean dpad_up;
-    public boolean a;
-    public boolean b;
-    public boolean x;
-    public boolean y;
-
-    Gamepad() {
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyDispatcher(this));
-    }
-}
-
-class Telemetry {
-    WindowFrame windowFrame;
-    Canvas canvas;
-    ArrayList<String> lineList = new ArrayList<>();
-
-    Telemetry() {
-        windowFrame = new WindowFrame("UI", 800);
-        windowFrame.setVisible(true);
-    }
-    void render() {
-        canvas = windowFrame.getCanvas();
-        Graphics g = canvas.getBufferStrategy().getDrawGraphics();
-        g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-
-        g.setFont(new Font("Sans", Font.BOLD, 14));
-        g.drawString("This is a test!", 100, 100);
-        g.dispose();
-        canvas.getBufferStrategy().show();
-    }
-    void addLine(String string) {
-        lineList.add(string);
-    }
-    void update() {
-        int FONT_SIZE = 14;
-        canvas = windowFrame.getCanvas();
-        Graphics g = canvas.getBufferStrategy().getDrawGraphics();
-        g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        g.setFont(new Font("Sans", Font.BOLD, FONT_SIZE));
-
-        int x = 100;
-        int y = 100;
-        for (String line: lineList) {
-            g.drawString(line, x, y);
-            y += FONT_SIZE;
-        }
-        g.dispose();
-        canvas.getBufferStrategy().show();
-
-        // Erase all of the lines in the list:
-        lineList.clear();
-    }
-}
-
+/**
+ * This class is a bit of glue to run your menu program. Don't change this!
+ */
 public class UiTesting {
     public static void main(String[] args) {
         Telemetry telemetry = new Telemetry();
         Gamepad gamepad = new Gamepad();
 
-        while (true) {
-            if (gamepad.a) {
-                telemetry.addLine("A pressed");
-            } else {
-                telemetry.addLine("A inactive");
-            }
-            if (gamepad.b) {
-                telemetry.addLine("B pressed");
-            } else {
-                telemetry.addLine("B inactive");
-            }
-            telemetry.update();
-        }
+        Menu menu = new Menu(telemetry, gamepad);
+        menu.run();
+    }
+}
+/**
+ * This is a very simple template for a menu class. You can copy and paste this class to
+ * and from your actual robot code.
+ */
+class Menu {
+    // The resulting menu state after the menu is run:
+    boolean isRed;
+
+    // Internal state:
+    private Telemetry telemetry;
+    private Gamepad gamepad;
+
+    /**
+     * On the robot, pass the real 'telemetry' and 'gamepad1' variables here. When running on
+     * the PC, this constructor will be called with fake Telemetry and Gamepad classes.
+     */
+    Menu(Telemetry telemetry, Gamepad gamepad) {
+        this.telemetry = telemetry;
+        this.gamepad = gamepad;
+    }
+
+    /**
+     * Run the menu. The resulting state can be found in the public fields of this class.
+     */
+    void run() {
+        telemetry.addLine("Press A for red, B for blue");
+        telemetry.update();
+
+        while (!gamepad.a && !gamepad.b)
+            ;
+
+        isRed = gamepad.a;
+        telemetry.addLine(String.format(" Result isRed: %s", isRed));
+        telemetry.update();
     }
 }

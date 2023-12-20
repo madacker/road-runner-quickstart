@@ -3,6 +3,9 @@ package com.example.uitesting.ui
 import java.awt.*
 import java.awt.image.BufferStrategy
 
+/**
+ * Wrapper for the drawing canvas.
+ */
 class MainCanvas(private var internalWidth: Int, private var internalHeight: Int): Canvas() {
     lateinit var bufferStrat: BufferStrategy
 

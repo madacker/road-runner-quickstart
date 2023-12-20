@@ -7,6 +7,9 @@ import javax.swing.JFrame
 import javax.swing.JPanel
 import kotlin.system.exitProcess
 
+/**
+ * Wrapper for the window frame.
+ */
 class WindowFrame(title: String, windowSize: Int) : JFrame() {
     var internalWidth = windowSize
     var internalHeight = windowSize
