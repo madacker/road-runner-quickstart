@@ -10,7 +10,7 @@ import com.example.uitesting.ui.Telemetry;
 /**
  * This class is a bit of glue to run your menu program. Don't change this!
  */
-public class UiTesting {
+public class MenuTest {
     public static void main(String[] args) {
         Telemetry telemetry = new Telemetry();
         Gamepad gamepad = new Gamepad();
