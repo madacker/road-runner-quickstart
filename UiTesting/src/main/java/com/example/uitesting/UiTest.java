@@ -27,7 +27,7 @@ public class UiTest {
 class Config {
     // Put config state that's set by the menu here. Make these 'static' so that they can be read
     // from both Auton and TeleOp:
-    static boolean isRed;
+    static boolean isRed = false;
 
     /**
      * Run the menu. The resulting state can be found in the public fields of this class.
