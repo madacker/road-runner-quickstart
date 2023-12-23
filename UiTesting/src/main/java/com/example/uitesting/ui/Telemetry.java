@@ -15,7 +15,7 @@ public class Telemetry {
     ArrayList<String> lineList = new ArrayList<>();
 
     public Telemetry() {
-        windowFrame = new WindowFrame("UI", 800);
+        windowFrame = new WindowFrame("UI", 400);
         windowFrame.setVisible(true);
     }
 
@@ -41,10 +41,10 @@ public class Telemetry {
     public void clear() { lineList.clear(); }
     public void clearAll() { lineList.clear(); }
 
-    private void test() {
-        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85"); // \uD83C\uDFFE"); // Two reindeers and a Santa
+    public void test() {
+        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\uD83C\uDFFE"); // Two reindeers and a Santa with a combining
         addLine("This\uD83E\uDD75has\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
-        addLine("This is\nmultiple lines");
+        addLine("This is\nmultiple\nlines followed by an empty line");
         addLine("");
         addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
         addLine("\n");
@@ -56,14 +56,6 @@ public class Telemetry {
     }
 
     public void update() {
-        String test = "Hi: \uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\n"; // Two reindeers and a Santa
-        int length = test.codePointCount(0, test.length());
-        System.out.println(String.format("Length: %d", length));
-        for (int i = 0; i < length; i++) {
-            int offset = test.offsetByCodePoints(0, i);
-            System.out.println(String.format("  Char: %x", (int) test.codePointAt(offset)));
-        }
-
         // Use this font for display on the PC. It's different from the sizing font because the
         // sizing font doesn't support the full unicode character set (like emojis):
         final int DISPLAY_FONT_SIZE = 16;
@@ -88,24 +80,27 @@ public class Telemetry {
         g.setFont(DISPLAY_FONT);
         FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
 
-        test();
-
         int y = HEIGHT_IN_LINES;
         int lineCount = 0;
         for (String line : lineList) {
             while (lineCount < HEIGHT_IN_LINES) {
                 int lineBreak = line.length();
                 if (metrics.stringWidth(line) > WIDTH_IN_FONT_UNITS) {
-                    // If the line is too long, try and break it at a space:
+                    // If the line is too long, try and break at a space:
+                    lineBreak = line.length() - 1;
                     while ((lineBreak > 0) &&
-                            ((line.charAt(lineBreak - 1) != ' ') ||
+                            ((line.charAt(lineBreak) != ' ') ||
                                     (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS)))
                         lineBreak--;
 
-                    // If no line break was found using a space, simply break it at any character:
+                    // If no line break was found using a space, simply break at any character
+                    // that isn't a UTF-16 trailing surrogate (the second half of a surrogate
+                    // pair):
                     if (lineBreak == 0) {
-                        lineBreak = line.length();
-                        while (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS)
+                        lineBreak = line.length() - 1;
+                        while ((lineBreak > 0) &&
+                                ((line.charAt(lineBreak) & 0xfc00) == 0xdc00) ||
+                                    (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS))
                             lineBreak--;
                     }
                 }
