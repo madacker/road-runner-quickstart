@@ -1,7 +1,5 @@
 package com.example.uitesting.ui;
 
-import com.example.uitesting.ui.WindowFrame;
-
 import java.awt.Canvas;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -12,11 +10,6 @@ import java.util.ArrayList;
  * This class implements a lightweight emulation of FTC Telemetry that can run on the PC.
  */
 public class Telemetry {
-    final int FONT_SIZE = 16;
-    final Font FONT = new Font("Verdana", Font.PLAIN, FONT_SIZE); // "Sans"
-    final int WIDTH_IN_PIXELS = 200;
-    final int HEIGHT_IN_LINES = 18;
-
     WindowFrame windowFrame;
     Canvas canvas;
     ArrayList<String> lineList = new ArrayList<>();
@@ -27,27 +20,102 @@ public class Telemetry {
     }
 
     public void addLine(String string) {
+        int newLineIndex;
+        while ((newLineIndex = string.indexOf("\n")) != -1) {
+            String line = string.substring(0, newLineIndex);
+            lineList.add(line);
+            string = string.substring(newLineIndex + 1);
+        }
         lineList.add(string);
     }
 
+    public void addData(String caption, Object value) {
+        addLine(String.format("%s: %s", caption, value.toString()));
+    }
+
+    public void addData(String caption, String format, Object... args) {
+        addData(caption, String.format(format, args));
+    }
+
+    public void addLine() { addLine(""); }
+    public void clear() { lineList.clear(); }
+    public void clearAll() { lineList.clear(); }
+
+    private void test() {
+        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\uD83C\uDFFE"); // Two reindeers and a Santa
+        addLine("This\uD83E\uDD75has\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
+        addLine("This is\nmultiple lines");
+        addLine("");
+        addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
+        addLine("\n");
+        addLine("123456789,123456789,123456789,123456789,12");
+        addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
+        for (int i = 0; i < 40; i++) {
+            addLine(String.format("Line %d", i));
+        }
+    }
+
     public void update() {
+        String test = "\uD83D\uDD95\uD83C\uDFFF";
+        System.out.println(String.format("Length: %d", test.length()));
+        for (int i = 0; i < test.length(); i++) {
+            System.out.println(String.format("  Char: %d", (int) test.charAt(i)));
+        }
+
+
+        // Use this font for display on the PC. It's different from the sizing font because the
+        // sizing font doesn't support the full unicode character set (like emojis):
+        final int DISPLAY_FONT_SIZE = 16;
+        final Font DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
+
+        // Try to emulate the same line width as the REV Driver Station in its horizontal
+        // configuration. Because the DS uses a proportional font, and because we don't have
+        // access to the source code, we can't precisely replicate the DS behavior when a
+        // single line is too wide for the DS and has to be broken into multiple lines. So
+        // we use a different proportional font for measuring the text and just kind of guess.
+        // We try to use a font that supplies similar proportions for different strings,
+        // settling on the following and measuring its width using the strings
+        // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
+        // are each as wide as can be displayed on the REV Control Hub without wrapping:
+        final Font SIZING_FONT = new Font("Verdana", Font.PLAIN, 12);
+        final int WIDTH_IN_FONT_UNITS = 312;
+        final int HEIGHT_IN_LINES = 18;
+
         canvas = windowFrame.getCanvas();
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        g.setFont(FONT);
+        g.setFont(DISPLAY_FONT);
+        FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
 
-        FontMetrics metrics = g.getFontMetrics(FONT);
-        System.out.println(String.format("%d, %d\n",
-                metrics.stringWidth("123456789,123456789,123456789,123456789,1"),
-                metrics.stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWW")));
-        lineList.add("123456789,123456789,123456789,123456789,1");
-        lineList.add("WWWWWWWWW,WWWWWWWWW,WWWWWWW");
+        test();
 
-        int x = 100;
-        int y = 100;
+        int y = HEIGHT_IN_LINES;
+        int lineCount = 0;
         for (String line : lineList) {
-            g.drawString(line, x, y);
-            y += FONT_SIZE;
+            while (lineCount < HEIGHT_IN_LINES) {
+                int lineBreak = line.length();
+                if (metrics.stringWidth(line) > WIDTH_IN_FONT_UNITS) {
+                    // If the line is too long, try and break it at a space:
+                    while ((lineBreak > 0) &&
+                            ((line.charAt(lineBreak - 1) != ' ') ||
+                                    (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS)))
+                        lineBreak--;
+
+                    // If no line break was found using a space, simply break it at any character:
+                    if (lineBreak == 0) {
+                        lineBreak = line.length();
+                        while (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS)
+                            lineBreak--;
+                    }
+                }
+
+                g.drawString(line.substring(0, lineBreak), 0, y);
+                y += DISPLAY_FONT_SIZE;
+                lineCount++;
+                line = line.substring(lineBreak);
+                if (line == "")
+                    break; // ====>
+            }
         }
         g.dispose();
         canvas.getBufferStrategy().show();

@@ -12,10 +12,12 @@ import com.example.uitesting.ui.Telemetry;
  */
 public class UiTest {
     public static void main(String[] args) {
+        // To run on the PC, we create our own emulated versions of the FTC's Telemetry and
+        // Gamepad objects:
         Telemetry telemetry = new Telemetry();
         Gamepad gamepad = new Gamepad();
 
-        // Invoke the menu:
+        // Invoke the config menu:
         Config config = new Config();
         config.menu(telemetry, gamepad);
     }
