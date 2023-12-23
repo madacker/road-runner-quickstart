@@ -42,7 +42,7 @@ public class Telemetry {
     public void clearAll() { lineList.clear(); }
 
     private void test() {
-        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\uD83C\uDFFE"); // Two reindeers and a Santa
+        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85"); // \uD83C\uDFFE"); // Two reindeers and a Santa
         addLine("This\uD83E\uDD75has\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         addLine("This is\nmultiple lines");
         addLine("");
@@ -56,12 +56,13 @@ public class Telemetry {
     }
 
     public void update() {
-        String test = "\uD83D\uDD95\uD83C\uDFFF";
-        System.out.println(String.format("Length: %d", test.length()));
-        for (int i = 0; i < test.length(); i++) {
-            System.out.println(String.format("  Char: %d", (int) test.charAt(i)));
+        String test = "Hi: \uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\n"; // Two reindeers and a Santa
+        int length = test.codePointCount(0, test.length());
+        System.out.println(String.format("Length: %d", length));
+        for (int i = 0; i < length; i++) {
+            int offset = test.offsetByCodePoints(0, i);
+            System.out.println(String.format("  Char: %x", (int) test.codePointAt(offset)));
         }
-
 
         // Use this font for display on the PC. It's different from the sizing font because the
         // sizing font doesn't support the full unicode character set (like emojis):
