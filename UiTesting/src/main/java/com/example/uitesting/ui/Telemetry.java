@@ -10,6 +10,25 @@ import java.util.ArrayList;
  * This class implements a lightweight emulation of FTC Telemetry that can run on the PC.
  */
 public class Telemetry {
+    // Use this font for display on the PC. It's different from the sizing font because the
+    // sizing font doesn't support the full unicode character set (like emojis):
+    final int DISPLAY_FONT_SIZE = 16;
+    final Font DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
+
+    // Try to emulate the same line width as the REV Driver Station in its horizontal
+    // configuration. Because the DS uses a proportional font, and because we don't have
+    // access to the source code, we can't precisely replicate the DS behavior when a
+    // single line is too wide for the DS and has to be broken into multiple lines. So
+    // we use a different proportional font for measuring the text and just kind of guess.
+    // We try to use a font that supplies similar proportions for different strings,
+    // settling on the following and measuring its width using the strings
+    // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
+    // are each as wide as can be displayed on the REV Control Hub without wrapping:
+    final Font SIZING_FONT = new Font("Verdana", Font.PLAIN, 12);
+    final int WIDTH_IN_FONT_UNITS = 312;
+    final int HEIGHT_IN_LINES = 18;
+
+    // Class state:
     WindowFrame windowFrame;
     Canvas canvas;
     ArrayList<String> lineList = new ArrayList<>();
@@ -20,13 +39,15 @@ public class Telemetry {
     }
 
     public void addLine(String string) {
-        int newLineIndex;
-        while ((newLineIndex = string.indexOf("\n")) != -1) {
-            String line = string.substring(0, newLineIndex);
-            lineList.add(line);
-            string = string.substring(newLineIndex + 1);
+        if (lineList.size() <= HEIGHT_IN_LINES) {
+            int newLineIndex;
+            while ((newLineIndex = string.indexOf("\n")) != -1) {
+                String line = string.substring(0, newLineIndex);
+                lineList.add(line);
+                string = string.substring(newLineIndex + 1);
+            }
+            lineList.add(string);
         }
-        lineList.add(string);
     }
 
     public void addData(String caption, Object value) {
@@ -45,7 +66,8 @@ public class Telemetry {
         addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\uD83C\uDFFE"); // Two reindeers and a Santa with a combining
         addLine("This\uD83E\uDD75has\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         addLine("This is\nmultiple\nlines followed by an empty line");
-        addLine("");
+        addData("Caption", 123.0);
+        addLine();
         addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
         addLine("\n");
         addLine("123456789,123456789,123456789,123456789,12");
@@ -56,24 +78,6 @@ public class Telemetry {
     }
 
     public void update() {
-        // Use this font for display on the PC. It's different from the sizing font because the
-        // sizing font doesn't support the full unicode character set (like emojis):
-        final int DISPLAY_FONT_SIZE = 16;
-        final Font DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
-
-        // Try to emulate the same line width as the REV Driver Station in its horizontal
-        // configuration. Because the DS uses a proportional font, and because we don't have
-        // access to the source code, we can't precisely replicate the DS behavior when a
-        // single line is too wide for the DS and has to be broken into multiple lines. So
-        // we use a different proportional font for measuring the text and just kind of guess.
-        // We try to use a font that supplies similar proportions for different strings,
-        // settling on the following and measuring its width using the strings
-        // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
-        // are each as wide as can be displayed on the REV Control Hub without wrapping:
-        final Font SIZING_FONT = new Font("Verdana", Font.PLAIN, 12);
-        final int WIDTH_IN_FONT_UNITS = 312;
-        final int HEIGHT_IN_LINES = 18;
-
         canvas = windowFrame.getCanvas();
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
