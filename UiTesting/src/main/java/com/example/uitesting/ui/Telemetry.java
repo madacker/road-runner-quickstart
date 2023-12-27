@@ -34,11 +34,40 @@ public class Telemetry {
     // Class state:
     WindowFrame windowFrame;
     Canvas canvas;
+    FontMetrics metrics;
     ArrayList<String> lineList = new ArrayList<>();
 
+    // Unit test:
+    private void test(Telemetry telemetry) {
+        telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
+        String emojis = ">";
+        for (int i = 0; i < 30; i++) {
+            emojis += (true) ? "\uD83C\uDF1E" : "\u2744\uFE0F"; // Surrogate vs. variation selector
+        }
+        telemetry.addLine(emojis);
+        telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
+        telemetry.addLine("");
+        telemetry.addData("Value", 123.0);
+        telemetry.addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
+        telemetry.addLine("123456789,123456789,123456789,123456789,12");
+        telemetry.addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
+        for (int i = 0; i < 40; i++) {
+            telemetry.addLine(String.format("Line %d", i));
+        }
+    }
+
+    // Return the width of the string with all trailing spaces removed:
+    private int stringWidth(String string) {
+        return metrics.stringWidth(string.replaceAll("\\s+$", ""));
+    }
+
+    // PC constructor for a Telemetry object:
     public Telemetry() {
         windowFrame = new WindowFrame("UI", 400);
         windowFrame.setVisible(true);
+
+        canvas = windowFrame.getCanvas();
+        metrics = canvas.getBufferStrategy().getDrawGraphics().getFontMetrics(SIZING_FONT);
     }
 
     public void addLine(String string) {
@@ -65,35 +94,14 @@ public class Telemetry {
     public void clear() { lineList.clear(); }
     public void clearAll() { lineList.clear(); }
 
-    public void test(Telemetry telemetry) {
-        telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
-        String emojis = ">";
-        for (int i = 0; i < 30; i++) {
-            // emojis += "\uD83C\uDF1E"; // Surrogate
-            emojis += "\u2744\uFE0F"; // Variation selector
-        }
-        telemetry.addLine(emojis);
-        telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
-        telemetry.addLine("");
-        telemetry.addData("Value", 123.0);
-        telemetry.addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
-        telemetry.addLine("123456789,123456789,123456789,123456789,12");
-        telemetry.addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
-        for (int i = 0; i < 40; i++) {
-            telemetry.addLine(String.format("Line %d", i));
-        }
-    }
-
     public void update() {
-        canvas = windowFrame.getCanvas();
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         g.setFont(DISPLAY_FONT);
-        FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
 
         if (TEST) {
-            System.out.println(metrics.stringWidth("123456789,123456789,123456789,123456789,12"));
-            System.out.println(metrics.stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
+            System.out.println(stringWidth("123456789,123456789,123456789,123456789,12"));
+            System.out.println(stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
             test(this);
         }
 
@@ -102,12 +110,12 @@ public class Telemetry {
         for (String line : lineList) {
             while (lineCount < HEIGHT_IN_LINES) {
                 int lineBreak = line.length();
-                if (metrics.stringWidth(line) > WIDTH_IN_FONT_UNITS) {
+                if (stringWidth(line) > WIDTH_IN_FONT_UNITS) {
                     // If the line is too long, try and break at a space:
                     lineBreak = line.length() - 1;
                     while ((lineBreak > 0) &&
                            ((line.charAt(lineBreak - 1) != ' ') || // -1 to avoid space on next line
-                            (metrics.stringWidth(line.substring(0, lineBreak - 1)) > WIDTH_IN_FONT_UNITS)))
+                            (stringWidth(line.substring(0, lineBreak - 1)) > WIDTH_IN_FONT_UNITS)))
                         lineBreak--;
 
                     // If no line break was found using a space, simply break at any character
@@ -120,7 +128,7 @@ public class Telemetry {
                             if (((character & 0xfc00) != 0xdc00) &&
                                     (character != 0xfe0e) &&
                                     (character != 0xfe0f) &&
-                                    (metrics.stringWidth(line.substring(0, lineBreak)) <= WIDTH_IN_FONT_UNITS))
+                                    (stringWidth(line.substring(0, lineBreak)) <= WIDTH_IN_FONT_UNITS))
                                 break; // ====>
                             lineBreak--;
                         }
