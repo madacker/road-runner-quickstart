@@ -24,8 +24,8 @@ public class Telemetry {
     // settling on the following and measuring its width using the strings
     // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
     // are each as wide as can be displayed on the REV Control Hub without wrapping:
-    final Font SIZING_FONT = new Font("Verdana", Font.PLAIN, 12);
-    final int WIDTH_IN_FONT_UNITS = 318;
+    final Font SIZING_FONT = new Font(null, Font.PLAIN, 10);
+    final int WIDTH_IN_FONT_UNITS = 239;
     final int HEIGHT_IN_LINES = 18;
 
     // Class state:
@@ -81,13 +81,20 @@ public class Telemetry {
     }
 
     public void update() {
+
+
+
         canvas = windowFrame.getCanvas();
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         g.setFont(DISPLAY_FONT);
         FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
 
-        test(this);
+        if (true) {
+            System.out.println(metrics.stringWidth("123456789,123456789,123456789,123456789,12"));
+            System.out.println(metrics.stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
+            test(this);
+        }
 
         int y = HEIGHT_IN_LINES;
         int lineCount = 0;
