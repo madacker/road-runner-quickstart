@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.tests;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraName;
@@ -139,6 +140,7 @@ class ColorDetectPipeline extends OpenCvPipeline {
     }
 }
 
+@Disabled
 @Autonomous(name = "Repro")
 public class Repro extends LinearOpMode {
     final boolean CRASH = false;

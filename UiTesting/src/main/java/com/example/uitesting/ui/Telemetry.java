@@ -25,7 +25,7 @@ public class Telemetry {
     // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
     // are each as wide as can be displayed on the REV Control Hub without wrapping:
     final Font SIZING_FONT = new Font("Verdana", Font.PLAIN, 12);
-    final int WIDTH_IN_FONT_UNITS = 312;
+    final int WIDTH_IN_FONT_UNITS = 318;
     final int HEIGHT_IN_LINES = 18;
 
     // Class state:
@@ -62,21 +62,21 @@ public class Telemetry {
     public void clear() { lineList.clear(); }
     public void clearAll() { lineList.clear(); }
 
-    public void test() {
-        addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
+    public void test(Telemetry telemetry) {
+        telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         String emojis = ">";
         for (int i = 0; i < 30; i++) {
             emojis += "\u2744\uFE0F";
         }
-        addLine(emojis);
-        addLine("This is\nmultiple\nlines followed by an empty line");
-        addLine("");
-        addData("Value", 123.0);
-        addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
-        addLine("123456789,123456789,123456789,123456789,12");
-        addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
+        telemetry.addLine(emojis);
+        telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
+        telemetry.addLine("");
+        telemetry.addData("Value", 123.0);
+        telemetry.addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
+        telemetry.addLine("123456789,123456789,123456789,123456789,12");
+        telemetry.addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
         for (int i = 0; i < 40; i++) {
-            addLine(String.format("Line %d", i));
+            telemetry.addLine(String.format("Line %d", i));
         }
     }
 
@@ -86,6 +86,8 @@ public class Telemetry {
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         g.setFont(DISPLAY_FONT);
         FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
+
+        test(this);
 
         int y = HEIGHT_IN_LINES;
         int lineCount = 0;
