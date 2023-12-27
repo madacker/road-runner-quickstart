@@ -83,7 +83,7 @@ public class Telemetry {
     }
 
     public void addData(String caption, Object value) {
-        addLine(String.format("%s: %s", caption, value.toString()));
+        addLine(String.format("%s : %s", caption, value.toString()));
     }
 
     public void addData(String caption, String format, Object... args) {
