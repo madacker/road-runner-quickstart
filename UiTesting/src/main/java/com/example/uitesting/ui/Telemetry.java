@@ -63,13 +63,16 @@ public class Telemetry {
     public void clearAll() { lineList.clear(); }
 
     public void test() {
-        addLine("\uD83E\uDD8C\uD83E\uDD8C\uD83C\uDF85\uD83C\uDFFE"); // Two reindeers and a Santa with a combining
-        addLine("This\uD83E\uDD75has\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
+        addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
+        String emojis = ">";
+        for (int i = 0; i < 30; i++) {
+            emojis += "\u2744\uFE0F";
+        }
+        addLine(emojis);
         addLine("This is\nmultiple\nlines followed by an empty line");
-        addData("Caption", 123.0);
-        addLine();
+        addLine("");
+        addData("Value", 123.0);
         addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
-        addLine("\n");
         addLine("123456789,123456789,123456789,123456789,12");
         addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
         for (int i = 0; i < 40; i++) {
@@ -93,18 +96,18 @@ public class Telemetry {
                     // If the line is too long, try and break at a space:
                     lineBreak = line.length() - 1;
                     while ((lineBreak > 0) &&
-                            ((line.charAt(lineBreak) != ' ') ||
-                                    (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS)))
+                           ((line.charAt(lineBreak - 1) != ' ') || // -1 to avoid space on next line
+                            (metrics.stringWidth(line.substring(0, lineBreak - 1)) > WIDTH_IN_FONT_UNITS)))
                         lineBreak--;
 
                     // If no line break was found using a space, simply break at any character
-                    // that isn't a UTF-16 trailing surrogate (the second half of a surrogate
-                    // pair):
+                    // that isn't a UTF-16 trailing surrogate (the second half of a Unicode
+                    // surrogate pair):
                     if (lineBreak == 0) {
                         lineBreak = line.length() - 1;
                         while ((lineBreak > 0) &&
-                                ((line.charAt(lineBreak) & 0xfc00) == 0xdc00) ||
-                                    (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS))
+                               ((line.charAt(lineBreak) & 0xfc00) == 0xdc00) ||
+                                (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS))
                             lineBreak--;
                     }
                 }
