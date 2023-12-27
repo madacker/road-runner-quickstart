@@ -10,6 +10,9 @@ import java.util.ArrayList;
  * This class implements a lightweight emulation of FTC Telemetry that can run on the PC.
  */
 public class Telemetry {
+    // Enable unit test:
+    final boolean TEST = false;
+
     // Use this font for display on the PC. It's different from the sizing font because the
     // sizing font doesn't support the full unicode character set (like emojis):
     final int DISPLAY_FONT_SIZE = 16;
@@ -66,7 +69,8 @@ public class Telemetry {
         telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         String emojis = ">";
         for (int i = 0; i < 30; i++) {
-            emojis += "\u2744\uFE0F";
+            // emojis += "\uD83C\uDF1E"; // Surrogate
+            emojis += "\u2744\uFE0F"; // Variation selector
         }
         telemetry.addLine(emojis);
         telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
@@ -81,16 +85,13 @@ public class Telemetry {
     }
 
     public void update() {
-
-
-
         canvas = windowFrame.getCanvas();
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         g.setFont(DISPLAY_FONT);
         FontMetrics metrics = g.getFontMetrics(SIZING_FONT);
 
-        if (true) {
+        if (TEST) {
             System.out.println(metrics.stringWidth("123456789,123456789,123456789,123456789,12"));
             System.out.println(metrics.stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
             test(this);
@@ -111,13 +112,18 @@ public class Telemetry {
 
                     // If no line break was found using a space, simply break at any character
                     // that isn't a UTF-16 trailing surrogate (the second half of a Unicode
-                    // surrogate pair):
+                    // surrogate pair) or a variation selector:
                     if (lineBreak == 0) {
                         lineBreak = line.length() - 1;
-                        while ((lineBreak > 0) &&
-                               ((line.charAt(lineBreak) & 0xfc00) == 0xdc00) ||
-                                (metrics.stringWidth(line.substring(0, lineBreak)) > WIDTH_IN_FONT_UNITS))
+                        while (lineBreak > 0) {
+                            int character = line.charAt(lineBreak);
+                            if (((character & 0xfc00) != 0xdc00) &&
+                                    (character != 0xfe0e) &&
+                                    (character != 0xfe0f) &&
+                                    (metrics.stringWidth(line.substring(0, lineBreak)) <= WIDTH_IN_FONT_UNITS))
+                                break; // ====>
                             lineBreak--;
+                        }
                     }
                 }
 

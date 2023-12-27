@@ -11,7 +11,7 @@ public class TelemetryExploration extends LinearOpMode {
         telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         String emojis = ">";
         for (int i = 0; i < 30; i++) {
-            emojis += "\u2744\uFE0F";
+            emojis += "\uD83C\uDF1E"; // "\u2744\uFE0F" uses an overlay
         }
         telemetry.addLine(emojis);
         telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
