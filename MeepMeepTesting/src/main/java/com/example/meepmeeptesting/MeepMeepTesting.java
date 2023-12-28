@@ -43,20 +43,42 @@ public class MeepMeepTesting {
                 false);
 
         if (true) {
-            // From blue wing to blue
-            Pose2d startPose = new Pose2d(-72 + 18, -72 + 18, Math.toRadians(225));
-            double startTangent = Math.toRadians(45);
+            if (false) { // Start far side
+                // From blue wing to blue backdrop:
+                Pose2d startPose = new Pose2d(-72 + 18, -72 + 18, Math.toRadians(225));
+                double startTangent = Math.toRadians(45);
 
-            // Test pose:
-            startPose = new Pose2d(-48, 0, Math.toRadians(0));
-            startTangent = Math.toRadians(-90);
+                // Test pose:
+                startPose = new Pose2d(-48, 0, Math.toRadians(0));
+                startTangent = Math.toRadians(-90);
 
-            myBot.runAction(myBot.getDrive().actionBuilder(startPose)
-                            .setTangent(startTangent)
-                            .splineToSplineHeading(new Pose2d(-36, -36, Math.PI), 0)
-                            .splineTo(new Vector2d(12, -36), 0)
-                            .splineTo(new Vector2d(48, 36), 0)
-                            .build());
+                myBot.runAction(myBot.getDrive().actionBuilder(startPose)
+                        .setTangent(startTangent)
+                        .splineToSplineHeading(new Pose2d(-36, -36, Math.PI), 0)
+                        .splineTo(new Vector2d(12, -36), 0)
+                        .splineTo(new Vector2d(48, 36), 0)
+                        .build());
+            } else { // Handle near side
+                // From blue backdrop to blue wing:
+                Pose2d startPose = new Pose2d(48, 36, Math.PI);
+                double startTangent = Math.PI;
+
+                myBot.runAction(myBot.getDrive().actionBuilder(startPose)
+                        .setTangent(startTangent)
+                        .splineToSplineHeading(new Pose2d(12, -36, Math.PI), Math.PI)
+                        .splineTo(new Vector2d(-36, -36), Math.PI)
+                        .splineTo(new Vector2d(-71 + 18, -72 + 18), Math.toRadians(225))
+                        .build());
+
+// THIS REVERSES SUDDENLY*****
+//                myBot.runAction(myBot.getDrive().actionBuilder(startPose)
+//                        .setTangent(startTangent)
+//                        .splineToSplineHeading(new Pose2d(12, -36, 0), Math.PI)
+//                        .splineTo(new Vector2d(-36, -36), 0)
+//                        .splineTo(new Vector2d(-71 + 18, -72 + 18), 0)
+//                        .build());
+
+            }
 
 
 // THIS HANGS*****
