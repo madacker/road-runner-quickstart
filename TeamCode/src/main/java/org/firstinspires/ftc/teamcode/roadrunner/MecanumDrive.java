@@ -664,4 +664,9 @@ public final class MecanumDrive {
         actionList.removeAll(deletionList);
         return actionList.size() != 0;
     }
+
+    // Abort all currently running actions:
+    public void abortActions() {
+        actionList.clear();
+    }
 }

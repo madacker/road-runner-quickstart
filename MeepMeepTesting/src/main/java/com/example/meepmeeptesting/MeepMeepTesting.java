@@ -43,11 +43,21 @@ public class MeepMeepTesting {
                 false);
 
         if (true) {
-            myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(0, 0, Math.toRadians(0)))
-                            .turn(Math.toRadians(-30))
-                            .turn(Math.toRadians(60), new TurnConstraints(0.3, -3.14, 3.14))
-                            .turn(Math.toRadians(-30))
+            // From blue wing to blue
+            Pose2d startPose = new Pose2d(-72 + 18, -72 + 18, Math.toRadians(225));
+            double startTangent = Math.toRadians(45);
+
+            // Test pose:
+            startPose = new Pose2d(-48, 0, Math.toRadians(0));
+            startTangent = Math.toRadians(-90);
+
+            myBot.runAction(myBot.getDrive().actionBuilder(startPose)
+                            .setTangent(startTangent)
+                            .splineToSplineHeading(new Pose2d(-36, -36, Math.PI), 0)
+                            .splineTo(new Vector2d(12, -36), 0)
+                            .splineTo(new Vector2d(48, 36), 0)
                             .build());
+
 
 // THIS HANGS*****
 //            Pose2d startPose = new Pose2d(-36, -60, Math.toRadians(90));

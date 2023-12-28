@@ -289,7 +289,7 @@ public class Driver extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket();
             Canvas canvas = packet.fieldOverlay();
 
-            // Handle input:
+            // The 'A' button activates the auto-parker:
             boolean autoActivated = false;
             if (!gamepad1.a)
                 parker = null;
@@ -297,6 +297,44 @@ public class Driver extends LinearOpMode {
                 if (parker == null)
                     parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
                 autoActivated = parker.park(packet);
+            }
+
+            // The 'right-bumper' button activates Road Runner homing:
+            boolean hasActions = drive.doActionsWork();
+            if (!gamepad1.right_bumper)
+                drive.abortActions();
+            else if (!hasActions) {
+                // Ensure that velocity is zero-ish:
+                if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
+                    (Math.abs(drive.poseVelocity.linearVel.y) < 0.1) &&
+                    (Math.abs(drive.poseVelocity.angVel) < 0.1)) {
+
+                    boolean goWing = drive.pose.position.x < 0.0;
+                    Pose2d endPose;
+                    double endTangent;
+                    if (goWing) {
+                        // Blue lower-left wing:
+                        endPose = new Pose2d(-72 + 9,-72 + 9, Math.toRadians(225));
+                        endTangent = Math.toRadians(225);
+                    } else {
+                        // Blue upper-right backdrop:
+                        endPose = new Pose2d(48, 30, Math.PI);
+                        endTangent = Math.PI;
+                    }
+
+                    Pose2d startPose = new Pose2d(
+                                drive.pose.position.x,
+                                drive.pose.position.y,
+                                drive.pose.heading.log());
+                    double startTangent = Math.atan2(
+                                endPose.position.y - startPose.position.y,
+                                endPose.position.x - startPose.position.x);
+
+                    drive.runParallel(drive.actionBuilder(startPose)
+                        .setTangent(startTangent)
+                        .splineToLinearHeading(endPose, endTangent)
+                        .build());
+                }
             }
 
             // Manually drive:
