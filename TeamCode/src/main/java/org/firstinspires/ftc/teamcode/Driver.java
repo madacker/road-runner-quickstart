@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -309,31 +310,35 @@ public class Driver extends LinearOpMode {
                     (Math.abs(drive.poseVelocity.linearVel.y) < 0.1) &&
                     (Math.abs(drive.poseVelocity.angVel) < 0.1)) {
 
-                    boolean goWing = drive.pose.position.x < 0.0;
-                    Pose2d endPose;
-                    double endTangent;
-                    if (goWing) {
-                        // Blue lower-left wing:
-                        endPose = new Pose2d(-72 + 9,-72 + 9, Math.toRadians(225));
-                        endTangent = Math.toRadians(225);
+                    boolean toBackdrop = drive.pose.position.x < 0.0;
+                    Action action;
+
+                    if (toBackdrop) {
+                        // Go to the blue backdrop:
+                        Pose2d keyPose = new Pose2d(-36, -36, Math.PI);
+                        double startTangent = Math.atan2(
+                                keyPose.position.y - drive.pose.position.y,
+                                keyPose.position.x - drive.pose.position.x);
+                        action = drive.actionBuilder(drive.pose)
+                                .setTangent(startTangent)
+                                .splineToSplineHeading(keyPose, 0)
+                                .splineTo(new Vector2d(12, -36), 0)
+                                .splineTo(new Vector2d(48, 36), 0)
+                                .build();
                     } else {
-                        // Blue upper-right backdrop:
-                        endPose = new Pose2d(48, 30, Math.PI);
-                        endTangent = Math.PI;
+                        // Go to the blue wing:
+                        Pose2d keyPose = new Pose2d(48, 36, Math.PI);
+                        double startTangent = Math.atan2(
+                                keyPose.position.y - drive.pose.position.y,
+                                keyPose.position.x - drive.pose.position.x);
+                        action = drive.actionBuilder(drive.pose)
+                                .setTangent(startTangent)
+                                .splineToSplineHeading(new Pose2d(12, -36, Math.PI), Math.PI)
+                                .splineTo(new Vector2d(-36, -36), Math.PI)
+                                .splineTo(new Vector2d(-71 + 18, -72 + 18), Math.toRadians(225))
+                                .build();
                     }
-
-                    Pose2d startPose = new Pose2d(
-                                drive.pose.position.x,
-                                drive.pose.position.y,
-                                drive.pose.heading.log());
-                    double startTangent = Math.atan2(
-                                endPose.position.y - startPose.position.y,
-                                endPose.position.x - startPose.position.x);
-
-                    drive.runParallel(drive.actionBuilder(startPose)
-                        .setTangent(startTangent)
-                        .splineToLinearHeading(endPose, endTangent)
-                        .build());
+                    drive.runParallel(action);
                 }
             }
 

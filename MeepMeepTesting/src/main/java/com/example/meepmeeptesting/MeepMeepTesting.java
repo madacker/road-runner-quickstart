@@ -49,8 +49,8 @@ public class MeepMeepTesting {
                 double startTangent = Math.toRadians(45);
 
                 // Test pose:
-                startPose = new Pose2d(-48, 0, Math.toRadians(0));
-                startTangent = Math.toRadians(-90);
+//                startPose = new Pose2d(-48, 0, Math.toRadians(0));
+//                startTangent = Math.toRadians(-90);
 
                 myBot.runAction(myBot.getDrive().actionBuilder(startPose)
                         .setTangent(startTangent)
