@@ -17,13 +17,101 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Encoder;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.IMU;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
 import org.firstinspires.ftc.teamcode.roadrunner.TwoDeadWheelLocalizer;
 
 import java.util.ArrayList;
 import java.util.List;
+
+class TickTracker {
+    final double ACCEPTABLE_ERROR = 0.95; // Should be no lower than 95% of the average
+    enum Correlation {
+        ZERO, POSITIVE, NEGATIVE, COUNTER
+    };
+    class Counter {
+        Encoder encoder;
+        String name;
+        Correlation correlation;
+        double initialPosition;
+        Counter(Encoder encoder, String name, Correlation correlation) {
+            this.encoder = encoder;
+            this.name = name;
+            this.correlation = correlation;
+            this.initialPosition = encoder.getPositionAndVelocity().position;
+        }
+        double ticks() {
+            return encoder.getPositionAndVelocity().position - initialPosition;
+        }
+    }
+    ArrayList<Counter> counters = new ArrayList<>();
+    void register(Encoder encoder, String name, Correlation correlation) {
+        counters.add(new Counter(encoder, name, correlation));
+    }
+
+    double averageTicks() {
+        double tickCount = 0;
+        double counterCount = 0;
+        for (Counter counter: counters) {
+            if (counter.correlation == Correlation.COUNTER) {
+                counterCount++;
+                if (counter.ticks() > 0) { // Ignore erroneous ticks from reversed encoders
+                    tickCount += counter.ticks();
+                }
+            }
+        }
+        return tickCount / counterCount;
+    }
+
+    double maxTicks() {
+        double total = 0;
+        for (Counter counter: counters) {
+            total += Math.abs(counter.ticks());
+        }
+        return total / counters.size();
+    }
+
+    void report(Telemetry telemetry, Counter counter, String message, boolean isBad) {
+        String icon = isBad ? "Boo! " : "Yay! ";
+        telemetry.addLine(String.format("%s %s %s", icon, counter.name, message));
+    }
+
+    void reportAll(Telemetry telemetry) {
+        assert(counters.size() != 0);
+        double averageTicks = averageTicks();
+        double maxTicks = maxTicks();
+        for (Counter counter: counters) {
+            String error = "";
+            if (counter.correlation == Correlation.COUNTER) {
+                if (Math.abs(counter.ticks()) < averageTicks * 0.05) {
+                    error = "is there a bad cable connection?";
+                } else if (counter.ticks() < 0) {
+                    error = "need to 'setDirection(DcMotorEx.Direction.REVERSE)'";
+                } else if (counter.ticks() < averageTicks * ACCEPTABLE_ERROR) {
+                    error = "too low, does the wheel have a bad contact with field?";
+                }
+            } else if (counter.correlation == Correlation.ZERO) {
+                if (Math.abs(counter.ticks()) < maxTicks * 0.05) {
+                    error = "should be zero";
+                }
+            } else if (counter.correlation == Correlation.POSITIVE) {
+                if (counter.ticks() < 0) {
+                    error = "should be positive, maybe 'setDirection(DcMotorEx.Direction.REVERSE)'?";
+                }
+            } else if (counter.correlation == Correlation.NEGATIVE) {
+                if (counter.ticks() > 0) {
+                    error = "should be negative, maybe 'setDirection(DcMotorEx.Direction.REVERSE)'?";
+                }
+            }
+        }
+    }
+}
 
 @TeleOp
 public class TuneRoadRunner extends LinearOpMode {
@@ -102,8 +190,103 @@ public class TuneRoadRunner extends LinearOpMode {
         }
     }
 
+
+    void forwardPushTest() {
+        DcMotorEx[] motors = { drive.leftFront, drive.leftBack, drive.rightBack, drive.rightFront };
+        for (DcMotorEx motor: motors) {
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        }
+
+        if (ui.readyPrompt("Push the robot forward in a straight line as far as you can go."
+                + "Measure the distance and set inPerTick = <inches-traveled> / <ticks>."
+                + "\n\nPress A to start, B to stop")) {
+
+            TickTracker tracker = new TickTracker();
+            if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
+                MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
+                tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.leftBack, "leftBack", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.rightBack, "rightBack", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.rightFront, "rightFront", TickTracker.Correlation.POSITIVE);
+            } else if (drive.localizer instanceof ThreeDeadWheelLocalizer) {
+                ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
+                tracker.register(loc.par0, "par0", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.par1, "par1", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.perp, "perp", TickTracker.Correlation.ZERO);
+            } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
+                TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
+                tracker.register(loc.par, "par", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.perp, "perp", TickTracker.Correlation.ZERO);
+            }
+
+            while (opModeIsActive() && !ui.cancel()) {
+                telemetry.addLine(String.format("Ticks (average): %.1f", tracker.averageTicks()));
+                // @@@ Show the ticks traveled
+                // @@@ Show the instructions still
+                tracker.reportAll(telemetry);
+                telemetry.update();
+            }
+        }
+
+        // Restore to Road Runner's defaults:
+        for (DcMotorEx motor: motors) {
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        }
+    }
+
+    void rotatedPushTest() {
+        DcMotorEx[] motors = { drive.leftFront, drive.leftBack, drive.rightBack, drive.rightFront };
+        for (DcMotorEx motor: motors) {
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        }
+
+        // @@@ Need to be able to restart using a button
+        if (ui.readyPrompt("Manually rotate the robot 90 degrees counterclockwise in place."
+                + "\n\nPress A to start, B to stop")) {
+
+            IMU imu = drive.imu;
+            TickTracker tracker = new TickTracker();
+            if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
+                MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
+                tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.NEGATIVE);
+                tracker.register(loc.leftBack, "leftBack", TickTracker.Correlation.NEGATIVE);
+                tracker.register(loc.rightBack, "rightBack", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.rightFront, "rightFront", TickTracker.Correlation.POSITIVE);
+            } else if (drive.localizer instanceof ThreeDeadWheelLocalizer) {
+                ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
+                tracker.register(loc.par0, "par0", TickTracker.Correlation.NEGATIVE);
+                tracker.register(loc.par1, "par1", TickTracker.Correlation.POSITIVE);
+                tracker.register(loc.perp, "perp", TickTracker.Correlation.NEGATIVE);
+            } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
+                TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
+                tracker.register(loc.par, "par", TickTracker.Correlation.NEGATIVE);
+                tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+            }
+
+            double startYaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+            while (opModeIsActive() && !ui.cancel()) {
+                double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES) - startYaw;
+                while (yaw < 0)
+                    yaw += 360.0;
+                while (yaw >= 360.0)
+                    yaw -= 360.0;
+                telemetry.addLine(String.format("IMU yaw (degrees): %.1", yaw));
+                // @@@ Show the ticks traveled
+                // @@@ Show the instructions still
+                tracker.reportAll(telemetry);
+                telemetry.update();
+            }
+        }
+
+        // Restore to Road Runner's defaults:
+        for (DcMotorEx motor: motors) {
+            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        }
+    }
+
     void localizerTest() {
         while (opModeIsActive() && !ui.cancel()) {
+            // @@@ Make it an exponent!
             PoseVelocity2d powers = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
                     -gamepad1.right_stick_x);
@@ -324,7 +507,9 @@ public class TuneRoadRunner extends LinearOpMode {
 
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
-        tests.add(new Test(this::localizerTest,             "Manual LocalizerTest (drive)"));
+        tests.add(new Test(this::localizerTest,             "Manual LocalizerTest (test driving)"));
+        tests.add(new Test(this::forwardPushTest,           "Forward push test (inPerTick)"));
+        tests.add(new Test(this::rotatedPushTest,           "Rotated push test (verification)"));
         tests.add(new Test(this::lateralInPerTickTuner,     "Manual lateral tuner (lateralInPerTick)"));
         tests.add(new Test(this::manualFeedforwardTuner,    "ManualFeedforwardTuner (kV and kA)"));
         tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
