@@ -20,6 +20,7 @@ import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeProfile;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Encoder;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -251,13 +252,32 @@ public class TuneRoadRunner extends LinearOpMode {
         }
     }
 
-    void pushTest() {
-        boolean passed = false;
-
+    // Road Runner expects the hardware to be in different states when using high-level MecanumDrive/
+    // TankDrive functionality vs. its lower-level tuning functionality.
+    private void useDrive(boolean enable) {
         DcMotorEx[] motors = { drive.leftFront, drive.leftBack, drive.rightBack, drive.rightFront };
-        for (DcMotorEx motor: motors) {
-            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        if (enable) {
+            // Initialize hardware state the same way that MecanumDrive does:
+            for (DcMotorEx motor: motors) {
+                motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            }
+            for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+                module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+            }
+        } else {
+            // Initialize hardware state in the way that FTC defaults to:
+            for (DcMotorEx motor: motors) {
+                motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+            }
+            for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {
+                module.setBulkCachingMode(LynxModule.BulkCachingMode.OFF);
+            }
         }
+    }
+
+    void pushTest() {
+        useDrive(false); // Don't use MecanumDrive/TankDrive
+        boolean passed = false;
 
         if (ui.readyPrompt("Push the robot forward in a straight line for two or more tiles (24\")."
                 + "\n\nPress A to start, B when complete")) {
@@ -358,18 +378,10 @@ public class TuneRoadRunner extends LinearOpMode {
                 }
             }
         }
-
-        // Restore to Road Runner's defaults:
-        for (DcMotorEx motor: motors) {
-            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        }
     }
 
     void forwardEncoderTuner() {
-        DcMotorEx[] motors = { drive.leftFront, drive.leftBack, drive.rightBack, drive.rightFront };
-        for (DcMotorEx motor: motors) {
-            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        }
+        useDrive(false); // Don't use MecanumDrive/TankDrive
 
         if (ui.readyPrompt("Push the robot forward in a straight line as far as possible. "
                 + "Measure distance and set inPerTick = <i>inches-traveled</i> / <i>average-ticks</i>."
@@ -402,14 +414,11 @@ public class TuneRoadRunner extends LinearOpMode {
                 telemetry.update();
             }
         }
-
-        // Restore to Road Runner's defaults:
-        for (DcMotorEx motor: motors) {
-            motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        }
     }
 
     void driveTest() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         while (opModeIsActive() && !ui.cancel()) {
             // @@@ Make it an exponent!
             // @@@ Add control for specific motors!
@@ -432,6 +441,8 @@ public class TuneRoadRunner extends LinearOpMode {
     }
 
     void lateralEncoderTuner() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         if (ui.readyPrompt(String.format("The robot will attempt to strafe left for %d inches. "
             + "Measure the actual distance using a tape measure. "
             + "Multiply 'lateralInPerTick' by <distance-measured> / %d."
@@ -447,6 +458,8 @@ public class TuneRoadRunner extends LinearOpMode {
     // This is a re-implementation of 'manualFeedforwardTuner' so that DISTANCE can be changed
     // from its hardcoded 64".
     void manualFeedforwardTuner() {
+        useDrive(false); // Don't use MecanumDrive/TankDrive
+
         if (!ui.readyPrompt(String.format("The robot will attempt to drive forwards then backwards for %d inches. "
                 + "Tune 'kV' and 'kA' using FTC Dashboard."
                 + "\n\nPress A to start, B to stop", DISTANCE)))
@@ -544,6 +557,8 @@ public class TuneRoadRunner extends LinearOpMode {
     }
 
     void manualFeedbackTunerAxial() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         if (ui.readyPrompt(String.format("The robot will attempt to drive backwards and forwards for %d inches. "
                 + "Tune 'axialGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
@@ -560,6 +575,8 @@ public class TuneRoadRunner extends LinearOpMode {
     }
 
     void manualFeedbackTunerLateral() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         if (ui.readyPrompt(String.format("The robot will attempt to strafe left and right for %d inches. "
                 + "Tune 'lateralGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop", DISTANCE))) {
@@ -576,6 +593,8 @@ public class TuneRoadRunner extends LinearOpMode {
     }
 
     void manualFeedbackTunerHeading() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         if (ui.readyPrompt("The robot will attempt to rotate in place "
                 + "180° clockwise and counterclockwise. "
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
@@ -593,6 +612,8 @@ public class TuneRoadRunner extends LinearOpMode {
     }
 
     void completionTest() {
+        useDrive(true); // Do use MecanumDrive/TankDrive
+
         if (ui.readyPrompt("The robot will drive forward 48 inches using a spline. "
                 + "It needs half a tile clearance on either side. "
                 + "\n\nPress A to start, B to stop")) {
@@ -637,7 +658,7 @@ public class TuneRoadRunner extends LinearOpMode {
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
         tests.add(new Test(this::driveTest,                 "Drive test (motors)"));
-        tests.add(new Test(this::pushTest,                  "Push test (encoders)"));
+        tests.add(new Test(this::pushTest,                  "Push test (encoders and IMU)"));
         tests.add(new Test(this::forwardEncoderTuner,       "Forward encoder tuner (inPerTick)"));
         // @@@ Call lateralEncoderTuner only if no dead wheels:
         tests.add(new Test(this::lateralEncoderTuner,       "Lateral encoder tuner (lateralInPerTick)"));
