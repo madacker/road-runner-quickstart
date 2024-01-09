@@ -98,7 +98,7 @@ class TickTracker {
                 if (Math.abs(yaw) < 5) {
                     error = "Yaw too small, are RevHubOrientationOnRobot flags correct when calling imu.initialize()?";
                 } else if (yaw < -5) {
-                    error = "Yaw is negative, you're turning counterclockwise \uD83D\uDD04, right?";
+                    error = "Yaw is negative, you're turning counterclockwise \uD83D, right?";
                 }
                 passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", yaw), error);
             }
@@ -287,7 +287,7 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         if (passed) {
-            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D\uDD04 by pushing."
+            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
                 TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATION);
