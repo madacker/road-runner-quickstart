@@ -98,9 +98,9 @@ class TickTracker {
                 if (Math.abs(yaw) < 5) {
                     error = "Yaw too small, are RevHubOrientationOnRobot flags correct when calling imu.initialize()?";
                 } else if (yaw < -5) {
-                    error = "Yaw is negative, you're turning counterclockwise, right?";
+                    error = "Yaw is negative, you're turning counterclockwise \uD83D\uDD04, right?";
                 }
-                passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f degrees", yaw), error);
+                passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", yaw), error);
             }
 
             for (Counter counter : counters) {
@@ -111,14 +111,14 @@ class TickTracker {
                         if (Math.abs(counter.ticks()) < averageTicks * ZERO_ERROR) {
                             error = "is there a bad cable connection?";
                         } else if (counter.ticks() < 0) {
-                            error = "use " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
                         } else if (counter.ticks() < averageTicks * STRAIGHT_ERROR) {
                             error = "too low, does the wheel have bad contact with field?";
                         }
                         value += String.format(" (%.1f%%)", 100*Math.abs(counter.ticks() / averageTicks));
                     } else if (counter.correlation == Correlation.ZERO) {
-                        if (Math.abs(counter.ticks()) < averageTicks * 0.05) {
-                            error = "should be zero given that it's a perpendicular dead wheel";
+                        if (Math.abs(counter.ticks()) > averageTicks * 0.05) {
+                            error = "should be zero given that it's perpendicular to travel";
                         }
                     }
                 } else if (mode == Mode.ROTATION) {
@@ -137,9 +137,9 @@ class TickTracker {
                     } else if ((counter.correlation == Correlation.POSITIVE) ||
                             (counter.correlation == Correlation.NEGATIVE)) {
                         if ((counter.ticks() < 0) && (counter.correlation == Correlation.POSITIVE)) {
-                            error = "use " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
                         } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.NEGATIVE)) {
-                            error = "use " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
                         } else if (Math.abs(counter.ticks()) < averageTicks * ZERO_ERROR) {
                             error = "too low, does the wheel have bad contact with field, or "
                                     + "is it too close to center of rotation?";
@@ -287,7 +287,7 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         if (passed) {
-            if (ui.readyPrompt("Rotate the robot 90 degrees counterclockwise by pushing."
+            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D\uDD04 by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
                 TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATION);
@@ -537,7 +537,7 @@ public class TuneRoadRunner extends LinearOpMode {
 
     void manualFeedbackTunerHeading() {
         if (ui.readyPrompt("The robot will attempt to rotate in place "
-                + "180 degrees clockwise and counterclockwise. "
+                + "180° clockwise and counterclockwise. "
                 + "Tune 'headingGain' so that target and actual align (typical values between 1 and 20)."
                 + "\n\nPress A to start, B to stop")) {
 

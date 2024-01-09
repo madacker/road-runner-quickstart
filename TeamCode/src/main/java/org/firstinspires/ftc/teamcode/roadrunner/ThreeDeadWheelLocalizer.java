@@ -39,10 +39,16 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
             // We:
             //  o Flipped right and left encoders
             //  o Reversed the *other* parallel encoder
-            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
-            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
-            par0.setDirection(DcMotorSimple.Direction.REVERSE);
+//            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
+//            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+//            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+//            par0.setDirection(DcMotorSimple.Direction.REVERSE);
+
+            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
+            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+            perp.setDirection(DcMotorSimple.Direction.REVERSE);
+            par1.setDirection(DcMotorSimple.Direction.REVERSE);
         } else {
             perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
             par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
@@ -71,7 +77,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         int par1PosDelta = par1PosVel.position - lastPar1Pos;
         int perpPosDelta = perpPosVel.position - lastPerpPos;
 
-        double angleSign = (USE_BACK_ENCODER) ? -1.0 : 1.0;
+        double angleSign = 1.0; // @@@@@@@@@@@@@@@@@ (USE_BACK_ENCODER) ? -1.0 : 1.0;
 
         Twist2dDual<Time> twist = new Twist2dDual<>(
                 new Vector2dDual<>(
