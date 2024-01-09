@@ -46,20 +46,15 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
     private int lastPar0Pos, lastPar1Pos, lastPerpPos;
 
     public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
-        // Turning loopiness caused by:
-        //   o Direction of perpendicular wheel and sign of "perpXTicks" are inconsistent
         if (USE_BACK_ENCODER) {
             perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
             par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
             par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-            // perp.setDirection(DcMotorSimple.Direction.REVERSE);
             par1.setDirection(DcMotorSimple.Direction.REVERSE);
         } else {
             perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
             par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
             par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-            // Road Runner wants the left and right encoders to return negative ticks in the raw view when moving forward!
-            // The perpendicular increases as expected though
             par1.setDirection(DcMotorSimple.Direction.REVERSE);
             perp.setDirection(DcMotorSimple.Direction.REVERSE);
         }
@@ -82,8 +77,6 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         int par1PosDelta = par1PosVel.position - lastPar1Pos;
         int perpPosDelta = perpPosVel.position - lastPerpPos;
 
-        double angleSign = 1.0; // @@@@@@@@@@@@@@@@@ (USE_BACK_ENCODER) ? -1.0 : 1.0;
-
         Twist2dDual<Time> twist = new Twist2dDual<>(
                 new Vector2dDual<>(
                         new DualNum<Time>(new double[] {
@@ -96,8 +89,8 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
                         }).times(inPerTick)
                 ),
                 new DualNum<>(new double[] {
-                        angleSign * (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                        angleSign * (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                        (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                        (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
                 })
         );
 

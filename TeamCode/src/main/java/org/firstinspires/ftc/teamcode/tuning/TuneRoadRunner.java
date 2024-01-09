@@ -1,5 +1,10 @@
 package org.firstinspires.ftc.teamcode.tuning;
 
+// @@@ There's a big voltage dip when stopping angularRampLogger - should avoid braking?
+// @@@ Fix encoder jump in encoder test
+// @@@ Add NONZERO to encoder test
+// @@@ Add more percentages
+
 import static com.acmerobotics.roadrunner.Profiles.constantProfile;
 
 import com.acmerobotics.dashboard.FtcDashboard;
@@ -98,7 +103,7 @@ class TickTracker {
                 if (Math.abs(yaw) < 5) {
                     error = "Yaw too small, are RevHubOrientationOnRobot flags correct when calling imu.initialize()?";
                 } else if (yaw < -5) {
-                    error = "Yaw is negative, you're turning counterclockwise \uD83D, right?";
+                    error = "Yaw is negative, you're turning counterclockwise \uD83D\uDD04, right?";
                 }
                 passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", yaw), error);
             }
@@ -276,10 +281,10 @@ public class TuneRoadRunner extends LinearOpMode {
             }
 
             while (opModeIsActive() && !ui.cancel()) {
-                // @@@ Show the instructions still
+                telemetry.addLine("Push straight forward.\n");
                 passed = tracker.reportAll(telemetry);
                 if (passed)
-                    telemetry.addLine("\nPress B when complete to move to rotation test");
+                    telemetry.addLine("\nPress B when complete to move to sideways test");
                 else
                     telemetry.addLine("\nPress B to cancel");
                 telemetry.update();
@@ -287,7 +292,41 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         if (passed) {
-            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D by pushing."
+            if (ui.readyPrompt("Push the robot sideways to the left for two or more tiles (24\")."
+                    + "\n\nPress A to start, B when complete")) {
+
+                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.STRAIGHT);
+                if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
+                    MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
+                    tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.NEGATIVE);
+                    tracker.register(loc.leftBack, "leftBack", TickTracker.Correlation.POSITIVE);
+                    tracker.register(loc.rightBack, "rightBack", TickTracker.Correlation.NEGATIVE);
+                    tracker.register(loc.rightFront, "rightFront", TickTracker.Correlation.POSITIVE);
+                } else if (drive.localizer instanceof ThreeDeadWheelLocalizer) {
+                    ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
+                    tracker.register(loc.par0, "par0", TickTracker.Correlation.ZERO);
+                    tracker.register(loc.par1, "par1", TickTracker.Correlation.ZERO);
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
+                    TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
+                    tracker.register(loc.par, "par", TickTracker.Correlation.ZERO);
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                }
+
+                while (opModeIsActive() && !ui.cancel()) {
+                    telemetry.addLine("Push to the left.\n");
+                    passed = tracker.reportAll(telemetry);
+                    if (passed)
+                        telemetry.addLine("\nPress B when complete");
+                    else
+                        telemetry.addLine("\nPress B to cancel");
+                    telemetry.update();
+                }
+            }
+        }
+
+        if (passed) {
+            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D\uDD04 by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
                 TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATION);
@@ -301,15 +340,16 @@ public class TuneRoadRunner extends LinearOpMode {
                     ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par0, "par0", TickTracker.Correlation.REVERSE);
                     tracker.register(loc.par1, "par1", TickTracker.Correlation.FORWARD);
-                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                    // tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE); // @@@ Should be NONZERO
                 } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
                     TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par, "par", TickTracker.Correlation.REVERSE);
-                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                    // tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE); // @@@ Should be NONZERO
                 }
 
                 while (opModeIsActive() && !ui.cancel()) {
-                    tracker.reportAll(telemetry);
+                    telemetry.addLine("Rotate 90° counterclockwise \uD83D\uDD04.\n");
+                    passed = tracker.reportAll(telemetry);
                     if (passed)
                         telemetry.addLine("\nPress B when complete");
                     else
