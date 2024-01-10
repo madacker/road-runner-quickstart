@@ -38,19 +38,20 @@ import java.util.List;
 
 class TickTracker {
     enum Correlation {
-        FORWARD, REVERSE, ZERO, POSITIVE, NEGATIVE
+        FORWARD, REVERSE, ZERO, NONZERO, POSITIVE, NEGATIVE
     }
     enum Mode {
-        STRAIGHT, ROTATION
+        FORWARD, LATERAL, ROTATE
     }
     Mode mode;
     IMU imu;
-    double startYaw;
+    double lastYaw; // Last yaw measurement
+    double totalYaw; // Accumulated yaw
 
     TickTracker(IMU imu, Mode mode) {
         this.imu = imu;
         this.mode = mode;
-        this.startYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        this.lastYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
     }
     ArrayList<Counter> counters = new ArrayList<>();
     void register(Encoder encoder, String name, Correlation correlation) {
@@ -68,6 +69,13 @@ class TickTracker {
             }
         }
         return tickCount / counterCount;
+    }
+    double maxTicks() {
+        double tickCount = 0;
+        for (Counter counter: counters) {
+            tickCount += Math.max(tickCount, Math.abs(counter.ticks()));
+        }
+        return tickCount;
     }
 
     boolean report(Telemetry telemetry, String name, String value, String error) {
@@ -88,70 +96,92 @@ class TickTracker {
 
         assert(counters.size() != 0);
         boolean passed = true;
-        double averageTicks = averageTicks();
+        double maxTicks = maxTicks();
 
-        if (averageTicks < 300) {
-            passed &= report(telemetry, "Ticks so far", String.valueOf(averageTicks), "keep pushing");
+        if (maxTicks < 300) {
+            passed &= report(telemetry, "Ticks so far", String.valueOf(maxTicks), "keep pushing");
         } else {
-            if (mode == Mode.ROTATION) {
-                double yaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES) - startYaw;
-                while (yaw < -180)
-                    yaw += 360.0;
-                while (yaw >= 180)
-                    yaw -= 360.0;
+            if (mode == Mode.ROTATE) {
+                double thisYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+                double yawDelta = thisYaw - lastYaw;
+                lastYaw = thisYaw;
+
+                while (yawDelta < -180)
+                    yawDelta += 360.0;
+                while (yawDelta >= 180)
+                    yawDelta -= 360.0;
+                totalYaw += yawDelta;
 
                 String error = "";
-                if (Math.abs(yaw) < 5) {
+                if (Math.abs(totalYaw) < 5) {
                     error = "Yaw too small, are RevHubOrientationOnRobot flags correct when calling imu.initialize()?";
-                } else if (yaw < -5) {
+                } else if (totalYaw < -5) {
                     error = "Yaw is negative, you're turning counterclockwise \uD83D\uDD04, right?";
                 }
-                passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", yaw), error);
+                passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", totalYaw), error);
             }
 
             for (Counter counter : counters) {
                 String error = "";
-                String value = String.format("%.0f", counter.ticks());
-                if (mode == Mode.STRAIGHT) {
-                    if (counter.correlation == Correlation.FORWARD) {
-                        if (Math.abs(counter.ticks()) < averageTicks * ZERO_ERROR) {
-                            error = "is there a bad cable connection?";
-                        } else if (counter.ticks() < 0) {
-                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
-                        } else if (counter.ticks() < averageTicks * STRAIGHT_ERROR) {
-                            error = "too low, does the wheel have bad contact with field?";
+                String value = String.format("%.0f (%.1f%%)",
+                        counter.ticks(), 100 * Math.abs(counter.ticks()) / maxTicks);
+                switch (counter.correlation) {
+                    case FORWARD:
+                    case REVERSE:
+                        if (mode == Mode.FORWARD) {
+                            if (Math.abs(counter.ticks()) < maxTicks * ZERO_ERROR) {
+                                error = "is there a bad cable connection?";
+                            } else if (counter.ticks() < 0) {
+                                error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            } else if (counter.ticks() < maxTicks * STRAIGHT_ERROR) {
+                                error = "too low, does the wheel have bad contact with field?";
+                            }
+                        } else if (mode == Mode.ROTATE) {
+                            if (Math.abs(counter.ticks()) < maxTicks * ZERO_ERROR) {
+                                error = "is there a bad cable connection?";
+                            } else if ((counter.ticks() < 0) && (counter.correlation == Correlation.FORWARD)) {
+                                error = "should be positive, are left & right encoders swapped?";
+                            } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.REVERSE)) {
+                                error = "should be negative, are left & right encoders swapped?";
+                            } else if (Math.abs(counter.ticks()) < maxTicks * ROTATION_ERROR) {
+                                error = "too low, does the wheel have bad contact with field?";
+                            }
                         }
-                        value += String.format(" (%.1f%%)", 100*Math.abs(counter.ticks() / averageTicks));
-                    } else if (counter.correlation == Correlation.ZERO) {
-                        if (Math.abs(counter.ticks()) > averageTicks * 0.05) {
-                            error = "should be zero given that it's perpendicular to travel";
+                        break;
+                    case POSITIVE:
+                    case NEGATIVE:
+                        if (mode == Mode.ROTATE) {
+                            if ((counter.ticks() < 0) && (counter.correlation == Correlation.POSITIVE)) {
+                                error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.NEGATIVE)) {
+                                error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
+                            } else if (Math.abs(counter.ticks()) < maxTicks * ZERO_ERROR) {
+                                error = "too low, does the wheel have bad contact with field, or "
+                                        + "is it too close to center of rotation?";
+                            }
+                        } else {
+                            if (Math.abs(counter.ticks()) < maxTicks * ZERO_ERROR) {
+                                error = "too low";
+                            } else if ((counter.ticks() < 0) && (counter.correlation == Correlation.POSITIVE)) {
+                                error = "should be positive";
+                            } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.NEGATIVE)) {
+                                error = "should be negative";
+                            }
                         }
-                    }
-                } else if (mode == Mode.ROTATION) {
-                    if ((counter.correlation == Correlation.FORWARD) ||
-                            (counter.correlation == Correlation.REVERSE)) {
-                        if (Math.abs(counter.ticks()) < averageTicks * ZERO_ERROR) {
-                            error = "is there a bad cable connection?";
-                        } else if ((counter.ticks() < 0) && (counter.correlation == Correlation.FORWARD)) {
-                            error = "should be positive, are left & right encoders swapped?";
-                        } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.REVERSE)) {
-                            error = "should be negative, are left & right encoders swapped?";
-                        } else if (Math.abs(counter.ticks()) < averageTicks * ROTATION_ERROR) {
-                            error = "too low, does the wheel have bad contact with field?";
+                        break;
+                    case ZERO:
+                        if (Math.abs(counter.ticks()) > maxTicks * 0.05) {
+                            error = "should be near zero given that it's perpendicular to travel";
                         }
-                        value += String.format(" (%.1f%%)", 100*Math.abs(counter.ticks() / averageTicks));
-                    } else if ((counter.correlation == Correlation.POSITIVE) ||
-                            (counter.correlation == Correlation.NEGATIVE)) {
-                        if ((counter.ticks() < 0) && (counter.correlation == Correlation.POSITIVE)) {
-                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
-                        } else if ((counter.ticks() > 0) && (counter.correlation == Correlation.NEGATIVE)) {
-                            error = "set " + counter.name + ".setDirection(DcMotorEx.Direction.REVERSE);";
-                        } else if (Math.abs(counter.ticks()) < averageTicks * ZERO_ERROR) {
-                            error = "too low, does the wheel have bad contact with field, or "
-                                    + "is it too close to center of rotation?";
+
+                        break;
+                    case NONZERO:
+                        if (Math.abs(counter.ticks()) < maxTicks * 0.05) {
+                            error = "shouldn't be close to zero";
                         }
-                    }
+                        break;
                 }
+
                 passed &= report(telemetry, counter.name, value, error);
             }
         }
@@ -252,6 +282,25 @@ public class TuneRoadRunner extends LinearOpMode {
         }
     }
 
+    // Run an Action but end it early if Cancel is pressed.
+    // Returns True if it ran without cancelling, False if it was cancelled.
+    private boolean runCancelableAction(Action action) {
+        drive.runParallel(action);
+        while (opModeIsActive() && !ui.cancel()) {
+            TelemetryPacket packet = new TelemetryPacket();
+            ui.showMessage("Press B to stop");
+            boolean more = drive.doActionsWork(packet);
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            if (!more) {
+                // We successfully completed the Action!
+                return true; // ====>
+            }
+        }
+        // The user either pressed Cancel or End:
+        drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
+        return false;
+    }
+
     // Road Runner expects the hardware to be in different states when using high-level MecanumDrive/
     // TankDrive functionality vs. its lower-level tuning functionality.
     private void useDrive(boolean enable) {
@@ -282,7 +331,7 @@ public class TuneRoadRunner extends LinearOpMode {
         if (ui.readyPrompt("Push the robot forward in a straight line for two or more tiles (24\")."
                 + "\n\nPress A to start, B when complete")) {
 
-            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.STRAIGHT);
+            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.FORWARD);
             if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                 MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                 tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.FORWARD);
@@ -315,7 +364,7 @@ public class TuneRoadRunner extends LinearOpMode {
             if (ui.readyPrompt("Push the robot sideways to the left for two or more tiles (24\")."
                     + "\n\nPress A to start, B when complete")) {
 
-                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.STRAIGHT);
+                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.LATERAL);
                 if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                     MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                     tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.NEGATIVE);
@@ -346,10 +395,10 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         if (passed) {
-            if (ui.readyPrompt("Rotate the robot 90° counterclockwise \uD83D\uDD04 by pushing."
+            if (ui.readyPrompt("Rotate the robot counterclockwise \uD83D\uDD04 by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
-                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATION);
+                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATE);
                 if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                     MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                     tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.REVERSE);
@@ -360,18 +409,19 @@ public class TuneRoadRunner extends LinearOpMode {
                     ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par0, "par0", TickTracker.Correlation.REVERSE);
                     tracker.register(loc.par1, "par1", TickTracker.Correlation.FORWARD);
-                    // tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE); // @@@ Should be NONZERO
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.NONZERO);
                 } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
                     TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par, "par", TickTracker.Correlation.REVERSE);
-                    // tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE); // @@@ Should be NONZERO
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.NONZERO);
                 }
 
                 while (opModeIsActive() && !ui.cancel()) {
-                    telemetry.addLine("Rotate 90° counterclockwise \uD83D\uDD04.\n");
+                    telemetry.addLine("Rotate counterclockwise \uD83D\uDD04.\n");
                     passed = tracker.reportAll(telemetry);
                     if (passed)
-                        telemetry.addLine("\nPress B when complete");
+                        telemetry.addLine("\nCongratulations, the encoders and IMU passed! "
+                                + "Press B to return to the menu.");
                     else
                         telemetry.addLine("\nPress B to cancel");
                     telemetry.update();
@@ -387,7 +437,7 @@ public class TuneRoadRunner extends LinearOpMode {
                 + "Measure distance and set inPerTick = <i>inches-traveled</i> / <i>average-ticks</i>."
                 + "\n\nPress A to start, B when complete")) {
 
-            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.STRAIGHT);
+            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.FORWARD);
             if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                 MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                 tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.FORWARD);
@@ -535,25 +585,6 @@ public class TuneRoadRunner extends LinearOpMode {
 
         // Set power to zero before exiting:
         drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
-    }
-
-    // Run an Action but end it early if Cancel is pressed.
-    // Returns True if it ran without cancelling, False if it was cancelled.
-    boolean runCancelableAction(Action action) {
-        drive.runParallel(action);
-        while (opModeIsActive() && !ui.cancel()) {
-            TelemetryPacket packet = new TelemetryPacket();
-            ui.showMessage("Press B to stop");
-            boolean more = drive.doActionsWork(packet);
-            FtcDashboard.getInstance().sendTelemetryPacket(packet);
-            if (!more) {
-                // We successfully completed the Action!
-                return true; // ====>
-            }
-        }
-        // The user either pressed Cancel or End:
-        drive.setDrivePowers(new PoseVelocity2d(new Vector2d(0.0, 0.0), 0.0));
-        return false;
     }
 
     void manualFeedbackTunerAxial() {
