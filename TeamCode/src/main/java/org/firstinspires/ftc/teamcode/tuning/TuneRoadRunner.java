@@ -70,12 +70,13 @@ class TickTracker {
         }
         return tickCount / counterCount;
     }
+
     double maxTicks() {
-        double tickCount = 0;
+        double maxCount = 0;
         for (Counter counter: counters) {
-            tickCount += Math.max(tickCount, Math.abs(counter.ticks()));
+            maxCount = Math.max(maxCount, Math.abs(counter.ticks()));
         }
-        return tickCount;
+        return maxCount;
     }
 
     boolean report(Telemetry telemetry, String name, String value, String error) {
@@ -92,7 +93,7 @@ class TickTracker {
     boolean reportAll(Telemetry telemetry) {
         final double ZERO_ERROR = 0.05; // Should be no higher than 5% of the average
         final double STRAIGHT_ERROR = 0.90; // Straight should be no lower than this of the average
-        final double ROTATION_ERROR = 0.75; // Rotation should be no lower than this of average
+        final double ROTATION_ERROR = 0.30; // Rotation should be no lower than this of average
 
         assert(counters.size() != 0);
         boolean passed = true;
@@ -395,7 +396,7 @@ public class TuneRoadRunner extends LinearOpMode {
         }
 
         if (passed) {
-            if (ui.readyPrompt("Rotate the robot counterclockwise \uD83D\uDD04 by pushing."
+            if (ui.readyPrompt("Rotate the robot counterclockwise at least 90° \uD83D\uDD04 by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
                 TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATE);
@@ -417,7 +418,7 @@ public class TuneRoadRunner extends LinearOpMode {
                 }
 
                 while (opModeIsActive() && !ui.cancel()) {
-                    telemetry.addLine("Rotate counterclockwise \uD83D\uDD04.\n");
+                    telemetry.addLine("Rotate counterclockwise\uD83D\uDD04.\n");
                     passed = tracker.reportAll(telemetry);
                     if (passed)
                         telemetry.addLine("\nCongratulations, the encoders and IMU passed! "
