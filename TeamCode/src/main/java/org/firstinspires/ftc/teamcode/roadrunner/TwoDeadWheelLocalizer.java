@@ -12,6 +12,7 @@ import com.acmerobotics.roadrunner.ftc.OverflowEncoder;
 import com.acmerobotics.roadrunner.ftc.PositionVelocityPair;
 import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 
@@ -20,8 +21,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 @Config
 public final class TwoDeadWheelLocalizer implements Localizer {
     public static class Params {
-        public double parYTicks = 0.0; // y position of the parallel encoder (in tick units)
-        public double perpXTicks = 0.0; // x position of the perpendicular encoder (in tick units)
+        public double parYTicks = -7503.0095770759635; // y position of the parallel encoder (in tick units)
+        public double perpXTicks = 11199.62940916759; // x position of the perpendicular encoder (in tick units)
     }
 
     public static Params PARAMS = new Params();
@@ -37,8 +38,10 @@ public final class TwoDeadWheelLocalizer implements Localizer {
     private double lastRawHeadingVel, headingVelOffset;
 
     public TwoDeadWheelLocalizer(HardwareMap hardwareMap, IMU imu, double inPerTick) {
-        par = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "par")));
-        perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "perp")));
+        par = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+        perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder")));
+        perp.setDirection(DcMotorSimple.Direction.REVERSE);
+
         this.imu = imu;
 
         lastParPos = par.getPositionAndVelocity().position;
