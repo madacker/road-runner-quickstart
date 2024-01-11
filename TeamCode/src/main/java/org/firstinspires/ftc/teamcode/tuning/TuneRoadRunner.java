@@ -1,10 +1,5 @@
 package org.firstinspires.ftc.teamcode.tuning;
 
-// @@@ There's a big voltage dip when stopping angularRampLogger - should avoid braking?
-// @@@ Fix encoder jump in encoder test
-// @@@ Add NONZERO to encoder test
-// @@@ Add more percentages
-
 import static com.acmerobotics.roadrunner.Profiles.constantProfile;
 
 import com.acmerobotics.dashboard.FtcDashboard;
@@ -91,9 +86,9 @@ class TickTracker {
     }
 
     boolean reportAll(Telemetry telemetry) {
-        final double ZERO_ERROR = 0.05; // Should be no higher than 5% of the average
-        final double STRAIGHT_ERROR = 0.90; // Straight should be no lower than this of the average
-        final double ROTATION_ERROR = 0.30; // Rotation should be no lower than this of average
+        final double ZERO_ERROR = 0.05; // Should be no higher than this of the max
+        final double STRAIGHT_ERROR = 0.90; // Straight should be no lower than this of the max
+        final double ROTATION_ERROR = 0.30; // Rotation should be no lower than this of max
 
         assert(counters.size() != 0);
         boolean passed = true;
@@ -174,7 +169,6 @@ class TickTracker {
                         if (Math.abs(counter.ticks()) > maxTicks * 0.05) {
                             error = "should be near zero given that it's perpendicular to travel";
                         }
-
                         break;
                     case NONZERO:
                         if (Math.abs(counter.ticks()) < maxTicks * 0.05) {
