@@ -291,20 +291,20 @@ public class Driver extends LinearOpMode {
             Canvas canvas = packet.fieldOverlay();
 
             // The 'A' button activates the auto-parker:
-            boolean autoActivated = false;
+            boolean parkingActivated = false;
             if (!gamepad1.a)
                 parker = null;
             else {
                 if (parker == null)
                     parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
-                autoActivated = parker.park(packet);
+                parkingActivated = parker.park(packet);
             }
 
-            // The 'right-bumper' button activates Road Runner homing:
-            boolean hasActions = drive.doActionsWork();
-            if (!gamepad1.right_bumper)
+            // The 'left-bumper' button activates Road Runner homing:
+            boolean roadrunnerActivated = drive.doActionsWork(packet);
+            if (!gamepad1.left_bumper)
                 drive.abortActions();
-            else if (!hasActions) {
+            else if (!roadrunnerActivated) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
                     (Math.abs(drive.poseVelocity.linearVel.y) < 0.1) &&
@@ -339,11 +339,12 @@ public class Driver extends LinearOpMode {
                                 .build();
                     }
                     drive.runParallel(action);
+                    roadrunnerActivated = true;
                 }
             }
 
             // Manually drive:
-            if (!autoActivated) {
+            if ((!parkingActivated) && (!roadrunnerActivated)) {
                 if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
                             scaleStick(-gamepad1.left_stick_y, fullAxialSpeed),

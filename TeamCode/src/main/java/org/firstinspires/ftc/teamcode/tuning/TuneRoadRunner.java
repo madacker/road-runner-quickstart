@@ -692,14 +692,14 @@ public class TuneRoadRunner extends LinearOpMode {
         tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
         tests.add(new Test(this::manualFeedbackTunerLateral,"ManualFeedbackTuner (lateralGain)"));
         tests.add(new Test(this::manualFeedbackTunerHeading,"ManualFeedbackTuner (headingGain)"));
-        tests.add(new Test(this::completionTest,            "Completion test (verification)"));
+        tests.add(new Test(this::completionTest,            "Completion test (overall verification)"));
 
         telemetry.addLine("Press START to begin");
         waitForStart();
 
         int selection = 0;
         while (opModeIsActive()) {
-            selection = ui.menu("Use Dpad to navigate, A to select\n", selection, true,
+            selection = ui.menu("<h1>Use Dpad to navigate, \nA to select</h1>XXX", selection, true,
                     tests.size(), i -> tests.get(i).description);
 
             tests.get(selection).method.invoke();   // Invoke the chosen test
