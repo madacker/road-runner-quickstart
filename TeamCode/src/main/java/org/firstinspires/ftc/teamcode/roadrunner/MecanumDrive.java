@@ -285,8 +285,8 @@ public final class MecanumDrive {
         if (isDevBot) {
             localizer = new DriveLocalizer();
         } else {
-            // localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
-            localizer = new TwoDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
+            localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
+            // localizer = new TwoDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
         }
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);

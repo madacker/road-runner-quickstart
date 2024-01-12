@@ -370,11 +370,11 @@ public class TuneRoadRunner extends LinearOpMode {
                     ThreeDeadWheelLocalizer loc = (ThreeDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par0, "par0", TickTracker.Correlation.ZERO);
                     tracker.register(loc.par1, "par1", TickTracker.Correlation.ZERO);
-                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.FORWARD);
                 } else if (drive.localizer instanceof TwoDeadWheelLocalizer) {
                     TwoDeadWheelLocalizer loc = (TwoDeadWheelLocalizer) drive.localizer;
                     tracker.register(loc.par, "par", TickTracker.Correlation.ZERO);
-                    tracker.register(loc.perp, "perp", TickTracker.Correlation.POSITIVE);
+                    tracker.register(loc.perp, "perp", TickTracker.Correlation.FORWARD);
                 }
 
                 while (opModeIsActive() && !ui.cancel()) {
@@ -699,7 +699,7 @@ public class TuneRoadRunner extends LinearOpMode {
 
         int selection = 0;
         while (opModeIsActive()) {
-            selection = ui.menu("<h1>Use Dpad to navigate, \nA to select</h1>XXX", selection, true,
+            selection = ui.menu("<h1>Use Dpad to navigate, A to select</h1>", selection, true,
                     tests.size(), i -> tests.get(i).description);
 
             tests.get(selection).method.invoke();   // Invoke the chosen test

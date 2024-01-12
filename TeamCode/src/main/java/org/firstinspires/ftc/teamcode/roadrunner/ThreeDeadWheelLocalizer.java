@@ -16,7 +16,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
-    static final public boolean USE_BACK_ENCODER = true;
+    public enum MiddleEncoder { FRONT, BACK, LEFT };
+    static final public MiddleEncoder MIDDLE_ENCODER = MiddleEncoder.LEFT;
 
     public static class Params {
         public double par0YTicks = 0.0; // y position of the first parallel encoder (in tick units)
@@ -24,15 +25,22 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         public double perpXTicks = 0.0; // x position of the perpendicular encoder (in tick units)
 
         Params() {
-            if (USE_BACK_ENCODER) {
-                par0YTicks = -7369.98756643720;
-                par1YTicks = 7480.191607023889;
-                perpXTicks = -13228.95945230742;
-
-            } else {
-                par0YTicks = -7503.0095770759635;
-                par1YTicks = 7314.3664886289025;
-                perpXTicks = 11199.62940916759;
+            switch (MIDDLE_ENCODER) {
+                case FRONT:
+                    par0YTicks = -7503.0095770759635;
+                    par1YTicks = 7314.3664886289025;
+                    perpXTicks = 11199.62940916759;
+                    break;
+                case BACK:
+                    par0YTicks = -7369.98756643720;
+                    par1YTicks = 7480.191607023889;
+                    perpXTicks = -13228.95945230742;
+                    break;
+                case LEFT:
+                    par0YTicks = -13435.250693821241;
+                    par1YTicks = 11088.248482224375;
+                    perpXTicks = 7472.1530143343225;
+                    break;
             }
         }
     }
@@ -46,17 +54,28 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
     private int lastPar0Pos, lastPar1Pos, lastPerpPos;
 
     public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
-        if (USE_BACK_ENCODER) {
-            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
-            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
-            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-            par1.setDirection(DcMotorSimple.Direction.REVERSE);
-        } else {
-            perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
-            par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
-            par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
-            par1.setDirection(DcMotorSimple.Direction.REVERSE);
-            perp.setDirection(DcMotorSimple.Direction.REVERSE);
+        switch (MIDDLE_ENCODER) {
+            default:
+            case FRONT:
+                par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+                perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder"))); // Front!
+                par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+                par1.setDirection(DcMotorSimple.Direction.REVERSE);
+                perp.setDirection(DcMotorSimple.Direction.REVERSE);
+                break;
+            case BACK:
+                par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder")));
+                perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder"))); // Back!
+                par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightBackMotor-rightEncoder")));
+                par1.setDirection(DcMotorSimple.Direction.REVERSE);
+                break;
+            case LEFT:
+                par0 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftBackMotor-backEncoder")));
+                perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "leftFrontMotor-leftEncoder"))); // Left!
+                par1 = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "rightFrontMotor-frontEncoder")));
+                par1.setDirection(DcMotorSimple.Direction.REVERSE);
+                perp.setDirection(DcMotorSimple.Direction.REVERSE);
+                break;
         }
 
         lastPar0Pos = par0.getPositionAndVelocity().position;
@@ -77,22 +96,43 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         int par1PosDelta = par1PosVel.position - lastPar1Pos;
         int perpPosDelta = perpPosVel.position - lastPerpPos;
 
-        Twist2dDual<Time> twist = new Twist2dDual<>(
-                new Vector2dDual<>(
-                        new DualNum<Time>(new double[] {
-                                (PARAMS.par0YTicks * par1PosDelta - PARAMS.par1YTicks * par0PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                                (PARAMS.par0YTicks * par1PosVel.velocity - PARAMS.par1YTicks * par0PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                        }).times(inPerTick),
-                        new DualNum<Time>(new double[] {
-                                (PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosDelta - par0PosDelta) + perpPosDelta),
-                                (PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosVel.velocity - par0PosVel.velocity) + perpPosVel.velocity),
-                        }).times(inPerTick)
-                ),
-                new DualNum<>(new double[] {
-                        (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                        (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
-                })
-        );
+        Twist2dDual<Time> twist;
+
+        if (MIDDLE_ENCODER == MiddleEncoder.LEFT) {
+            twist = new Twist2dDual<>(
+                    new Vector2dDual<>(
+                            new DualNum<Time>(new double[] {
+                                    -(PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosDelta - par0PosDelta) + perpPosDelta),
+                                    -(PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosVel.velocity - par0PosVel.velocity) + perpPosVel.velocity),
+                            }).times(inPerTick),
+                            new DualNum<Time>(new double[] {
+                                    (PARAMS.par0YTicks * par1PosDelta - PARAMS.par1YTicks * par0PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                                    (PARAMS.par0YTicks * par1PosVel.velocity - PARAMS.par1YTicks * par0PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                            }).times(inPerTick)
+                    ),
+                    new DualNum<>(new double[] {
+                            (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                            (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                    })
+            );
+        } else {
+            twist = new Twist2dDual<>(
+                    new Vector2dDual<>(
+                            new DualNum<Time>(new double[]{
+                                    (PARAMS.par0YTicks * par1PosDelta - PARAMS.par1YTicks * par0PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                                    (PARAMS.par0YTicks * par1PosVel.velocity - PARAMS.par1YTicks * par0PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                            }).times(inPerTick),
+                            new DualNum<Time>(new double[]{
+                                    (PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosDelta - par0PosDelta) + perpPosDelta),
+                                    (PARAMS.perpXTicks / (PARAMS.par0YTicks - PARAMS.par1YTicks) * (par1PosVel.velocity - par0PosVel.velocity) + perpPosVel.velocity),
+                            }).times(inPerTick)
+                    ),
+                    new DualNum<>(new double[]{
+                            (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                            (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                    })
+            );
+        }
 
         lastPar0Pos = par0PosVel.position;
         lastPar1Pos = par1PosVel.position;
