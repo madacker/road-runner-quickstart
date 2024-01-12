@@ -302,15 +302,13 @@ public class Driver extends LinearOpMode {
 
             // The 'left-bumper' button activates Road Runner homing:
             boolean roadrunnerActivated = drive.doActionsWork(packet);
-            if (!gamepad1.left_bumper)
-                drive.abortActions();
-            else if (!roadrunnerActivated) {
+            if ((gamepad1.left_bumper) && (!roadrunnerActivated)) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
                     (Math.abs(drive.poseVelocity.linearVel.y) < 0.1) &&
                     (Math.abs(drive.poseVelocity.angVel) < 0.1)) {
 
-                    boolean toBackdrop = drive.pose.position.x < 0.0;
+                    boolean toBackdrop = drive.pose.position.x < 6.0;
                     Action action;
 
                     if (toBackdrop) {
@@ -327,15 +325,15 @@ public class Driver extends LinearOpMode {
                                 .build();
                     } else {
                         // Go to the blue wing:
-                        Pose2d keyPose = new Pose2d(48, 36, Math.PI);
+                        Pose2d keyPose = new Pose2d(12, -36, Math.PI);
                         double startTangent = Math.atan2(
                                 keyPose.position.y - drive.pose.position.y,
                                 keyPose.position.x - drive.pose.position.x);
                         action = drive.actionBuilder(drive.pose)
                                 .setTangent(startTangent)
-                                .splineToSplineHeading(new Pose2d(12, -36, Math.PI), Math.PI)
+                                .splineToSplineHeading(keyPose, Math.PI)
                                 .splineTo(new Vector2d(-36, -36), Math.PI)
-                                .splineTo(new Vector2d(-71 + 18, -72 + 18), Math.toRadians(225))
+                                .splineTo(new Vector2d(-72 + 24, -72 + 24), Math.toRadians(225))
                                 .build();
                     }
                     drive.runParallel(action);

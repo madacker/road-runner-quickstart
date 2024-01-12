@@ -232,6 +232,7 @@ public class TuneRoadRunner extends LinearOpMode {
         // Display the menu:
         int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
             while (opModeIsActive()) {
+                String output = "";
                 if (up()) {
                     current--;
                     if (current < 0)
@@ -247,12 +248,13 @@ public class TuneRoadRunner extends LinearOpMode {
                 if (select())
                     return current;
                 if (header != null) {
-                    telemetry.addLine(header);
+                    output += header;
                 }
                 for (int i = 0; i < numStrings; i++) {
                     String cursor = (i == current) ? "➤" : " ";
-                    telemetry.addLine(cursor + menuStrings.getString(i));
+                    output += cursor + menuStrings.getString(i) + "\n";
                 }
+                telemetry.addLine(output);
                 telemetry.update();
                 // Sleep to allow other system processing (and ironically improve responsiveness):
                 sleep(10);
@@ -681,6 +683,17 @@ public class TuneRoadRunner extends LinearOpMode {
         drive = new MecanumDrive(hardwareMap, defaultPose);
         ui = new Ui();
 
+        String configuration = "Mecanum drive, ";
+        if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
+            configuration += "no telemetry pods";
+        } else if (drive.localizer instanceof ThreeDeadWheelLocalizer) {
+            configuration += "3 telemetry pods";
+        } else {
+            configuration += "2 telemetry pods";
+        }
+        String navigation = "Used Dpad to navigate, A to select";
+        String heading = String.format("<h4>%s</h4><h2>%s</h2>", configuration, navigation);
+
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
         tests.add(new Test(this::driveTest,                 "Drive test (motors)"));
@@ -699,7 +712,7 @@ public class TuneRoadRunner extends LinearOpMode {
 
         int selection = 0;
         while (opModeIsActive()) {
-            selection = ui.menu("<h1>Use Dpad to navigate, A to select</h1>", selection, true,
+            selection = ui.menu(heading, selection, true,
                     tests.size(), i -> tests.get(i).description);
 
             tests.get(selection).method.invoke();   // Invoke the chosen test

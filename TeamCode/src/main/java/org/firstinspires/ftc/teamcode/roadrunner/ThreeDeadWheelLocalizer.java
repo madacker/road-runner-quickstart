@@ -99,6 +99,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         Twist2dDual<Time> twist;
 
         if (MIDDLE_ENCODER == MiddleEncoder.LEFT) {
+            // Transform delta-x and delta-y by 90 degrees:
             twist = new Twist2dDual<>(
                     new Vector2dDual<>(
                             new DualNum<Time>(new double[] {
@@ -116,6 +117,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
                     })
             );
         } else {
+            // No transformation on delta-x and delta-y:
             twist = new Twist2dDual<>(
                     new Vector2dDual<>(
                             new DualNum<Time>(new double[]{
