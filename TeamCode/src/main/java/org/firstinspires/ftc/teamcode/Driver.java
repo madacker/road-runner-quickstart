@@ -198,17 +198,12 @@ class Wall {
         double pointToPointAngle = Math.atan2(dy, dx);
         double distance = Math.cos(pointToPointAngle - towardWallAngle) * pointToPointDistance;
 
-packet.put("Distance to wall", distance);
-packet.put("Wall approach velocity", towardWallVelocity);
-
         // Calculate the maximum speed directly towards the target assuming constant
         // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
         // current velocity, u is the initial velocity, a is the acceleration, s is distance
         // traveled. We apply it in reverse:
         double maxApproachVelocity = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distance);
         towardWallVelocity = Math.min(towardWallVelocity, maxApproachVelocity);
-
-packet.put("Max approach", maxApproachVelocity);
 
         // Constitute the revised velocity's component vectors:
         Vector2d towardWallVector = new Vector2d(

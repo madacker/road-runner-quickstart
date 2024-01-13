@@ -285,7 +285,7 @@ public final class MecanumDrive {
         if (isDevBot) {
             localizer = new DriveLocalizer();
         } else {
-            localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
+            localizer = new ThreeDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
             // localizer = new TwoDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
         }
 
@@ -466,6 +466,11 @@ public final class MecanumDrive {
             rightFront.setPower(feedforward.compute(wheelVels.rightFront) / voltage);
 
             FlightRecorder.write("TARGET_POSE", new PoseMessage(txWorldTarget.value()));
+
+            Pose2d error = txWorldTarget.value().minusExp(pose);
+            p.put("Error (x)", error.position.x);
+            p.put("Error (y)", error.position.y);
+            p.put("Error (heading) (deg)", Math.toDegrees(error.heading.log()));
 
             // only draw when active; only one drive action should be active at a time
             Canvas c = p.fieldOverlay();
