@@ -223,6 +223,8 @@ class Wall {
 
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
+    final boolean FASTEST = true;
+
     // Shape the stick input for more precision at slow speeds:
     public double shapeStick(double stickValue) {
         return Math.signum(stickValue) * Math.pow(stickValue, 2.0);
@@ -256,10 +258,16 @@ public class Driver extends LinearOpMode {
         double previousAngularSpeed = 0;
 
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        Refiner refiner = new Refiner(hardwareMap);
-        Led led = new Led(hardwareMap);
         AutoParker parker = null;
-        Wall wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
+        Refiner refiner = null;
+        Led led = null;
+        Wall wall = null;
+
+        if (!FASTEST) {
+            refiner = new Refiner(hardwareMap);
+            led = new Led(hardwareMap);
+            wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
+        }
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
         double fullAxialSpeed
@@ -279,7 +287,8 @@ public class Driver extends LinearOpMode {
 
             // Update the telemetry pose and update the LED loop:
             drive.updatePoseEstimate();
-            led.update();
+            if (led != null)
+                led.update();
 
             // Set up for visualizations:
             TelemetryPacket packet = new TelemetryPacket();
@@ -346,7 +355,8 @@ public class Driver extends LinearOpMode {
 
                     PoseVelocity2d fieldVelocity = drive.pose.times(calibratedVelocity);
 
-                    wall.repulse(fieldVelocity, packet); // @@@
+                    if (wall != null)
+                        wall.repulse(fieldVelocity, packet); // @@@
 
                     drive.setDrivePowers(null, fieldVelocity);
                 } else {
@@ -359,14 +369,16 @@ public class Driver extends LinearOpMode {
             }
 
             // Refine the pose estimate using AprilTags:
-            Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
-            if (refinedPose != null) {
-                led.setSteadyColor(Led.Color.GREEN);
-                led.setPulseColor(Led.Color.RED, 0.25);
+            if (refiner != null) {
+                Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
+                if (refinedPose != null) {
+                    led.setSteadyColor(Led.Color.GREEN);
+                    led.setPulseColor(Led.Color.RED, 0.25);
 
-                // Set the new pose and record it:
-                drive.pose = refinedPose;
-                drive.recordPose(refinedPose, 1);
+                    // Set the new pose and record it:
+                    drive.pose = refinedPose;
+                    drive.recordPose(refinedPose, 1);
+                }
             }
 
             // Draw the pose history:
@@ -412,11 +424,16 @@ public class Driver extends LinearOpMode {
         }
 
         // Cleanup:
-        refiner.close();
-        TimeSplitter.logAllResults();
-        led.setSteadyColor(Led.Color.OFF);
+        if (refiner != null) {
+            refiner.close();
+        }
+        if (led != null) {
+            led.setSteadyColor(Led.Color.OFF);
+        }
 
         // Output summary:
+        TimeSplitter.logAllResults();
+
         TelemetryPacket packet = new TelemetryPacket();
         packet.addLine(String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
                 maxLinearSpeed, fullAxialSpeed, maxLinearAcceleration, minLinearDeceleration));
