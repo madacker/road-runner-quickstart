@@ -1,0 +1,158 @@
+package com.example.kinematictesting.framework;
+
+import static java.lang.Math.max;
+import static java.lang.System.nanoTime;
+
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.dashboard.canvas.Canvas;
+
+import com.acmerobotics.roadrunner.AccelConstraint;
+import com.acmerobotics.roadrunner.DualNum;
+import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
+import com.acmerobotics.roadrunner.Time;
+import com.acmerobotics.roadrunner.TurnConstraints;
+import com.acmerobotics.roadrunner.Twist2dDual;
+import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.Vector2dDual;
+
+import java.util.LinkedList;
+
+class Localizer {
+    Twist2dDual<Time> update() {
+        Twist2dDual<Time> twist = new Twist2dDual<>(
+                new Vector2dDual<>(
+                        new DualNum<Time>(new double[] {
+                                0, // Delta position.x
+                                0, // Delta velocity.x
+                        }),
+                        new DualNum<Time>(new double[] {
+                                0, // Delta position.y
+                                0, // Delta velocity.y
+                        })
+                ),
+                new DualNum<>(new double[] {
+                        0, // Delta rotational
+                        0  // Delta rotationalVelocity
+                })
+        );
+        return twist;
+    }
+}
+
+public final class MecanumDrive {
+
+    public static class Params {
+        // path profile parameters (in inches)
+        public double maxWheelVel = 50 / 2.5;
+        public double minProfileAccel = -30;
+        public double maxProfileAccel = 50;
+
+        // turn profile parameters (in radians)
+        public double maxAngVel = Math.PI / 2.5; // shared with path
+        public double maxAngAccel = Math.PI;
+    }
+
+    public static Params PARAMS = new Params();
+
+//    public final MecanumKinematics kinematics = new MecanumKinematics(
+//            PARAMS.inPerTick * PARAMS.trackWidthTicks, PARAMS.inPerTick / PARAMS.lateralInPerTick);
+
+    public final TurnConstraints defaultTurnConstraints = new TurnConstraints(
+            PARAMS.maxAngVel, -PARAMS.maxAngAccel, PARAMS.maxAngAccel);
+//    public final VelConstraint defaultVelConstraint =
+//            new MinVelConstraint(Arrays.asList(
+//                    kinematics.new WheelVelConstraint(PARAMS.maxWheelVel),
+//                    new AngularVelConstraint(PARAMS.maxAngVel)
+//            ));
+    public final AccelConstraint defaultAccelConstraint =
+            new ProfileAccelConstraint(PARAMS.minProfileAccel, PARAMS.maxProfileAccel);
+
+    public final Localizer localizer;
+    public Pose2d pose;
+    public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
+
+    public MecanumDrive(Pose2d pose) {
+        this.pose = pose;
+        this.localizer = new Localizer();
+    }
+
+    public void setDrivePowers(PoseVelocity2d powers) {
+        // @@@ Call other guy
+    }
+
+    // Used by setDrivePowers to calculate acceleration:
+    PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+    double previousAssistSeconds = 0; // Previous call's nanoTime() in seconds
+
+    /**
+     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
+     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
+     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
+     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
+     * at the same time in which case the velocities are added together (to allow assist and stick
+     * control to blend together, for example).
+     *
+     * It's also possible to map the controller input to inches/s and radians/s instead of the
+     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
+     * .maxAngVel to determine the range to specify. Note however that the robot can actually
+     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
+     * robot down.
+     */
+    public void setDrivePowers(
+            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
+            PoseVelocity2d stickVelocity,
+            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
+            PoseVelocity2d assistVelocity)
+    {
+        // @@@ Implement
+    }
+
+    private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
+
+    public PoseVelocity2d updatePoseEstimate() {
+        Twist2dDual<Time> twist = localizer.update();
+        pose = pose.plus(twist.value());
+
+        poseHistory.add(pose);
+        while (poseHistory.size() > 100) {
+            poseHistory.removeFirst();
+        }
+
+        poseVelocity = twist.velocity().value();
+        return poseVelocity;
+    }
+
+    private void drawPoseHistory(Canvas c) {
+        double[] xPoints = new double[poseHistory.size()];
+        double[] yPoints = new double[poseHistory.size()];
+
+        int i = 0;
+        for (Pose2d t : poseHistory) {
+            xPoints[i] = t.position.x;
+            yPoints[i] = t.position.y;
+
+            i++;
+        }
+
+        c.setStrokeWidth(1);
+        c.setStroke("#3F51B5");
+        c.strokePolyline(xPoints, yPoints);
+    }
+
+    public static void drawRobot(Canvas c, Pose2d t, double robotRadius) {
+        c.setStrokeWidth(1);
+        c.strokeCircle(t.position.x, t.position.y, robotRadius);
+
+        Vector2d halfv = t.heading.vec().times(0.5 * robotRadius);
+        Vector2d p1 = t.position.plus(halfv);
+        Vector2d p2 = p1.plus(halfv);
+        c.strokeLine(p1.x, p1.y, p2.x, p2.y);
+    }
+
+    public static void drawRobot(Canvas c, Pose2d t) {
+        final double ROBOT_RADIUS = 9;
+        drawRobot(c, t, ROBOT_RADIUS);
+    }
+}

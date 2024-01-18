@@ -6,7 +6,7 @@ import java.awt.image.BufferStrategy
 /**
  * Wrapper for the drawing canvas.
  */
-class MainCanvas(private var internalWidth: Int, private var internalHeight: Int): Canvas() {
+class MainCanvas(private var internalWidth: Int, private var internalHeight: Int): java.awt.Canvas() {
     lateinit var bufferStrat: BufferStrategy
 
     init {
