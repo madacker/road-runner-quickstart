@@ -2,6 +2,7 @@ package com.example.kinematictesting.framework
 
 import java.awt.*
 import java.awt.image.BufferStrategy
+import javax.imageio.ImageIO
 
 /**
  * Wrapper for the drawing canvas.
@@ -24,5 +25,14 @@ class MainCanvas(private var internalWidth: Int, private var internalHeight: Int
 
     override fun getPreferredSize(): Dimension {
         return Dimension(internalWidth, internalHeight)
+    }
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+    fun getBackground(resource: String): Image {
+        val classLoader = Thread.currentThread().contextClassLoader
+
+        return ImageIO.read(classLoader.getResourceAsStream(resource))
+            .getScaledInstance(internalWidth, internalHeight, Image.SCALE_SMOOTH)
     }
 }
