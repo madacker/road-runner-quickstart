@@ -2,13 +2,13 @@ package com.example.kinematictesting.framework;
 
 import static java.lang.Thread.sleep;
 
+import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Image;
 
 public class Simulation {
     WindowFrame windowFrame;
     MainCanvas canvas;
-    Simulation simulation;
     Image backgroundImage;
 
     public Simulation() {
@@ -22,6 +22,7 @@ public class Simulation {
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         g.drawImage(backgroundImage, 0, 0, null);
+        g.setColor(new Color(0xffffff));
         g.drawString("Hello kinematic world!", 20, 20);
         g.dispose();
         canvas.getBufferStrategy().show();
