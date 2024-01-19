@@ -9,19 +9,11 @@ import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TurnConstraints;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.badlogic.gdx.controllers.Controller;
-import com.badlogic.gdx.controllers.Controllers;
 import com.noahbres.meepmeep.MeepMeep;
 import com.noahbres.meepmeep.roadrunner.Constraints;
 import com.noahbres.meepmeep.roadrunner.DriveShim;
 import com.noahbres.meepmeep.roadrunner.DriveTrainType;
 import com.noahbres.meepmeep.roadrunner.entity.RoadRunnerBotEntity;
-
-import org.libsdl.SDL;
-import org.libsdl.SDL_Error;
-
-import kotlin.jvm.JvmField;
-import uk.co.electronstudio.sdl2gdx.SDL2ControllerManager;
 
 class MecanumDrive {
     DriveShim shim;
@@ -36,27 +28,6 @@ class MecanumDrive {
 public class MeepMeepTesting {
     public static void main(String[] args) {
         MeepMeep meepMeep = new MeepMeep(800);
-
-        SDL2ControllerManager controllerManager = new SDL2ControllerManager();
-        int count = controllerManager.getControllers().size;
-        Controller controller = null;
-        if (count != 0) {
-            controller = controllerManager.getControllers().get(0);
-            while (true) {
-                try {
-                    controllerManager.pollState();
-                } catch (SDL_Error e) {
-                    throw new RuntimeException(e);
-                }
-                System.out.println("State: " + controller.getButton(SDL.SDL_CONTROLLER_BUTTON_A)
-                        + " " + controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX));
-                 try {
-                    sleep(1000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
 
         RoadRunnerBotEntity myBot = new RoadRunnerBotEntity(
                 meepMeep,

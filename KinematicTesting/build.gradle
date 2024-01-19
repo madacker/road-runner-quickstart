@@ -10,10 +10,12 @@ java {
 }
 
 repositories {
+    jcenter()
     maven { url = 'https://maven.brott.dev/' }
 }
 
 dependencies {
     implementation "com.acmerobotics.roadrunner:core:1.0.0-beta6"
     implementation "com.acmerobotics.roadrunner:actions:1.0.0-beta6"
+    implementation "uk.co.electronstudio.sdl2gdx:sdl2gdx:1.0.+"
 }

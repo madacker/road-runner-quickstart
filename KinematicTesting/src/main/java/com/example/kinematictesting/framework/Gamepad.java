@@ -1,5 +1,14 @@
 package com.example.kinematictesting.framework;
 
+import static java.lang.Thread.sleep;
+
+import com.badlogic.gdx.controllers.Controller;
+
+import org.libsdl.SDL;
+import org.libsdl.SDL_Error;
+
+import uk.co.electronstudio.sdl2gdx.SDL2ControllerManager;
+
 public class Gamepad {
 
     public volatile float left_stick_x = 0f;
@@ -29,19 +38,21 @@ public class Gamepad {
     public volatile boolean square = false;
     public volatile boolean share = false;
     public volatile boolean options = false;
-    public volatile boolean touchpad = false;
-    public volatile boolean touchpad_finger_1;
-    public volatile boolean touchpad_finger_2;
-    public volatile float touchpad_finger_1_x;
-    public volatile float touchpad_finger_1_y;
-    public volatile float touchpad_finger_2_x;
-    public volatile float touchpad_finger_2_y;
+//    public volatile boolean touchpad = false;
+//    public volatile boolean touchpad_finger_1;
+//    public volatile boolean touchpad_finger_2;
+//    public volatile float touchpad_finger_1_x;
+//    public volatile float touchpad_finger_1_y;
+//    public volatile float touchpad_finger_2_x;
+//    public volatile float touchpad_finger_2_y;
     public volatile boolean ps = false;
 
+    SDL2ControllerManager controllerManager;
     public Gamepad() {
+        controllerManager = new SDL2ControllerManager();
     }
 
-    protected void updateButtonAliases(){
+    void updateButtonAliases(){
         // There is no assignment for touchpad because there is no equivalent on XBOX controllers.
         circle = b;
         cross = a;
@@ -50,5 +61,42 @@ public class Gamepad {
         share = back;
         options = start;
         ps = guide;
+    }
+
+    // Poll the attached game controller to update the button and axis states
+    public void update() {
+        int count = controllerManager.getControllers().size;
+        Controller controller = null;
+        if (count != 0) {
+            controller = controllerManager.getControllers().get(0);
+            try {
+                controllerManager.pollState();
+            } catch (SDL_Error e) {
+                return;
+            }
+
+            a = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_A);
+            b = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_B);
+            x = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_X);
+            y = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_Y);
+            back = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_BACK);
+            guide = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_GUIDE);
+            start = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_START);
+            dpad_up = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_UP);
+            dpad_down = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+            dpad_left = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+            dpad_right = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+            left_bumper = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+            right_bumper = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+            left_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK);
+            right_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+
+            left_stick_x = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX);
+            left_stick_y = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTY);
+            right_stick_x = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTX);
+            right_stick_y = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTY);
+            left_trigger = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+            right_trigger = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        }
     }
 }

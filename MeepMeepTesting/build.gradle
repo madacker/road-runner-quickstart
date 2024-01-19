@@ -9,10 +9,8 @@ java {
 
 repositories {
     maven { url = 'https://maven.brott.dev/' }
-    jcenter()
 }
 
 dependencies {
     implementation 'com.acmerobotics.roadrunner:MeepMeep:0.1.2'
-    implementation "uk.co.electronstudio.sdl2gdx:sdl2gdx:1.0.+"
 }

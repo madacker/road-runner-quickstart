@@ -18,8 +18,9 @@ public class KinematicTesting {
         Drive drive = new Drive(mecanumDrive, gamepad);
 
         while (true) {
-            drive.update();
             simulation.update();
+            gamepad.update();
+            drive.update();
         }
     }
 }
