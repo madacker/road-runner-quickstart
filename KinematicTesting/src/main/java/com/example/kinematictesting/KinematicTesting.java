@@ -1,13 +1,14 @@
 package com.example.kinematictesting;
 
 import com.acmerobotics.dashboard.canvas.Canvas;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.example.kinematictesting.framework.FtcDashboard;
 import com.example.kinematictesting.framework.Gamepad;
 import com.example.kinematictesting.framework.MecanumDrive;
 import com.example.kinematictesting.framework.Simulation;
+import com.example.kinematictesting.framework.TelemetryPacket;
 
 public class KinematicTesting {
     public static void main(String[] args)
@@ -50,7 +51,7 @@ class Drive {
         Canvas c = p.fieldOverlay();
         c.setStroke("#3F51B5");
         MecanumDrive.drawRobot(c, drive.pose);
-//        FtcDashboard dashboard = FtcDashboard.getInstance();
-//        dashboard.sendTelemetryPacket(p);
+        FtcDashboard dashboard = FtcDashboard.getInstance();
+        dashboard.sendTelemetryPacket(p);
     }
 }
