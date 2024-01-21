@@ -24,6 +24,9 @@ import java.awt.RenderingHints;
 import java.awt.Transparency;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+
+import javax.imageio.ImageIO;
 
 class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
@@ -45,7 +48,16 @@ class Field {
 
     Field(Simulation simulation) {
         this.simulation = simulation;
-        backgroundImage = simulation.canvas.getBackground("background/season-2023-centerstage/field-2023-juice-dark.png");
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+        try {
+            backgroundImage = ImageIO
+                    .read(classLoader.getResourceAsStream("background/season-2023-centerstage/field-2023-juice-dark.png"))
+                    .getScaledInstance(FIELD_SURFACE_DIMENSION, FIELD_SURFACE_DIMENSION, Image.SCALE_SMOOTH);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         initializeRobotImage();
     }
 
@@ -116,23 +128,25 @@ class Field {
     }
 
     void renderFieldOverlay(Graphics2D g) {
-        for (CanvasOp op: FtcDashboard.fieldOverlay.getOperations()) {
-            if (op instanceof Circle) {
-                Circle circle = (Circle) op;
-            } if (op instanceof Polygon) {
-                Polygon polygon = (Polygon) op;
-            } else if (op instanceof Polyline) {
-                Polyline polyline = (Polyline) op;
-            } else if (op instanceof Spline) {
-                Spline spline = (Spline) op;
-            } else if (op instanceof Stroke) {
-                Stroke stroke = (Stroke) op;
-            } else if (op instanceof Fill) {
-                Fill fill = (Fill) op;
-            } else if (op instanceof StrokeWidth) {
-                StrokeWidth strokeWidth = (StrokeWidth) op;
-            } else {
-                throw new IllegalArgumentException("Unexpected field overlay op");
+        if (FtcDashboard.fieldOverlay != null) {
+            for (CanvasOp op : FtcDashboard.fieldOverlay.getOperations()) {
+                if (op instanceof Circle) {
+                    Circle circle = (Circle) op;
+                } else if (op instanceof Polygon) {
+                    Polygon polygon = (Polygon) op;
+                } else if (op instanceof Polyline) {
+                    Polyline polyline = (Polyline) op;
+                } else if (op instanceof Spline) {
+                    Spline spline = (Spline) op;
+                } else if (op instanceof Stroke) {
+                    Stroke stroke = (Stroke) op;
+                } else if (op instanceof Fill) {
+                    Fill fill = (Fill) op;
+                } else if (op instanceof StrokeWidth) {
+                    StrokeWidth strokeWidth = (StrokeWidth) op;
+                } else {
+                    throw new IllegalArgumentException("Unexpected field overlay op");
+                }
             }
         }
     }
@@ -160,15 +174,16 @@ public class Simulation {
     private Field field;
 
     public Simulation() {
-        canvas = windowFrame.getCanvas();
-        windowFrame = new WindowFrame("UI", 400);
+        windowFrame = new WindowFrame("UI", 1280, 720);
         windowFrame.setVisible(true);
+        canvas = windowFrame.getCanvas();
         field = new Field(this);
     }
 
     public void update() {
         // All Graphics objects can be cast to Graphics2D:
         Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
+
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         field.render(g);
 
