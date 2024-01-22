@@ -11,7 +11,6 @@ import com.acmerobotics.dashboard.canvas.Spline;
 import com.acmerobotics.dashboard.canvas.Stroke;
 import com.acmerobotics.dashboard.canvas.StrokeWidth;
 import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.Vector2d;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -19,7 +18,6 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
-import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
@@ -28,8 +26,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
-
-import jdk.internal.org.jline.terminal.Size;
 
 class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
@@ -114,33 +110,17 @@ class Field {
                 round(ROBOT_IMAGE_HEIGHT * DIRECTION_LINE_HEIGHT));
     }
 
-    double scaleInchesToPixel(double inches) {
-        return (inches / 72.0) * FIELD_SURFACE_DIMENSION;
-    }
-    Vector2d mirrorX(Vector2d vector) {
-        return new Vector2d(-vector.x, vector.y);
-    }
-    Vector2d mirrorY(Vector2d vector) {
-        return new Vector2d(vector.x, -vector.y);
-    }
-    Vector2d fieldCoordsToScreenCoords(Vector2d vector) {
-        return mirrorY(vector)
-                .plus(new Vector2d(FIELD_SURFACE_DIMENSION / 2.0, FIELD_SURFACE_DIMENSION / 2.0))
-                .times(FIELD_SURFACE_DIMENSION / 144.0)
-                .plus(new Vector2d(FIELD_INSET, FIELD_INSET));
-    }
-
     void renderRobot(Graphics2D g) {
         AffineTransform imageTransform = new AffineTransform();
         imageTransform.translate(simulation.pose.position.x, simulation.pose.position.y);
-        imageTransform.scale((double) simulation.robotSize.width / ROBOT_IMAGE_WIDTH,
-                             (double) simulation.robotSize.height / ROBOT_IMAGE_HEIGHT);
+        imageTransform.scale(1.0 / ROBOT_IMAGE_WIDTH,1.0 / ROBOT_IMAGE_HEIGHT);
         imageTransform.rotate(simulation.pose.heading.log() + Math.toRadians(90));
+        imageTransform.scale(simulation.robotSize.width, simulation.robotSize.height);
         imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2, -ROBOT_IMAGE_HEIGHT / 2);
         g.drawImage(robotImage, imageTransform, null);
     }
 
-    void renderFieldOverlay(Graphics2D g) {
+    void renderOverlay(Graphics2D g) {
         if (FtcDashboard.fieldOverlay != null) {
             for (CanvasOp op : FtcDashboard.fieldOverlay.getOperations()) {
                 if (op instanceof Circle) {
@@ -169,7 +149,7 @@ class Field {
         // Lay down the background image without needing a transform:
         g.drawImage(backgroundImage, FIELD_VIEW.x + FIELD_INSET, FIELD_VIEW.y + FIELD_INSET, null);
 
-        // Prime the viewport/transform and the clipping for field rendering:
+        // Prime the viewport/transform and the clipping for field and overlay rendering:
         AffineTransform oldTransform = g.getTransform();
         g.setClip(FIELD_VIEW.x, FIELD_VIEW.y, FIELD_VIEW.width, FIELD_VIEW.height);
         g.transform(new AffineTransform(
@@ -179,7 +159,7 @@ class Field {
                 FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET));
 
         renderRobot(g);
-        renderFieldOverlay(g);
+        renderOverlay(g);
 
         // Restore:
         g.setTransform(oldTransform);
@@ -191,8 +171,8 @@ class Field {
 }
 
 public class Simulation {
-    public Pose2d pose = new Pose2d(24, 0, Math.toRadians(180)); // Robot's true pose
-    public Dimension robotSize = new Dimension(18, 18); // Size in inches of user's robot
+    public Pose2d pose = new Pose2d(24, 24, Math.toRadians(90)); // Robot's true pose
+    public Dimension robotSize = new Dimension(24, 18); // Size in inches of user's robot
     public MainCanvas canvas; // Canvas for the entire window frame
 
     private WindowFrame windowFrame;
