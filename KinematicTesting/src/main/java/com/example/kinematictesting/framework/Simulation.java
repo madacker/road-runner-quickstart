@@ -11,6 +11,7 @@ import com.acmerobotics.dashboard.canvas.Spline;
 import com.acmerobotics.dashboard.canvas.Stroke;
 import com.acmerobotics.dashboard.canvas.StrokeWidth;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.Vector2d;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -25,6 +26,7 @@ import java.awt.Transparency;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.Vector;
 
 import javax.imageio.ImageIO;
 
@@ -32,7 +34,7 @@ class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
     // all around it:
     final int FIELD_VIEW_DIMENSION = 720;
-    final int FIELD_SURFACE_DIMENSION = 700;
+    final int FIELD_SURFACE_DIMENSION = 360;
 
     // These are derived from the above to describe the field rendering:
     final int FIELD_INSET = (FIELD_VIEW_DIMENSION - FIELD_SURFACE_DIMENSION) / 2;
@@ -114,13 +116,26 @@ class Field {
     double scaleInchesToPixel(double inches) {
         return (inches / 72.0) * FIELD_SURFACE_DIMENSION;
     }
+    Vector2d mirrorX(Vector2d vector) {
+        return new Vector2d(-vector.x, vector.y);
+    }
+    Vector2d mirrorY(Vector2d vector) {
+        return new Vector2d(vector.x, -vector.y);
+    }
+    Vector2d fieldCoordsToScreenCoords(Vector2d vector) {
+        return mirrorY(vector)
+                .plus(new Vector2d(FIELD_SURFACE_DIMENSION / 2.0, FIELD_SURFACE_DIMENSION / 2.0))
+                .times(FIELD_SURFACE_DIMENSION / 144.0)
+                .plus(new Vector2d(FIELD_INSET, FIELD_INSET));
+    }
 
     void renderRobot(Graphics2D g) {
         Pose2d pose = simulation.pose;
+        Vector2d coords = fieldCoordsToScreenCoords(new Vector2d(pose.position.x, pose.position.y));
 
         AffineTransform transform = new AffineTransform();
-        transform.translate(pose.position.x + FIELD_INSET, pose.position.y + FIELD_INSET);
-        transform.rotate(pose.heading.log());
+        transform.translate(coords.x, coords.y);
+        transform.rotate(Math.toRadians(45)); // @@@ pose.heading.log());
         transform.translate(scaleInchesToPixel(-ROBOT_WIDTH / 2), scaleInchesToPixel(-ROBOT_HEIGHT / 2));
         transform.scale(scaleInchesToPixel(ROBOT_WIDTH) / FIELD_SURFACE_DIMENSION,
                         scaleInchesToPixel(ROBOT_HEIGHT) / FIELD_SURFACE_DIMENSION);
