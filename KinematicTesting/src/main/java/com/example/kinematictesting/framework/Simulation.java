@@ -11,6 +11,8 @@ import com.acmerobotics.dashboard.canvas.Spline;
 import com.acmerobotics.dashboard.canvas.Stroke;
 import com.acmerobotics.dashboard.canvas.StrokeWidth;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.Vector2d;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -171,7 +173,8 @@ class Field {
 }
 
 public class Simulation {
-    public Pose2d pose = new Pose2d(24, 24, Math.toRadians(90)); // Robot's true pose
+    public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
+    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(200, 100), Math.toRadians(90)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(24, 18); // Size in inches of user's robot
     public MainCanvas canvas; // Canvas for the entire window frame
 
@@ -185,7 +188,17 @@ public class Simulation {
         field = new Field(this);
     }
 
+    public void advance() {
+        double deltaT = 0.020; // Seconds
+        pose = new Pose2d(
+                pose.position.x + deltaT * poseVelocity.linearVel.x * deltaT,
+                pose.position.y + deltaT * poseVelocity.linearVel.y * deltaT,
+                pose.heading.log() + deltaT * poseVelocity.angVel);
+    }
+
     public void update() {
+        advance();
+
         // All Graphics objects can be cast to Graphics2D:
         Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
 
