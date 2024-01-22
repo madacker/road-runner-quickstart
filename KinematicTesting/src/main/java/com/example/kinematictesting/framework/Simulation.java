@@ -26,23 +26,24 @@ import java.awt.Transparency;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.Vector;
 
 import javax.imageio.ImageIO;
+
+import jdk.internal.org.jline.terminal.Size;
 
 class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
     // all around it:
     final int FIELD_VIEW_DIMENSION = 720;
-    final int FIELD_SURFACE_DIMENSION = 360;
+    final int FIELD_SURFACE_DIMENSION = 480;
 
     // These are derived from the above to describe the field rendering:
     final int FIELD_INSET = (FIELD_VIEW_DIMENSION - FIELD_SURFACE_DIMENSION) / 2;
     final Rectangle FIELD_VIEW = new Rectangle(0, 0, FIELD_VIEW_DIMENSION, FIELD_VIEW_DIMENSION);
 
     // Robot dimensions:
-    final int ROBOT_WIDTH = 128;
-    final int ROBOT_HEIGHT = 128;
+    final int ROBOT_IMAGE_WIDTH = 128;
+    final int ROBOT_IMAGE_HEIGHT = 128;
 
     Simulation simulation;
     Image backgroundImage;
@@ -78,7 +79,7 @@ class Field {
 
         GraphicsConfiguration config =
                 GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        robotImage = config.createCompatibleImage(ROBOT_WIDTH, ROBOT_HEIGHT, Transparency.TRANSLUCENT);
+        robotImage = config.createCompatibleImage(ROBOT_IMAGE_WIDTH, ROBOT_IMAGE_HEIGHT, Transparency.TRANSLUCENT);
 
         Graphics2D g = robotImage.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -86,31 +87,31 @@ class Field {
 
         // Draw the body:
         g.setColor(new Color(0xe5, 0x3e, 0x3d, OPACITY));
-        g.fillRect(0, 0, ROBOT_WIDTH, ROBOT_HEIGHT);
+        g.fillRect(0, 0, ROBOT_IMAGE_WIDTH, ROBOT_IMAGE_HEIGHT);
 
         // Draw the wheels:
         g.setColor(new Color(0x74, 0x2a, 0x2a, OPACITY));
         g.fillRect(
-                round(WHEEL_PADDING_X * ROBOT_WIDTH), round(WHEEL_PADDING_Y * ROBOT_HEIGHT),
-                round(WHEEL_WIDTH * ROBOT_WIDTH), round(WHEEL_HEIGHT * ROBOT_HEIGHT));
+                round(WHEEL_PADDING_X * ROBOT_IMAGE_WIDTH), round(WHEEL_PADDING_Y * ROBOT_IMAGE_HEIGHT),
+                round(WHEEL_WIDTH * ROBOT_IMAGE_WIDTH), round(WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT));
         g.fillRect(
-                round(ROBOT_WIDTH - WHEEL_WIDTH * ROBOT_WIDTH - WHEEL_PADDING_X * ROBOT_WIDTH),
-                round(WHEEL_PADDING_Y * ROBOT_HEIGHT), round(WHEEL_WIDTH * ROBOT_WIDTH),
-                round(WHEEL_HEIGHT * ROBOT_HEIGHT));
+                round(ROBOT_IMAGE_WIDTH - WHEEL_WIDTH * ROBOT_IMAGE_WIDTH - WHEEL_PADDING_X * ROBOT_IMAGE_WIDTH),
+                round(WHEEL_PADDING_Y * ROBOT_IMAGE_HEIGHT), round(WHEEL_WIDTH * ROBOT_IMAGE_WIDTH),
+                round(WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT));
         g.fillRect(
-                round(ROBOT_WIDTH - WHEEL_WIDTH * ROBOT_WIDTH - WHEEL_PADDING_X * ROBOT_WIDTH),
-                round(ROBOT_HEIGHT - WHEEL_HEIGHT * ROBOT_HEIGHT - WHEEL_PADDING_Y * ROBOT_HEIGHT),
-                round(WHEEL_WIDTH * ROBOT_WIDTH), round(WHEEL_HEIGHT * ROBOT_HEIGHT));
+                round(ROBOT_IMAGE_WIDTH - WHEEL_WIDTH * ROBOT_IMAGE_WIDTH - WHEEL_PADDING_X * ROBOT_IMAGE_WIDTH),
+                round(ROBOT_IMAGE_HEIGHT - WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT - WHEEL_PADDING_Y * ROBOT_IMAGE_HEIGHT),
+                round(WHEEL_WIDTH * ROBOT_IMAGE_WIDTH), round(WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT));
         g.fillRect(
-                round(WHEEL_PADDING_X * ROBOT_WIDTH),
-                round(ROBOT_HEIGHT - WHEEL_HEIGHT * ROBOT_HEIGHT - WHEEL_PADDING_Y * ROBOT_HEIGHT),
-                round(WHEEL_WIDTH * ROBOT_WIDTH), round(WHEEL_HEIGHT * ROBOT_HEIGHT));
+                round(WHEEL_PADDING_X * ROBOT_IMAGE_WIDTH),
+                round(ROBOT_IMAGE_HEIGHT - WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT - WHEEL_PADDING_Y * ROBOT_IMAGE_HEIGHT),
+                round(WHEEL_WIDTH * ROBOT_IMAGE_WIDTH), round(WHEEL_HEIGHT * ROBOT_IMAGE_HEIGHT));
 
         // Draw the direction indicator:
         g.setColor(new Color(0x74, 0x2a, 0x2a));
-        g.fillRect(round(ROBOT_WIDTH / 2.0 - DIRECTION_LINE_WIDTH * ROBOT_WIDTH / 2.0), 0,
-                round(DIRECTION_LINE_WIDTH * ROBOT_WIDTH),
-                round(ROBOT_HEIGHT * DIRECTION_LINE_HEIGHT));
+        g.fillRect(round(ROBOT_IMAGE_WIDTH / 2.0 - DIRECTION_LINE_WIDTH * ROBOT_IMAGE_WIDTH / 2.0), 0,
+                round(DIRECTION_LINE_WIDTH * ROBOT_IMAGE_WIDTH),
+                round(ROBOT_IMAGE_HEIGHT * DIRECTION_LINE_HEIGHT));
     }
 
     double scaleInchesToPixel(double inches) {
@@ -130,16 +131,42 @@ class Field {
     }
 
     void renderRobot(Graphics2D g) {
-        Pose2d pose = simulation.pose;
-        Vector2d coords = fieldCoordsToScreenCoords(new Vector2d(pose.position.x, pose.position.y));
+        AffineTransform graphicsTransform = new AffineTransform(
+                FIELD_SURFACE_DIMENSION / 144.0, 0,
+                0, -FIELD_SURFACE_DIMENSION / 144.0,
+                FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET,
+                FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET);
+        g.transform(graphicsTransform);
+        g.translate(simulation.pose.position.x, simulation.pose.position.y);
 
-        AffineTransform transform = new AffineTransform();
-        transform.translate(coords.x, coords.y);
-        transform.rotate(Math.toRadians(45)); // @@@ pose.heading.log());
-        transform.translate(scaleInchesToPixel(-ROBOT_WIDTH / 2), scaleInchesToPixel(-ROBOT_HEIGHT / 2));
-        transform.scale(scaleInchesToPixel(ROBOT_WIDTH) / FIELD_SURFACE_DIMENSION,
-                        scaleInchesToPixel(ROBOT_HEIGHT) / FIELD_SURFACE_DIMENSION);
-        g.drawImage(robotImage, transform, null);
+        g.setColor(new Color(0x00ff00));
+        g.fillRect(0, 0, 24, 24);
+
+        AffineTransform imageTransform = new AffineTransform();
+        imageTransform.scale((double) simulation.robotSize.width / ROBOT_IMAGE_WIDTH,
+                (double) simulation.robotSize.height / ROBOT_IMAGE_HEIGHT);
+        imageTransform.rotate(Math.toRadians(45));
+        imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2, -ROBOT_IMAGE_HEIGHT / 2);
+        g.drawImage(robotImage, imageTransform, null);
+
+
+//        transform.translate(FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET + simulation.pose.position.x,
+//                FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET + simulation.pose.position.y);
+//        transform.scale(simulation.robotSize.width / (144.0 * ROBOT_IMAGE_HEIGHT) * FIELD_SURFACE_DIMENSION,
+//                        simulation.robotSize.height / (144.0 * ROBOT_IMAGE_WIDTH) * FIELD_SURFACE_DIMENSION);
+//        transform.rotate(Math.toRadians(45));
+//        transform.translate(-ROBOT_IMAGE_HEIGHT / 2, -ROBOT_IMAGE_HEIGHT / 2);
+//        g.drawImage(robotImage, transform, null);
+
+
+//        Pose2d pose = simulation.pose;
+//        Vector2d coords = fieldCoordsToScreenCoords(new Vector2d(pose.position.x, pose.position.y));
+//
+//        transform.translate(coords.x, coords.y);
+//        transform.rotate(Math.toRadians(45)); // @@@ pose.heading.log());
+//        transform.translate(scaleInchesToPixel(-ROBOT_WIDTH / 2), scaleInchesToPixel(-ROBOT_HEIGHT / 2));
+//        transform.scale(scaleInchesToPixel(ROBOT_WIDTH) / FIELD_SURFACE_DIMENSION,
+//                        scaleInchesToPixel(ROBOT_HEIGHT) / FIELD_SURFACE_DIMENSION);
     }
 
     void renderFieldOverlay(Graphics2D g) {
@@ -182,7 +209,8 @@ class Field {
 }
 
 public class Simulation {
-    public Pose2d pose = new Pose2d(0, 0, 0); // Robot's true pose
+    public Pose2d pose = new Pose2d(24, 24, 0); // Robot's true pose
+    public Dimension robotSize = new Dimension(18, 18); // Size in inches of user's robot
     public MainCanvas canvas; // Canvas for the entire window frame
 
     private WindowFrame windowFrame;
