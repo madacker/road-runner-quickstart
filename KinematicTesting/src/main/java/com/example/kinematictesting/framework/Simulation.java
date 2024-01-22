@@ -131,16 +131,13 @@ class Field {
     }
 
     void renderRobot(Graphics2D g) {
-        AffineTransform oldTransform = g.getTransform();
-        g.translate(simulation.pose.position.x, simulation.pose.position.y);
-
         AffineTransform imageTransform = new AffineTransform();
+        imageTransform.translate(simulation.pose.position.x, simulation.pose.position.y);
         imageTransform.scale((double) simulation.robotSize.width / ROBOT_IMAGE_WIDTH,
                              (double) simulation.robotSize.height / ROBOT_IMAGE_HEIGHT);
         imageTransform.rotate(simulation.pose.heading.log() + Math.toRadians(90));
         imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2, -ROBOT_IMAGE_HEIGHT / 2);
         g.drawImage(robotImage, imageTransform, null);
-        g.setTransform(oldTransform);
     }
 
     void renderFieldOverlay(Graphics2D g) {
@@ -194,7 +191,7 @@ class Field {
 }
 
 public class Simulation {
-    public Pose2d pose = new Pose2d(0, 24, 45); // Robot's true pose
+    public Pose2d pose = new Pose2d(24, 0, Math.toRadians(180)); // Robot's true pose
     public Dimension robotSize = new Dimension(18, 18); // Size in inches of user's robot
     public MainCanvas canvas; // Canvas for the entire window frame
 
