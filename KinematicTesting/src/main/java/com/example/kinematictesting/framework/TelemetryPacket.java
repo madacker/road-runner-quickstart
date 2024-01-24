@@ -1,11 +1,8 @@
 package com.example.kinematictesting.framework;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
-import com.acmerobotics.dashboard.canvas.Canvas;
 
 public class TelemetryPacket {
     public TreeMap<String, String> data;

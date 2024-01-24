@@ -1,10 +1,7 @@
 package com.example.kinematictesting.framework;
 
-import com.acmerobotics.dashboard.canvas.Canvas;
-
 import java.util.ArrayList;
 import java.util.TreeMap;
-import java.util.stream.Stream;
 
 public class FtcDashboard {
     static public TreeMap<String, String> data = new TreeMap<>();

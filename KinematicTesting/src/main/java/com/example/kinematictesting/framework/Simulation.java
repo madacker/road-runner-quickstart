@@ -2,14 +2,6 @@ package com.example.kinematictesting.framework;
 
 import static java.lang.Thread.sleep;
 
-import com.acmerobotics.dashboard.canvas.CanvasOp;
-import com.acmerobotics.dashboard.canvas.Circle;
-import com.acmerobotics.dashboard.canvas.Fill;
-import com.acmerobotics.dashboard.canvas.Polygon;
-import com.acmerobotics.dashboard.canvas.Polyline;
-import com.acmerobotics.dashboard.canvas.Spline;
-import com.acmerobotics.dashboard.canvas.Stroke;
-import com.acmerobotics.dashboard.canvas.StrokeWidth;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
@@ -118,32 +110,8 @@ class Field {
         imageTransform.scale(1.0 / ROBOT_IMAGE_WIDTH,1.0 / ROBOT_IMAGE_HEIGHT);
         imageTransform.rotate(simulation.pose.heading.log() + Math.toRadians(90));
         imageTransform.scale(simulation.robotSize.width, simulation.robotSize.height);
-        imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2, -ROBOT_IMAGE_HEIGHT / 2);
+        imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2.0, -ROBOT_IMAGE_HEIGHT / 2.0);
         g.drawImage(robotImage, imageTransform, null);
-    }
-
-    void renderOverlay(Graphics2D g) {
-        if (FtcDashboard.fieldOverlay != null) {
-            for (CanvasOp op : FtcDashboard.fieldOverlay.getOperations()) {
-                if (op instanceof Circle) {
-                    Circle circle = (Circle) op;
-                } else if (op instanceof Polygon) {
-                    Polygon polygon = (Polygon) op;
-                } else if (op instanceof Polyline) {
-                    Polyline polyline = (Polyline) op;
-                } else if (op instanceof Spline) {
-                    Spline spline = (Spline) op;
-                } else if (op instanceof Stroke) {
-                    Stroke stroke = (Stroke) op;
-                } else if (op instanceof Fill) {
-                    Fill fill = (Fill) op;
-                } else if (op instanceof StrokeWidth) {
-                    StrokeWidth strokeWidth = (StrokeWidth) op;
-                } else {
-                    throw new IllegalArgumentException("Unexpected field overlay op");
-                }
-            }
-        }
     }
 
     // Render the field, the robot, and the field overlay:
@@ -161,7 +129,8 @@ class Field {
                 FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET));
 
         renderRobot(g);
-        renderOverlay(g);
+        if (FtcDashboard.fieldOverlay != null)
+            FtcDashboard.fieldOverlay.render(g);
 
         // Restore:
         g.setTransform(oldTransform);

@@ -1,11 +1,5 @@
 package com.example.kinematictesting.framework;
 
-import static java.lang.Math.max;
-import static java.lang.System.nanoTime;
-
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
-import com.acmerobotics.dashboard.canvas.Canvas;
-
 import com.acmerobotics.roadrunner.AccelConstraint;
 import com.acmerobotics.roadrunner.DualNum;
 import com.acmerobotics.roadrunner.Pose2d;
