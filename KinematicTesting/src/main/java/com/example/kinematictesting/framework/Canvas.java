@@ -198,16 +198,19 @@ public class Canvas {
     public void render(Graphics2D g) {
         // https://github.dev/acmerobotics/ftc-dashboard/blob/26920d66b1abe1e03d5d10d7ec3701467ea56a0c/FtcDashboard/dash/src/components/views/FieldView/Field.js
         Color strokeColor = Color.BLACK;
-        Color fillColor = Color.WHITE;
+        Color fillColor = Color.BLACK;
+
         for (CanvasOp op : getOperations()) {
             if (op instanceof Circle) {
                 Circle circle = (Circle) op;
                 if (circle.stroke) {
                     g.setColor(strokeColor);
-                    g.draw(new Ellipse2D.Double(circle.radius, circle.radius, circle.x, circle.y));
+                    g.draw(new Ellipse2D.Double(circle.x - circle.radius, circle.y - circle.radius,
+                            2 * circle.radius, 2 * circle.radius));
                 } else {
                     g.setColor(fillColor);
-                    g.fill(new Ellipse2D.Double(circle.radius, circle.radius, circle.x, circle.y));
+                    g.fill(new Ellipse2D.Double(circle.x - circle.radius, circle.y - circle.radius,
+                            2 * circle.radius, 2 * circle.radius));
                 }
             } else if (op instanceof Polygon) {
                 Polygon polygon = (Polygon) op;
