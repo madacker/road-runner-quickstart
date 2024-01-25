@@ -1,12 +1,36 @@
 package com.example.kinematictesting.framework;
 
-import com.acmerobotics.dashboard.canvas.CanvasOp;
-
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.util.ArrayList;
+
+abstract class CanvasOp {
+    public enum Type {
+        GRID,
+        TRANSLATE,
+        ROTATION,
+        SCALE,
+        ALPHA,
+        CIRCLE,
+        POLYGON,
+        POLYLINE,
+        SPLINE,
+        STROKE,
+        FILL,
+        STROKE_WIDTH,
+        TEXT,
+        IMAGE;
+    }
+
+    private Type type;
+    public CanvasOp(Type type) {
+        this.type = type;
+    }
+}
 
 class Circle extends CanvasOp {
     public double x;
@@ -104,8 +128,129 @@ class StrokeWidth extends CanvasOp {
     }
 }
 
+class Scale extends CanvasOp {
+    public double scaleX;
+    public double scaleY;
+
+    public Scale(double scaleX, double scaleY) {
+        super(Type.SCALE);
+
+        this.scaleX = scaleX;
+        this.scaleY = scaleY;
+    }
+}
+
+class Text extends CanvasOp {
+    public String text;
+    public double x;
+    public double y;
+    public String font;
+    public double theta;
+    public boolean stroke;
+    public boolean usePageFrame;
+
+    public Text(String text, double x, double y, String font, double theta, boolean stroke,
+                boolean usePageFrame) {
+        super(Type.TEXT);
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.font = font;
+        this.theta = theta;
+        this.stroke = stroke;
+        this.usePageFrame = usePageFrame;
+    }
+}
+
+class Image extends CanvasOp {
+
+    public String path;
+    public double x, y;
+    public double width, height;
+    public double theta, pivotX, pivotY;
+    public boolean usePageFrame;
+
+    public Image(String path, double x, double y, double width, double height, double theta,
+                 double pivotX, double pivotY, boolean usePageFrame) {
+        super(Type.IMAGE);
+
+        this.path = path;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.theta = theta;
+        this.pivotX = pivotX;
+        this.pivotY = pivotY;
+        this.usePageFrame = usePageFrame;
+    }
+}
+
+class Alpha extends CanvasOp {
+    public double alpha;
+
+    public Alpha(double alpha) {
+        super(Type.ALPHA);
+
+        this.alpha = alpha;
+    }
+}
+
+class Grid extends CanvasOp {
+
+    public double x, y;
+    public double width, height;
+    public int numTicksX, numTicksY;
+    public double theta, pivotX, pivotY;
+    public boolean usePageFrame;
+
+    public Grid(double x, double y, double width, double height, int numTicksX, int numTicksY,
+                double theta, double pivotX, double pivotY, boolean usePageFrame) {
+        super(Type.GRID);
+
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.numTicksX = numTicksX;
+        this.numTicksY = numTicksY;
+        this.theta = theta;
+        this.pivotX = pivotX;
+        this.pivotY = pivotY;
+        this.usePageFrame = usePageFrame;
+    }
+}
+
+class Rotation extends CanvasOp {
+    public double rotation;
+
+    public Rotation(double radians) {
+        super(Type.ROTATION);
+
+        this.rotation = radians;
+    }
+}
+
+class Translate extends CanvasOp {
+    public double x;
+    public double y;
+
+    public Translate(double x, double y) {
+        super(Type.TRANSLATE);
+
+        this.x = x;
+        this.y = y;
+    }
+}
+
 public class Canvas {
     private ArrayList<CanvasOp> ops;
+    AffineTransform defaultTransform;
+    double userOriginX;
+    double userOriginY;
+    double userRotation;
+    double userScaleX;
+    double userScaleY;
 
     public Canvas() {
         ops = new ArrayList<>();
@@ -175,6 +320,80 @@ public class Canvas {
         return this;
     }
 
+    public Canvas setScale(double scaleX, double scaleY) {
+        ops.add(new Scale(scaleX, scaleY));
+        return this;
+    }
+
+    public Canvas setRotation(double radians) {
+        ops.add(new Rotation(radians));
+        return this;
+    }
+
+    public Canvas setTranslation(double x, double y) {
+        ops.add(new Translate(x, y));
+        return this;
+    }
+
+    public Canvas strokeText(String text, double x, double y, String font, double theta,
+                             boolean usePageFrame) {
+        ops.add(new Text(text, x, y, font, theta, true, usePageFrame));
+        return this;
+    }
+
+    public Canvas strokeText(String text, double x, double y, String font, double theta) {
+        strokeText(text, x, y, font, theta, true);
+        return this;
+    }
+
+    public Canvas fillText(String text, double x, double y, String font, double theta,
+                           boolean usePageFrame) {
+        ops.add(new Text(text, x, y, font, theta, false, usePageFrame));
+        return this;
+    }
+
+    public Canvas fillText(String text, double x, double y, String font, double theta) {
+        fillText(text, x, y, font, theta, true);
+        return this;
+    }
+
+    /**
+     * Draws an image served at the given path. All files stored in the assets images/ folder will
+     * be served under path /images/.
+     */
+    public Canvas drawImage(String path, double x, double y, double width, double height) {
+        drawImage(path, x, y, width, height, 0, 0, 0, true);
+        return this;
+    }
+
+    public Canvas drawImage(String path, double x, double y, double width, double height,
+                            double theta, double pivotX, double pivotY, boolean usePageFrame) {
+        ops.add(new Image(path, x, y, width, height, theta, pivotX, pivotY, usePageFrame));
+        return this;
+    }
+
+    public Canvas drawGrid(double x, double y, double width, double height, int numTicksX,
+                           int numTicksY) {
+        drawGrid(x, y, width, height, numTicksX, numTicksY, 0, 0, 0, true);
+        return this;
+    }
+
+    public Canvas drawGrid(double x, double y, double width, double height, int numTicksX,
+                           int numTicksY, double theta, double pivotX, double pivotY,
+                           boolean usePageFrame) {
+        ops.add(new Grid(x, y, width, height, numTicksX, numTicksY, theta, pivotX, pivotY,
+                usePageFrame));
+        return this;
+    }
+
+    /**
+     * Set the global alpha for subsequent operations.
+     */
+    public Canvas setAlpha(double alpha) {
+        ops.add(new Alpha(alpha));
+        return this;
+    }
+
     public ArrayList<CanvasOp> getOperations() {
         return ops;
     }
@@ -195,13 +414,51 @@ public class Canvas {
         return result;
     }
 
+    private void setUserTransform(Graphics2D g) {
+        g.setTransform(defaultTransform);
+        g.translate(userOriginX, userOriginY);
+        g.rotate(userRotation);
+        g.scale(userScaleX, userScaleY);
+    }
+
     public void render(Graphics2D g) {
         // https://github.dev/acmerobotics/ftc-dashboard/blob/26920d66b1abe1e03d5d10d7ec3701467ea56a0c/FtcDashboard/dash/src/components/views/FieldView/Field.js
+        defaultTransform = g.getTransform();
+        userOriginX = 0;
+        userOriginY = 0;
+        userRotation = 0;
+        userScaleX = 1;
+        userScaleY = 1;
+
         Color strokeColor = Color.BLACK;
         Color fillColor = Color.BLACK;
 
         for (CanvasOp op : getOperations()) {
-            if (op instanceof Circle) {
+            if (op instanceof Scale) {
+                Scale scale = (Scale) op;
+                userScaleX = scale.scaleX;
+                userScaleY = scale.scaleY;
+                setUserTransform(g);
+            } else if (op instanceof Rotation) {
+                Rotation rotation = (Rotation) op;
+                userRotation = rotation.rotation;
+                setUserTransform(g);
+            } else if (op instanceof Translate) {
+                Translate translate = (Translate) op;
+                userOriginX = translate.x;
+                userOriginY = translate.y;
+                setUserTransform(g);
+            } else if (op instanceof Stroke) {
+                // c.setStroke("#3F51B5");
+                Stroke stroke = (Stroke) op;
+                strokeColor = Color.decode(stroke.color);
+            } else if (op instanceof Fill) {
+                Fill fill = (Fill) op;
+                fillColor = Color.decode(fill.color);
+            } else if (op instanceof StrokeWidth) {
+                StrokeWidth strokeWidth = (StrokeWidth) op;
+                g.setStroke(new BasicStroke(strokeWidth.width));
+            } else if (op instanceof Circle) {
                 Circle circle = (Circle) op;
                 if (circle.stroke) {
                     g.setColor(strokeColor);
@@ -251,16 +508,28 @@ public class Canvas {
                             spline.fy);
                 }
                 g.drawPolyline(xPoints, yPoints, xPoints.length);
-            } else if (op instanceof Stroke) {
-                // c.setStroke("#3F51B5");
-                Stroke stroke = (Stroke) op;
-                strokeColor = Color.decode(stroke.color);
-            } else if (op instanceof Fill) {
-                Fill fill = (Fill) op;
-                fillColor = Color.decode(fill.color);
-            } else if (op instanceof StrokeWidth) {
-                StrokeWidth strokeWidth = (StrokeWidth) op;
-                g.setStroke(new BasicStroke(strokeWidth.width));
+            } else if (op instanceof Image) {
+                Image image = (Image) op;
+                // @@@
+            } else if (op instanceof Text) {
+                AffineTransform originalTransform = g.getTransform();
+                Text text = (Text) op;
+                if (text.usePageFrame) {
+                    g.setTransform(defaultTransform);
+                }
+                g.translate(text.x, text.y);
+                if (!text.usePageFrame) {
+                    g.scale(1, -1);
+                }
+                g.rotate(text.theta);
+                g.drawString(text.text, 0, 0);
+                g.setTransform(originalTransform);
+            } else if (op instanceof Grid) {
+                Grid grid = (Grid) op;
+                // @@@
+            } else if (op instanceof Alpha) {
+                Alpha alpha = (Alpha) op; // Ranges from 0.0 to 1.0
+                g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) alpha.alpha));
             } else {
                 throw new IllegalArgumentException("Unexpected field overlay op");
             }
