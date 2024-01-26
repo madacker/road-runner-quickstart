@@ -15,9 +15,9 @@ public class KinematicTesting {
     public static void main(String[] args)
     {
         Simulation simulation = new Simulation();
+        MecanumDrive mecanumDrive = new MecanumDrive(simulation);
         Gamepad gamepad = new Gamepad();
         Telemetry telemetry = new Telemetry();
-        MecanumDrive mecanumDrive = new MecanumDrive(new Pose2d(0, 0, 0));
         Drive drive = new Drive(mecanumDrive, gamepad, telemetry);
 
         while (true) {

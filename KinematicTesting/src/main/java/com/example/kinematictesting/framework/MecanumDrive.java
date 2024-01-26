@@ -14,23 +14,34 @@ import com.acmerobotics.roadrunner.Vector2dDual;
 import java.util.LinkedList;
 
 class Localizer {
+    Simulation simulation;
+    Pose2d previousPose;
+    PoseVelocity2d previousVelocity;
+
+    Localizer(Simulation simulation) {
+        this.simulation = simulation;
+        this.previousPose = simulation.pose;
+        this.previousVelocity = simulation.poseVelocity;
+    }
     Twist2dDual<Time> update() {
         Twist2dDual<Time> twist = new Twist2dDual<>(
                 new Vector2dDual<>(
                         new DualNum<Time>(new double[] {
-                                0, // Delta position.x
-                                0, // Delta velocity.x
+                                simulation.pose.position.x - previousPose.position.x,
+                                simulation.poseVelocity.linearVel.x - previousVelocity.linearVel.x,
                         }),
                         new DualNum<Time>(new double[] {
-                                0, // Delta position.y
-                                0, // Delta velocity.y
+                                simulation.pose.position.y - previousPose.position.y,
+                                simulation.poseVelocity.linearVel.y - previousVelocity.linearVel.y,
                         })
                 ),
                 new DualNum<>(new double[] {
-                        0, // Delta rotational
-                        0  // Delta rotationalVelocity
+                        simulation.pose.heading.log() - previousPose.heading.log(),
+                        simulation.poseVelocity.angVel - previousVelocity.angVel
                 })
         );
+        previousPose = simulation.pose;
+        previousVelocity = simulation.poseVelocity;
         return twist;
     }
 }
@@ -67,13 +78,16 @@ public final class MecanumDrive {
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
 
-    public MecanumDrive(Pose2d pose) {
-        this.pose = pose;
-        this.localizer = new Localizer();
+    public MecanumDrive(Simulation simulation) {
+        this.pose = new Pose2d(
+                simulation.pose.position.x,
+                simulation.pose.position.y,
+                simulation.pose.heading.log());
+        this.localizer = new Localizer(simulation);
     }
 
     public void setDrivePowers(PoseVelocity2d powers) {
-        // @@@ Call other guy
+        setDrivePowers(powers, null);
     }
 
     // Used by setDrivePowers to calculate acceleration:
