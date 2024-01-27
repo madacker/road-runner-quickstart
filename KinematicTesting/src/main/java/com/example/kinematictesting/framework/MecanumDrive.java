@@ -7,6 +7,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TurnConstraints;
+import com.acmerobotics.roadrunner.Twist2d;
 import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.Vector2dDual;
@@ -23,26 +24,35 @@ class Localizer {
         this.previousPose = simulation.pose;
         this.previousVelocity = simulation.poseVelocity;
     }
+    static Vector2d transform(double x, double y, double theta) {
+        return new Vector2d(x * Math.cos(theta) - y * Math.sin(theta),
+                            x * Math.sin(theta) + y * Math.cos(theta));
+    }
     Twist2dDual<Time> update() {
-        Twist2dDual<Time> twist = new Twist2dDual<>(
-                new Vector2dDual<>(
-                        new DualNum<Time>(new double[] {
-                                simulation.pose.position.x - previousPose.position.x,
-                                simulation.poseVelocity.linearVel.x - previousVelocity.linearVel.x,
-                        }),
-                        new DualNum<Time>(new double[] {
-                                simulation.pose.position.y - previousPose.position.y,
-                                simulation.poseVelocity.linearVel.y - previousVelocity.linearVel.y,
-                        })
-                ),
-                new DualNum<>(new double[] {
-                        simulation.pose.heading.log() - previousPose.heading.log(),
-                        simulation.poseVelocity.angVel - previousVelocity.angVel
-                })
-        );
+        double deltaAng = simulation.pose.heading.log() - previousPose.heading.log();
+        double deltaAngVel = simulation.poseVelocity.angVel - previousVelocity.angVel;
+
+        // Transform from field-absolute position to robot-relative position:
+        double robotAngle = simulation.pose.heading.log();
+        Vector2d deltaLinear = transform(
+                simulation.pose.position.x - previousPose.position.x,
+                simulation.pose.position.y - previousPose.position.y,
+                -robotAngle);
+        Vector2d deltaLinearVel = transform(
+                simulation.poseVelocity.linearVel.x - previousVelocity.linearVel.x,
+                simulation.poseVelocity.linearVel.y - previousVelocity.linearVel.y,
+                -robotAngle);
+
         previousPose = simulation.pose;
         previousVelocity = simulation.poseVelocity;
-        return twist;
+
+        return new Twist2dDual<>(
+                new Vector2dDual<>(
+                        new DualNum<Time>(new double[] { deltaLinear.x, deltaLinearVel.x }),
+                        new DualNum<Time>(new double[] { deltaLinear.y, deltaLinearVel.y })
+                ),
+                new DualNum<>(new double[] { deltaAng, deltaAngVel })
+        );
     }
 }
 
@@ -60,17 +70,8 @@ public final class MecanumDrive {
     }
 
     public static Params PARAMS = new Params();
-
-//    public final MecanumKinematics kinematics = new MecanumKinematics(
-//            PARAMS.inPerTick * PARAMS.trackWidthTicks, PARAMS.inPerTick / PARAMS.lateralInPerTick);
-
     public final TurnConstraints defaultTurnConstraints = new TurnConstraints(
             PARAMS.maxAngVel, -PARAMS.maxAngAccel, PARAMS.maxAngAccel);
-//    public final VelConstraint defaultVelConstraint =
-//            new MinVelConstraint(Arrays.asList(
-//                    kinematics.new WheelVelConstraint(PARAMS.maxWheelVel),
-//                    new AngularVelConstraint(PARAMS.maxAngVel)
-//            ));
     public final AccelConstraint defaultAccelConstraint =
             new ProfileAccelConstraint(PARAMS.minProfileAccel, PARAMS.maxProfileAccel);
 
