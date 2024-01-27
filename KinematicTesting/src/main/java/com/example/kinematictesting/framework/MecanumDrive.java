@@ -87,42 +87,27 @@ public final class MecanumDrive {
         this.localizer = new Localizer(simulation);
     }
 
-    public void setDrivePowers(PoseVelocity2d powers) {
-        setDrivePowers(powers, null);
-    }
-
-    // Used by setDrivePowers to calculate acceleration:
-    PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
-    double previousAssistSeconds = 0; // Previous call's nanoTime() in seconds
-
-    /**
-     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
-     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
-     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
-     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
-     * at the same time in which case the velocities are added together (to allow assist and stick
-     * control to blend together, for example).
-     *
-     * It's also possible to map the controller input to inches/s and radians/s instead of the
-     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
-     * .maxAngVel to determine the range to specify. Note however that the robot can actually
-     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
-     * robot down.
-     */
-    public void setDrivePowers(
-            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
-            PoseVelocity2d stickVelocity,
-            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
-            PoseVelocity2d assistVelocity)
-    {
-        // @@@ Implement
-    }
-
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
 
     public PoseVelocity2d updatePoseEstimate() {
         Twist2dDual<Time> twist = localizer.update();
-        pose = pose.plus(twist.value());
+
+        final boolean POSE_EXPONTENTIAL = false;
+        if (POSE_EXPONTENTIAL) {
+            // Use pose exponential refinement and conversion to field-relative:
+            pose = pose.plus(twist.value());
+        } else {
+            // Use forward Euler integration for refinement and conversion:
+            Twist2d robotTwist = twist.value();
+            Vector2d fieldDelta = Localizer.transform(
+                    robotTwist.line.x,
+                    robotTwist.line.y,
+                    pose.heading.log() + robotTwist.angle);
+            pose = new Pose2d(
+                    pose.position.x + fieldDelta.x,
+                    pose.position.y + fieldDelta.y,
+                    pose.heading.log() + robotTwist.angle);
+        }
 
         poseHistory.add(pose);
         while (poseHistory.size() > 100) {
@@ -163,5 +148,36 @@ public final class MecanumDrive {
     public static void drawRobot(Canvas c, Pose2d t) {
         final double ROBOT_RADIUS = 9;
         drawRobot(c, t, ROBOT_RADIUS);
+    }
+
+    public void setDrivePowers(PoseVelocity2d powers) {
+        setDrivePowers(powers, null);
+    }
+
+    // Used by setDrivePowers to calculate acceleration:
+    PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+    double previousAssistSeconds = 0; // Previous call's nanoTime() in seconds
+
+    /**
+     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
+     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
+     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
+     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
+     * at the same time in which case the velocities are added together (to allow assist and stick
+     * control to blend together, for example).
+     *
+     * It's also possible to map the controller input to inches/s and radians/s instead of the
+     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
+     * .maxAngVel to determine the range to specify. Note however that the robot can actually
+     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
+     * robot down.
+     */
+    public void setDrivePowers(
+            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
+            PoseVelocity2d stickVelocity,
+            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
+            PoseVelocity2d assistVelocity)
+    {
+        // @@@ Implement
     }
 }
