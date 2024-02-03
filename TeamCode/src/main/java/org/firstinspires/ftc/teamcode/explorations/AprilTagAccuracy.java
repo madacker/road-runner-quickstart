@@ -21,7 +21,7 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        Refiner refiner = new Refiner(hardwareMap);
+        Refiner refiner = new Refiner(hardwareMap, false);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
         waitForStart();

@@ -31,6 +31,9 @@ public class Refiner {
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
 
+    // False if the current robot pose hasn't been properly initialized:
+    private boolean reliablePose;
+
     // Camera characteristics:
     private static final String CAMERA_NAME = "webcam2";
     private static final double CAMERA_OFFSET_Y = -8.0; // Camera location on the robot
@@ -75,7 +78,8 @@ public class Refiner {
             new AprilTagLocation(10, -72,  43.0, 0, true),   // Blue audience wall, large
     };
 
-    public Refiner(HardwareMap hardwareMap) {
+    public Refiner(HardwareMap hardwareMap, boolean reliablePose) {
+        this.reliablePose = reliablePose;
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
@@ -201,9 +205,19 @@ public class Refiner {
     }
 
     /**
+     * Compute the distance between two poses.
+     */
+    private double distance(Pose2d a, Pose2d b) {
+        return Math.hypot(a.position.x - b.position.x, b.position.y - b.position.y);
+    }
+
+    /**
      *  Return a refined pose based on April Tags and the distance sensor.
      */
     public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive, Canvas canvas) {
+
+        // We arbitrarily decide that a pose has to be within 6 inches to be reliable:
+        final double EPSILON = 6.0;
 
         // visualizeDistance(currentPose, canvas);
 
@@ -228,27 +242,63 @@ public class Refiner {
             }
         }
 
-        // Choose the best of the vision poses:
+        // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
-        if (visionPoses.size() == 1) {
-            // If only a single tag is in view, adopt its pose only if it's relatively close
-            // to our current pose estimate:
-            if (visionPoses.get(0).distance < 6)
-                visionPose = visionPoses.get(0);
-        } else if (visionPoses.size() > 1) {
-            // If multiple tags are in view, choose the closest one (reasoning that it's unlikely
-            // that *both* are wildly bogus).
-            for (VisionPose candidatePose: visionPoses) {
-                if (candidatePose.distance == minDistance)
-                    visionPose = candidatePose;
+
+        if (!reliablePose) {
+            double maxDistance = 0;
+            // The current pose hasn't been properly initialized yet and is unreliable. Choose
+            // a vision pose to that we think is reliable:
+            if (visionPoses.size() == 3) {
+                // Compute the distance between each pose and its neighbors:
+                double[] distances = new double[3];
+                for (int i = 0; i < 3; i++) {
+                    for (int j = 0; j < 3; j++) {
+                        if (i != j) {
+                            double distance = distance(visionPoses.get(i).pose, visionPoses.get(j).pose);
+                            distances[i] += distance;
+                            maxDistance = Math.max(distance, maxDistance);
+                        }
+                    }
+                }
+
+                // If all three pose estimates are reasonably close, choose the one with the
+                // shortest distance to the other two:
+                if (maxDistance <= EPSILON) {
+                    double min = Math.min(Math.min(distances[0], distances[1]), distances[2]);
+                    for (int i = 0; i < 3; i++) {
+                        if (distances[i] == min)
+                            visionPose = visionPoses.get(i);
+                    }
+                }
+            }
+        } else {
+            // The current pose is a pretty good estimate so propose a refined pose estimate
+            // only if we think it's highly reliable:
+            if (visionPoses.size() == 1) {
+                // If only a single tag is in view, adopt its pose only if it's relatively close
+                // to our current pose estimate:
+                if (visionPoses.get(0).distance < EPSILON)
+                    visionPose = visionPoses.get(0);
+            } else if (visionPoses.size() > 1) {
+                // If multiple tags are in view, choose the closest one (reasoning that it's unlikely
+                // that *both* are wildly bogus).
+                for (VisionPose candidatePose : visionPoses) {
+                    if (candidatePose.distance == minDistance)
+                        visionPose = candidatePose;
+                }
             }
         }
 
-        // If we have chosen a refined pose, use only its position. The heading is more reliable
-        // from the IMU:
-        return (visionPose == null) ? null : new Pose2d(
-                visionPose.pose.position.x,
-                visionPose.pose.position.y,
-                currentPose.heading.log());
+        // Return null if there was no reliable vision pose:
+        if (visionPose == null)
+            return null;
+
+        // Remember that the current pose is now trustworthy:
+        reliablePose = true;
+
+        // Only use the position of the refined pose. Keep the old heading because that's quite
+        // reliable since it comes from the IMU:
+        return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
     }
 }

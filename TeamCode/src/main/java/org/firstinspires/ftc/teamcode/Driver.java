@@ -264,7 +264,7 @@ public class Driver extends LinearOpMode {
         Wall wall = null;
 
         if (!FASTEST) {
-            refiner = new Refiner(hardwareMap);
+            refiner = new Refiner(hardwareMap, false);
             led = new Led(hardwareMap);
             wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
         }
