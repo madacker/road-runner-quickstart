@@ -60,7 +60,7 @@ public class AprilTagAccuracy extends LinearOpMode {
 
             // Draw the pose history:
             drive.updatePoseEstimate();
-            Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
+            Pose2d refinedPose = refiner.refinePose(drive.pose, drive, canvas);
             if (refinedPose != null) {
                 drive.recordPose(refinedPose, 0);
 

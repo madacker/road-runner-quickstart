@@ -53,12 +53,23 @@ import java.util.List;
 @Config
 public final class MecanumDrive {
 
-    public class PoseNode {
+    // This structure is used to record the pose history.
+    public class PoseEpoch {
         Pose2d pose;
         int flags;
-        public PoseNode(Pose2d pose, int flags) {
+        public PoseEpoch(Pose2d pose, int flags) {
             this.pose = pose;
             this.flags = flags;
+        }
+    }
+
+    // This structure is used to record the odometry twist history:
+    public class TwistEpoch {
+        Twist2d twist;
+        double time;
+        public TwistEpoch(Twist2d twist, double time) {
+            this.twist = twist;
+            this.time = time;
         }
     }
 
@@ -167,7 +178,8 @@ public final class MecanumDrive {
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
 
-    public final LinkedList<PoseNode> poseHistory = new LinkedList<>();
+    public final LinkedList<PoseEpoch> poseHistory = new LinkedList<>();
+    public final LinkedList<TwistEpoch> twistHistory = new LinkedList<>();
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -567,11 +579,23 @@ public final class MecanumDrive {
         }
     }
 
+    public static double time() {
+        return nanoTime() * 1e-9;
+    }
+
     public PoseVelocity2d updatePoseEstimate() {
+        double time = time();
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
 
-        poseHistory.add(new PoseNode(pose, 0));
+        // Add to the twist history, discarding any over 1 second old:
+        twistHistory.add(new TwistEpoch(twist.value(), time));
+        while (time - twistHistory.get(0).time > 1.0) {
+            twistHistory.removeFirst();
+        }
+
+        // Add to the pose history, with a fixed cap:
+        poseHistory.add(new PoseEpoch(pose, 0));
         while (poseHistory.size() > 100) {
             poseHistory.removeFirst();
         }
@@ -582,6 +606,21 @@ public final class MecanumDrive {
         return poseVelocity;
     }
 
+    // Take an old pose and update it to the current time using the odometry twist
+    // history:
+    public Pose2d applyTwistHistory(Pose2d pose, double seconds) {
+        double time = time();
+
+        // Apply from oldest to newest:
+        for (TwistEpoch epoch: twistHistory) {
+            if (time - epoch.time <= seconds) {
+                pose = pose.plus(epoch.twist);
+            }
+        }
+
+        return pose;
+    }
+
     public void drawPoseHistory(Canvas c) {
 
         if (false) {
@@ -589,7 +628,7 @@ public final class MecanumDrive {
             double[] yPoints = new double[poseHistory.size()];
             int i = 0;
 
-            for (PoseNode t : poseHistory) {
+            for (PoseEpoch t : poseHistory) {
                 xPoints[i] = t.pose.position.x;
                 yPoints[i] = t.pose.position.y;
                 i++;
@@ -600,7 +639,7 @@ public final class MecanumDrive {
             c.strokePolyline(xPoints, yPoints);
         } else {
             c.setFill("#3F51B5");
-            for (PoseNode t: poseHistory) {
+            for (PoseEpoch t: poseHistory) {
                 c.fillRect(t.pose.position.x - 0.5, t.pose.position.y - 0.5, 1, 1);
             }
         }
@@ -619,7 +658,7 @@ public final class MecanumDrive {
 
     // Set the new pose, marking it in the pose history as a discontinuity:
     public void recordPose(Pose2d pose, int flags) {
-        poseHistory.add(new PoseNode(pose, flags));
+        poseHistory.add(new PoseEpoch(pose, flags));
     }
 
     public static void drawRobot(Canvas c, Pose2d t, double robotRadius) {

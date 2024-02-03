@@ -315,7 +315,7 @@ public class Driver extends LinearOpMode {
                     boolean toBackdrop = drive.pose.position.x < 6.0;
                     Action action;
 
-                    if (toBackdrop) {
+                    if (false) { // if (toBackdrop) {
                         // Go to the blue backdrop:
                         Pose2d keyPose = new Pose2d(-36, -36, Math.PI);
                         double startTangent = Math.atan2(
@@ -370,7 +370,7 @@ public class Driver extends LinearOpMode {
 
             // Refine the pose estimate using AprilTags:
             if (refiner != null) {
-                Pose2d refinedPose = refiner.refinePose(drive.pose, canvas);
+                Pose2d refinedPose = refiner.refinePose(drive.pose, drive, canvas);
                 if (refinedPose != null) {
                     led.setSteadyColor(Led.Color.GREEN);
                     led.setPulseColor(Led.Color.RED, 0.25);

@@ -4,32 +4,47 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import android.graphics.PointF;
-
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import android.util.Size;
+
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.teamcode.explorations.AprilTagTest;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
-import org.firstinspires.ftc.vision.apriltag.AprilTagMetadata;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Pose refiner. Leverages AprilTags and the distance sensor to improve the accuracy of thse
+ * estimated pose.
+ */
 public class Refiner {
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
-    private final double CAMERA_OFFSET_Y = 8.0; // Camera location on the robot
-    private final double CAMERA_OFFSET_X = 0.0;
-    private final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
+
+    // Camera characteristics:
+    private static final String CAMERA_NAME = "webcam2";
+    private static final double CAMERA_OFFSET_Y = -8.0; // Camera location on the robot
+    private static final double CAMERA_OFFSET_X = 5.75;
+    private static final double CAMERA_ORIENTATION = Math.PI;
+    private static final int CAMERA_PIXEL_WIDTH = 1280;
+    private static final int CAMERA_PIXEL_HEIGHT = 720;
+    private static final double CAMERA_FX = 906.940247073; // Set to -1.0 to use FTC defaults
+    private static final double CAMERA_FY = 906.940247073;
+    private static final double CAMERA_CX = 670.833056673;
+    private static final double CAMERA_CY = 355.34234068;
+
+    // Distance sensor characteristics:
+    private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
 
     // Structure defining the location of April Tags:
     class AprilTagLocation {
@@ -71,7 +86,8 @@ public class Refiner {
 
     private void initializeAprilTags(HardwareMap hardwareMap) {
         // Create the AprilTag processor.
-        aprilTag = new AprilTagProcessor.Builder()
+         AprilTagProcessor.Builder processorBuilder = new AprilTagProcessor.Builder();
+         
             // The following default settings are available to un-comment and edit as needed.
             //.setDrawAxes(false)
             //.setDrawCubeProjection(false)
@@ -85,7 +101,12 @@ public class Refiner {
             // to load a predefined calibration for your camera.
             //.setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
             // ... these parameters are fx, fy, cx, cy.
-            .build();
+
+         if (CAMERA_FX != -1.0) {
+             processorBuilder.setLensIntrinsics(CAMERA_FX, CAMERA_FY, CAMERA_CX, CAMERA_CY);
+         }
+
+        aprilTag = processorBuilder.build();
 
         // Adjust Image Decimation to trade-off detection-range for detection-rate.
         // eg: Some typical detection data using a Logitech C920 WebCam
@@ -99,10 +120,10 @@ public class Refiner {
         // Create the vision portal by using a builder.
         VisionPortal.Builder builder = new VisionPortal.Builder();
 
-        builder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
+        builder.setCamera(hardwareMap.get(WebcamName.class, CAMERA_NAME));
 
         // Choose a camera resolution. Not all cameras support all resolutions.
-        //builder.setCameraResolution(new Size(640, 480));
+        builder.setCameraResolution(new Size(CAMERA_PIXEL_WIDTH, CAMERA_PIXEL_HEIGHT));
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
         //builder.enableLiveView(true);
@@ -128,7 +149,7 @@ public class Refiner {
         //visionPortal.stopStreaming();
     }
 
-    private void processDistance(Pose2d odometryPose, Canvas canvas) {
+    private void visualizeDistance(Pose2d odometryPose, Canvas canvas) {
         double distance = distanceSensor.getDistance(DistanceUnit.INCH);
         if (distance >= 0) {
             distance += DISTANCE_SENSOR_OFFSET;
@@ -149,7 +170,10 @@ public class Refiner {
         return null;
     }
 
-    private Pose2d computePose(AprilTagDetection detection, AprilTagLocation tag) {
+    /**
+     * Compute the robot's field-relative pose from the April-tag-relative pose.
+     */
+    private Pose2d computeRobotPose(AprilTagDetection detection, AprilTagLocation tag) {
         double dx = detection.ftcPose.x + CAMERA_OFFSET_X;
         double dy = detection.ftcPose.y + CAMERA_OFFSET_Y;
         double distance = Math.sqrt(dx * dx + dy * dy);
@@ -158,33 +182,73 @@ public class Refiner {
         double x = tag.x + Math.cos(gamma) * distance;
         double y = tag.y + Math.sin(gamma) * distance;
 
-        double theta = Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees);
+        double theta = Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees) + CAMERA_ORIENTATION;
         return new Pose2d(new Vector2d(x, y), Math.PI - theta);
     }
 
-    public Pose2d refinePose(Pose2d odometryPose, Canvas canvas) {
-        processDistance(odometryPose, canvas);
+    /**
+     * Interim data structure used to track poses determined by the AprilTags.
+     */
+    class VisionPose {
+        Pose2d pose; // Field-relative robot pose
+        double distance; // Distance from current pose
+        AprilTagLocation tag; // Tag that determined this pose
+        VisionPose(Pose2d pose, double distance, AprilTagLocation tag) {
+            this.pose = pose;
+            this.distance = distance;
+            this.tag = tag;
+        }
+    }
 
-        Pose2d result = null;
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-        for (AprilTagDetection detection : currentDetections) {
+    /**
+     *  Return a refined pose based on April Tags and the distance sensor.
+     */
+    public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive, Canvas canvas) {
+
+        // visualizeDistance(currentPose, canvas);
+
+        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
+        ArrayList<VisionPose> visionPoses = new ArrayList<>();
+        double minDistance = Float.MAX_VALUE;
+
+        for (AprilTagDetection detection: currentDetections) {
             if (detection.metadata != null) {
                 AprilTagLocation tag = getTag(detection);
                 if (tag != null) {
-                    Pose2d pose = computePose(detection, tag);
+                    Pose2d datedVisionPose = computeRobotPose(detection, tag);
+                    Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6);
+                    // @@@@@@@@@@@@@@@ Update lag estimate
+                    double distance = Math.hypot(
+                            currentPose.position.x - visionPose.position.x,
+                            currentPose.position.y - visionPose.position.y);
 
-//                    if (canvas != null) {
-//                        canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
-//                        MecanumDrive.drawRobot(canvas, pose, 7);
-//                    }
-
-                    if (!tag.large) {
-                        result = pose;
-                    }
+                    minDistance = Math.min(minDistance, distance);
+                    visionPoses.add(new VisionPose(visionPose, distance, tag));
                 }
             }
         }
 
-        return result;
+        // Choose the best of the vision poses:
+        VisionPose visionPose = null;
+        if (visionPoses.size() == 1) {
+            // If only a single tag is in view, adopt its pose only if it's relatively close
+            // to our current pose estimate:
+            if (visionPoses.get(0).distance < 6)
+                visionPose = visionPoses.get(0);
+        } else if (visionPoses.size() > 1) {
+            // If multiple tags are in view, choose the closest one (reasoning that it's unlikely
+            // that *both* are wildly bogus).
+            for (VisionPose candidatePose: visionPoses) {
+                if (candidatePose.distance == minDistance)
+                    visionPose = candidatePose;
+            }
+        }
+
+        // If we have chosen a refined pose, use only its position. The heading is more reliable
+        // from the IMU:
+        return (visionPose == null) ? null : new Pose2d(
+                visionPose.pose.position.x,
+                visionPose.pose.position.y,
+                currentPose.heading.log());
     }
 }
