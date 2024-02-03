@@ -27,12 +27,8 @@ import java.util.List;
  * estimated pose.
  */
 public class Refiner {
-    private AprilTagProcessor aprilTag;
-    private VisionPortal visionPortal;
-    private DistanceSensor distanceSensor;
-
-    // False if the current robot pose hasn't been properly initialized:
-    private boolean reliablePose;
+    // True if doing April Tags latency calibration:
+    private static final boolean LATENCY_CALIBRATION = true;
 
     // Camera characteristics:
     private static final String CAMERA_NAME = "webcam2";
@@ -48,6 +44,14 @@ public class Refiner {
 
     // Distance sensor characteristics:
     private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
+
+    // Run-time state:
+    private AprilTagProcessor aprilTag;
+    private VisionPortal visionPortal;
+    private DistanceSensor distanceSensor;
+
+    // False if the current robot pose hasn't been properly initialized:
+    private boolean reliablePose;
 
     // Structure defining the location of April Tags:
     class AprilTagLocation {
@@ -245,7 +249,11 @@ public class Refiner {
         // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
 
-        if (!reliablePose) {
+        if (LATENCY_CALIBRATION) {
+            // When doing April Tags latency calibration, return success as soon as we get
+            // a single pose, no matter how bad:
+            visionPose = (visionPoses.size() != 0) ? visionPoses.get(0) : null;
+        } else if (!reliablePose) {
             double maxDistance = 0;
             // The current pose hasn't been properly initialized yet and is unreliable. Choose
             // a vision pose to that we think is reliable:
