@@ -32,8 +32,8 @@ public class Refiner {
 
     // Camera characteristics:
     private static final String CAMERA_NAME = "webcam2";
-    private static final double CAMERA_OFFSET_Y = -8.0; // Camera location on the robot
-    private static final double CAMERA_OFFSET_X = 5.75;
+    private static final double CAMERA_OFFSET_Y = 8.0; // Camera location on the robot (assuming it's facing forward)
+    private static final double CAMERA_OFFSET_X = -5.75;
     private static final double CAMERA_ORIENTATION = Math.PI;
     private static final int CAMERA_PIXEL_WIDTH = 1280;
     private static final int CAMERA_PIXEL_HEIGHT = 720;
@@ -228,15 +228,20 @@ public class Refiner {
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
 
-        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
         if (currentDetections != null) {
             for (AprilTagDetection detection : currentDetections) {
                 if (detection.metadata != null) {
                     AprilTagLocation tag = getTag(detection);
                     if (tag != null) {
                         Pose2d datedVisionPose = computeRobotPose(detection, tag);
-                        Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6);
-                        // @@@@@@@@@@@@@@@ Update lag estimate
+                        Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6); // @@@
+
+                        if (canvas != null) {
+                            canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
+                            MecanumDrive.drawRobot(canvas, visionPose, 7);
+                        }
+
                         double distance = Math.hypot(
                                 currentPose.position.x - visionPose.position.x,
                                 currentPose.position.y - visionPose.position.y);
@@ -309,6 +314,9 @@ public class Refiner {
 
         // Only use the position of the refined pose. Keep the old heading because that's quite
         // reliable since it comes from the IMU:
-        return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
+
+        return visionPose.pose; // @@@@@@@@@@@@@@@
+
+        // return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
     }
 }
