@@ -225,23 +225,25 @@ public class Refiner {
 
         // visualizeDistance(currentPose, canvas);
 
-        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
 
-        for (AprilTagDetection detection: currentDetections) {
-            if (detection.metadata != null) {
-                AprilTagLocation tag = getTag(detection);
-                if (tag != null) {
-                    Pose2d datedVisionPose = computeRobotPose(detection, tag);
-                    Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6);
-                    // @@@@@@@@@@@@@@@ Update lag estimate
-                    double distance = Math.hypot(
-                            currentPose.position.x - visionPose.position.x,
-                            currentPose.position.y - visionPose.position.y);
+        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
+        if (currentDetections != null) {
+            for (AprilTagDetection detection : currentDetections) {
+                if (detection.metadata != null) {
+                    AprilTagLocation tag = getTag(detection);
+                    if (tag != null) {
+                        Pose2d datedVisionPose = computeRobotPose(detection, tag);
+                        Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6);
+                        // @@@@@@@@@@@@@@@ Update lag estimate
+                        double distance = Math.hypot(
+                                currentPose.position.x - visionPose.position.x,
+                                currentPose.position.y - visionPose.position.y);
 
-                    minDistance = Math.min(minDistance, distance);
-                    visionPoses.add(new VisionPose(visionPose, distance, tag));
+                        minDistance = Math.min(minDistance, distance);
+                        visionPoses.add(new VisionPose(visionPose, distance, tag));
+                    }
                 }
             }
         }
