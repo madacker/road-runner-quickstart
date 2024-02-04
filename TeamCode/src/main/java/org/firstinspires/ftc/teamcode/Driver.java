@@ -31,7 +31,7 @@ class AutoParker {
         return angle;
     }
 
-    AutoParker(MecanumDrive drive, TelemetryPacket packet, Pose2d target) {
+    AutoParker(MecanumDrive drive, Pose2d target) {
         this.drive = drive;
         this.target = target;
 
@@ -70,7 +70,7 @@ class AutoParker {
     }
 
     // Returns true when parked, false when not parked yet:
-    boolean park(TelemetryPacket packet) {
+    boolean park() {
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
         double radialLength = radialVector.norm();
@@ -172,7 +172,7 @@ class Wall {
     }
 
     // The velocity must be field-relative, calibrated inches/s and radians/s:
-    PoseVelocity2d repulse(PoseVelocity2d velocity, TelemetryPacket packet) {
+    PoseVelocity2d repulse(PoseVelocity2d velocity) {
 
         // Length of the velocity vector:
         double velocityMagnitude = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
@@ -246,8 +246,6 @@ public class Driver extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        TimeSplitter loopTime = TimeSplitter.create("> Loop");
-
         double maxLinearAcceleration = 0;
         double minLinearDeceleration = 0;
         double maxLinearSpeed = 0;
@@ -283,16 +281,12 @@ public class Driver extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            loopTime.startSplit();
+            Loop.start(telemetry);
 
             // Update the telemetry pose and update the LED loop:
             drive.updatePoseEstimate();
             if (led != null)
                 led.update();
-
-            // Set up for visualizations:
-            TelemetryPacket packet = new TelemetryPacket();
-            Canvas canvas = packet.fieldOverlay();
 
             // The 'A' button activates the auto-parker:
             boolean parkingActivated = false;
@@ -300,12 +294,12 @@ public class Driver extends LinearOpMode {
                 parker = null;
             else {
                 if (parker == null)
-                    parker = new AutoParker(drive, packet, new Pose2d(0, 0, 0));
-                parkingActivated = parker.park(packet);
+                    parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+                parkingActivated = parker.park();
             }
 
             // The 'left-bumper' button activates Road Runner homing:
-            boolean roadrunnerActivated = drive.doActionsWork(packet);
+            boolean roadrunnerActivated = drive.doActionsWork();
             if ((gamepad1.left_bumper) && (!roadrunnerActivated)) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
@@ -356,7 +350,7 @@ public class Driver extends LinearOpMode {
                     PoseVelocity2d fieldVelocity = drive.pose.times(calibratedVelocity);
 
                     if (wall != null)
-                        wall.repulse(fieldVelocity, packet); // @@@
+                        wall.repulse(fieldVelocity); // @@@
 
                     drive.setDrivePowers(null, fieldVelocity);
                 } else {
@@ -370,7 +364,7 @@ public class Driver extends LinearOpMode {
 
             // Refine the pose estimate using AprilTags:
             if (refiner != null) {
-                Pose2d refinedPose = refiner.refinePose(drive.pose, drive, canvas);
+                Pose2d refinedPose = refiner.refinePose(drive.pose, drive);
                 if (refinedPose != null) {
                     led.setSteadyColor(Led.Color.GREEN);
                     led.setPulseColor(Led.Color.RED, 0.25);
@@ -382,13 +376,13 @@ public class Driver extends LinearOpMode {
             }
 
             // Draw the pose history:
-            drive.drawPoseHistory(canvas);
+            drive.drawPoseHistory(Loop.canvas);
 
             // Draw the refinement history:
 
             // Draw the best estimate pose:
-            canvas.setStroke("#3F51B5");
-            MecanumDrive.drawRobot(canvas, drive.pose);
+            Loop.canvas.setStroke("#3F51B5");
+            MecanumDrive.drawRobot(Loop.canvas, drive.pose);
 
             // Log interesting data:
             double linearSpeed = Math.hypot(drive.poseVelocity.linearVel.x, drive.poseVelocity.linearVel.y);
@@ -419,8 +413,7 @@ public class Driver extends LinearOpMode {
 //            packet.put("Angular theoretical", fullAngularSpeed);
 
             // Finish up:
-            FtcDashboard.getInstance().sendTelemetryPacket(packet);
-            loopTime.endSplit();
+            Loop.end();
         }
 
         // Cleanup:

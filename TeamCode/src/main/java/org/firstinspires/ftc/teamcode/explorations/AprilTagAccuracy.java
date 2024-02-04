@@ -12,6 +12,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Led;
+import org.firstinspires.ftc.teamcode.Loop;
 import org.firstinspires.ftc.teamcode.Refiner;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -27,11 +28,8 @@ public class AprilTagAccuracy extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            // Set up for visualizations:
-            TelemetryPacket packet = new TelemetryPacket();
-            Canvas canvas = packet.fieldOverlay();
-
-            boolean doingSweep = drive.doActionsWork(packet);
+            Loop.start(telemetry);
+            boolean doingSweep = drive.doActionsWork(Loop.packet);
             if (!doingSweep) {
                 if (gamepad1.a) {
                     double SWEEP_ANGLE = 80; // Degrees
@@ -54,13 +52,13 @@ public class AprilTagAccuracy extends LinearOpMode {
 
             // Draw the best estimate pose:
             if (!doingSweep) {
-                canvas.setStroke("#3F51B5");
-                MecanumDrive.drawRobot(canvas, drive.pose);
+                Loop.canvas.setStroke("#3F51B5");
+                MecanumDrive.drawRobot(Loop.canvas, drive.pose);
             }
 
             // Draw the pose history:
             drive.updatePoseEstimate();
-            Pose2d refinedPose = refiner.refinePose(drive.pose, drive, canvas);
+            Pose2d refinedPose = refiner.refinePose(drive.pose, drive);
             if (refinedPose != null) {
                 led.setPulseColor(Led.Color.RED, 0.25);
                 drive.recordPose(refinedPose, 0);
@@ -70,10 +68,8 @@ public class AprilTagAccuracy extends LinearOpMode {
                     drive.pose = refinedPose;
                 }
             }
-            drive.drawPoseHistory(canvas);
-
-            FtcDashboard.getInstance().sendTelemetryPacket(packet);
-            led.update();
+            drive.drawPoseHistory(Loop.canvas);
+            Loop.end();
         }
     }
 }

@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pose refiner. Leverages AprilTags and the distance sensor to improve the accuracy of thse
+ * Pose refiner. Leverages AprilTags and the distance sensor to improve the accuracy of the
  * estimated pose.
  */
 public class Refiner {
@@ -41,6 +41,7 @@ public class Refiner {
     private static final double CAMERA_FY = 906.940247073;
     private static final double CAMERA_CX = 670.833056673;
     private static final double CAMERA_CY = 355.34234068;
+    private static final double CAMERA_LATENCY = 0.19; // Seconds
 
     // Distance sensor characteristics:
     private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
@@ -49,6 +50,11 @@ public class Refiner {
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
+
+    // Frame-rate tracker:
+    private double intervalStart; // In seconds
+    private int intervalCount;
+    private double fps;
 
     // False if the current robot pose hasn't been properly initialized:
     private boolean reliablePose;
@@ -157,7 +163,7 @@ public class Refiner {
         //visionPortal.stopStreaming();
     }
 
-    private void visualizeDistance(Pose2d odometryPose, Canvas canvas) {
+    private void visualizeDistance(Pose2d odometryPose) {
         double distance = distanceSensor.getDistance(DistanceUnit.INCH);
         if (distance >= 0) {
             distance += DISTANCE_SENSOR_OFFSET;
@@ -166,7 +172,7 @@ public class Refiner {
             double x = odometryPose.position.x + distance * Math.cos(theta);
             double y = odometryPose.position.y + distance * Math.sin(theta);
 
-            canvas.fillRect(x - 1, y - 1, 3, 3);
+            Loop.canvas.fillRect(x - 1, y - 1, 3, 3);
         }
     }
 
@@ -212,13 +218,13 @@ public class Refiner {
      * Compute the distance between two poses.
      */
     private double distance(Pose2d a, Pose2d b) {
-        return Math.hypot(a.position.x - b.position.x, b.position.y - b.position.y);
+        return Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
     }
 
     /**
      *  Return a refined pose based on April Tags and the distance sensor.
      */
-    public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive, Canvas canvas) {
+    public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive) {
 
         // We arbitrarily decide that a pose has to be within 6 inches to be reliable:
         final double EPSILON = 6.0;
@@ -228,19 +234,17 @@ public class Refiner {
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
 
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
         if (currentDetections != null) {
             for (AprilTagDetection detection : currentDetections) {
                 if (detection.metadata != null) {
                     AprilTagLocation tag = getTag(detection);
                     if (tag != null) {
                         Pose2d datedVisionPose = computeRobotPose(detection, tag);
-                        Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, 0.6); // @@@
+                        Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, CAMERA_LATENCY);
 
-                        if (canvas != null) {
-                            canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
-                            MecanumDrive.drawRobot(canvas, visionPose, 7);
-                        }
+                        Loop.canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
+                        MecanumDrive.drawRobot(Loop.canvas, visionPose, 7);
 
                         double distance = Math.hypot(
                                 currentPose.position.x - visionPose.position.x,
@@ -252,6 +256,21 @@ public class Refiner {
                 }
             }
         }
+
+        // Track the FPS:
+        double intervalDuration = Loop.time() - intervalStart;
+        if (intervalDuration > 1.0) {
+            fps = intervalCount / intervalDuration;
+            intervalStart = Loop.time();
+            intervalCount = 0;
+        }
+        if (currentDetections != null) {
+            intervalCount++;
+        }
+
+        Loop.telemetry.addLine(String.format("Vision FPS: %.2f", fps));
+        Loop.telemetry.addLine(String.format("Vision pose count: %d",
+                (visionPoses == null) ? 0 : visionPoses.size()));
 
         // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
