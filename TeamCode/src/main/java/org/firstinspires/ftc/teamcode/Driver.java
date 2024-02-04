@@ -294,7 +294,7 @@ public class Driver extends LinearOpMode {
                 parker = null;
             else {
                 if (parker == null)
-                    parker = new AutoParker(drive, new Pose2d(0, 0, 0));
+                    parker = new AutoParker(drive, new Pose2d(45, 36, Math.PI));
                 parkingActivated = parker.park();
             }
 

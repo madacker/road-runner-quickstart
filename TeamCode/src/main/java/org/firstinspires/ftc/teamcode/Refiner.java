@@ -227,7 +227,8 @@ public class Refiner {
     public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive) {
 
         // We arbitrarily decide that a pose has to be within this many inches to be reliable:
-        final double EPSILON = 2.0;
+        final double FINE_EPSILON = 2.0;
+        final double COARSE_EPSILON = 10.0;
 
         // visualizeDistance(currentPose, canvas);
 
@@ -271,6 +272,7 @@ public class Refiner {
         // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
         int poseCount = visionPoses.size();
+        boolean excellentPose = false;
 
         if (LATENCY_CALIBRATION) {
             // When doing April Tags latency calibration, return success as soon as we get
@@ -296,13 +298,14 @@ public class Refiner {
 
                 // If all three pose estimates are reasonably close, choose the one with the
                 // shortest distance to the other two:
-                if (maxDistance <= EPSILON) {
+                if (maxDistance <= FINE_EPSILON) {
                     double min = Math.min(Math.min(distances[0], distances[1]), distances[2]);
                     for (int i = 0; i < 3; i++) {
                         if (distances[i] == min) {
                             visionPose = visionPoses.get(i);
+                            // @@@ Are min and max here weird?
                             poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxDistance);
-                            reliablePose = true;
+                            excellentPose = true;
                         }
                     }
                 }
@@ -319,14 +322,12 @@ public class Refiner {
                 } else {
                     poseStatus = String.format("%d inadequate vision poses", poseCount);
                 }
-                if (poseCount == 1) {
+                if ((poseCount == 1) && (minDistance < FINE_EPSILON)) {
                     // If only a single tag is in view, adopt its pose only if it's relatively close
                     // to our current pose estimate:
-                    if (visionPoses.get(0).distance < EPSILON) {
-                        poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).distance);
-                        visionPose = visionPoses.get(0);
-                    }
-                } else if (poseCount > 1) {
+                    poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).distance);
+                    visionPose = visionPoses.get(0);
+                } else if ((poseCount > 1) && (minDistance < COARSE_EPSILON)) {
                     // If multiple tags are in view, choose the closest one to our current pose
                     // (reasoning that it's unlikely that *both* are wildly bogus).
                     for (VisionPose candidatePose : visionPoses) {
@@ -352,11 +353,11 @@ public class Refiner {
         // Remember that the current pose is now trustworthy:
         reliablePose = true;
 
-        // Only use the position of the refined pose. Keep the old heading because that's quite
-        // reliable since it comes from the IMU:
-
-        return visionPose.pose; // @@@@@@@@@@@@@@@
-
-        // return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
+        if (excellentPose)
+            return visionPose.pose;
+        else
+            // Only use the position of the refined pose. Keep the old heading because that's quite
+            // reliable since it comes from the IMU:
+            return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
     }
 }
