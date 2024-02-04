@@ -4,7 +4,6 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -27,8 +26,8 @@ import java.util.List;
  * estimated pose.
  */
 public class Refiner {
-    // True if doing April Tags latency calibration:
-    private static final boolean LATENCY_CALIBRATION = true;
+    // True if doing April Tags latency calibration. Should be false normally:
+    private static final boolean LATENCY_CALIBRATION = false;
 
     // Camera characteristics:
     private static final String CAMERA_NAME = "webcam2";
@@ -51,10 +50,11 @@ public class Refiner {
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
 
-    // Frame-rate tracker:
-    private double intervalStart; // In seconds
-    private int intervalCount;
+    // Informational state tracking:
+    private double windowStart; // In seconds
+    private int windowCount;
     private double fps;
+    private String poseStatus = "";
 
     // False if the current robot pose hasn't been properly initialized:
     private boolean reliablePose;
@@ -226,17 +226,17 @@ public class Refiner {
      */
     public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive) {
 
-        // We arbitrarily decide that a pose has to be within 6 inches to be reliable:
-        final double EPSILON = 6.0;
+        // We arbitrarily decide that a pose has to be within this many inches to be reliable:
+        final double EPSILON = 2.0;
 
         // visualizeDistance(currentPose, canvas);
 
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
 
-        List<AprilTagDetection> currentDetections = aprilTag.getFreshDetections();
-        if (currentDetections != null) {
-            for (AprilTagDetection detection : currentDetections) {
+        List<AprilTagDetection> tagDetections = aprilTag.getFreshDetections();
+        if (tagDetections != null) {
+            for (AprilTagDetection detection : tagDetections) {
                 if (detection.metadata != null) {
                     AprilTagLocation tag = getTag(detection);
                     if (tag != null) {
@@ -258,32 +258,30 @@ public class Refiner {
         }
 
         // Track the FPS:
-        double intervalDuration = Loop.time() - intervalStart;
+        double intervalDuration = Loop.time() - windowStart;
         if (intervalDuration > 1.0) {
-            fps = intervalCount / intervalDuration;
-            intervalStart = Loop.time();
-            intervalCount = 0;
+            fps = windowCount / intervalDuration;
+            windowStart = Loop.time();
+            windowCount = 0;
         }
-        if (currentDetections != null) {
-            intervalCount++;
+        if (tagDetections != null) {
+            windowCount++;
         }
-
-        Loop.telemetry.addLine(String.format("Vision FPS: %.2f", fps));
-        Loop.telemetry.addLine(String.format("Vision pose count: %d",
-                (visionPoses == null) ? 0 : visionPoses.size()));
 
         // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
+        int poseCount = visionPoses.size();
 
         if (LATENCY_CALIBRATION) {
             // When doing April Tags latency calibration, return success as soon as we get
             // a single pose, no matter how bad:
             visionPose = (visionPoses.size() != 0) ? visionPoses.get(0) : null;
-        } else if (!reliablePose) {
-            double maxDistance = 0;
-            // The current pose hasn't been properly initialized yet and is unreliable. Choose
-            // a vision pose to that we think is reliable:
-            if (visionPoses.size() == 3) {
+        } else {
+            // We love it when there are 3 accurate poses - we always use it to set our current
+            // pose, regardless of the state of the old pose:
+            if (poseCount == 3) {
+                double maxDistance = 0;
+
                 // Compute the distance between each pose and its neighbors:
                 double[] distances = new double[3];
                 for (int i = 0; i < 3; i++) {
@@ -301,28 +299,51 @@ public class Refiner {
                 if (maxDistance <= EPSILON) {
                     double min = Math.min(Math.min(distances[0], distances[1]), distances[2]);
                     for (int i = 0; i < 3; i++) {
-                        if (distances[i] == min)
+                        if (distances[i] == min) {
                             visionPose = visionPoses.get(i);
+                            poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxDistance);
+                            reliablePose = true;
+                        }
                     }
                 }
             }
-        } else {
-            // The current pose is a pretty good estimate so propose a refined pose estimate
-            // only if we think it's highly reliable:
-            if (visionPoses.size() == 1) {
-                // If only a single tag is in view, adopt its pose only if it's relatively close
-                // to our current pose estimate:
-                if (visionPoses.get(0).distance < EPSILON)
-                    visionPose = visionPoses.get(0);
-            } else if (visionPoses.size() > 1) {
-                // If multiple tags are in view, choose the closest one (reasoning that it's unlikely
-                // that *both* are wildly bogus).
-                for (VisionPose candidatePose : visionPoses) {
-                    if (candidatePose.distance == minDistance)
-                        visionPose = candidatePose;
+
+            // If we already have a reliable pose, adopt the new pose only if it's close to
+            // the old pose:
+            if ((visionPose == null) && (reliablePose) && (tagDetections != null)) {
+                // Set a default status:
+                if (poseCount == 0) {
+                    poseStatus = "No vision pose found";
+                } else if (poseCount == 1) {
+                    poseStatus = "One inadequate vision pose";
+                } else {
+                    poseStatus = String.format("%d inadequate vision poses", poseCount);
+                }
+                if (poseCount == 1) {
+                    // If only a single tag is in view, adopt its pose only if it's relatively close
+                    // to our current pose estimate:
+                    if (visionPoses.get(0).distance < EPSILON) {
+                        poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).distance);
+                        visionPose = visionPoses.get(0);
+                    }
+                } else if (poseCount > 1) {
+                    // If multiple tags are in view, choose the closest one to our current pose
+                    // (reasoning that it's unlikely that *both* are wildly bogus).
+                    for (VisionPose candidatePose : visionPoses) {
+                        if (candidatePose.distance == minDistance) {
+                            visionPose = candidatePose;
+                            poseStatus = String.format("Good one in %d vision pose, %.2f", visionPoses.size(), candidatePose.distance);
+                        }
+                    }
                 }
             }
         }
+
+        // Update some status:
+        Loop.telemetry.addLine(String.format("Vision FPS: %.2f", fps));
+        Loop.telemetry.addLine(String.format("Vision pose count: %d",
+                (visionPoses == null) ? 0 : visionPoses.size()));
+        Loop.telemetry.addLine(poseStatus);
 
         // Return null if there was no reliable vision pose:
         if (visionPose == null)

@@ -14,6 +14,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.Led;
 import org.firstinspires.ftc.teamcode.Loop;
 import org.firstinspires.ftc.teamcode.Refiner;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 @TeleOp(name="AprilTagAccuracy",group="Explore")
@@ -71,5 +72,7 @@ public class AprilTagAccuracy extends LinearOpMode {
             drive.drawPoseHistory(Loop.canvas);
             Loop.end();
         }
+
+        TimeSplitter.logAllResults();
     }
 }

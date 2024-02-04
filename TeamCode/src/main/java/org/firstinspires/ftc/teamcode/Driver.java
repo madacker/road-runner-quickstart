@@ -223,7 +223,7 @@ class Wall {
 
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
-    final boolean FASTEST = true;
+    final boolean FASTEST = false;
 
     // Shape the stick input for more precision at slow speeds:
     public double shapeStick(double stickValue) {
