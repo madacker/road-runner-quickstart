@@ -8,7 +8,6 @@ import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.TurnConstraints;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -21,6 +20,7 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        Led led = new Led(hardwareMap);
         Refiner refiner = new Refiner(hardwareMap, false);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
@@ -62,6 +62,7 @@ public class AprilTagAccuracy extends LinearOpMode {
             drive.updatePoseEstimate();
             Pose2d refinedPose = refiner.refinePose(drive.pose, drive, canvas);
             if (refinedPose != null) {
+                led.setPulseColor(Led.Color.RED, 0.25);
                 drive.recordPose(refinedPose, 0);
 
                 // Don't reset the pose while doing a sweep:
@@ -72,6 +73,7 @@ public class AprilTagAccuracy extends LinearOpMode {
             drive.drawPoseHistory(canvas);
 
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            led.update();
         }
     }
 }

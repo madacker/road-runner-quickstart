@@ -15,7 +15,7 @@ public class Led {
     private DigitalChannel redLed;
     private DigitalChannel greenLed;
 
-    Led(HardwareMap hardwareMap) {
+    public Led(HardwareMap hardwareMap) {
         redLed = hardwareMap.get(DigitalChannel.class, "red");
         greenLed = hardwareMap.get(DigitalChannel.class, "green");
 
