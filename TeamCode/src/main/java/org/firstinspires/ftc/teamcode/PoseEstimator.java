@@ -4,6 +4,8 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import static java.lang.System.nanoTime;
+
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -19,13 +21,121 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+
+
+/**
+ * Apply a moving window average filter to the pose estimates.
+ */
+class Filter {
+    static final double POSITION_WINDOW_DURATION = 2.0; // Seconds
+    static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
+
+    static final double MAX_POSITION_CHANGE_RATE = 6; // Inches per second
+    static final double MAX_HEADING_CHANGE_RATE = Math.toRadians(1); // Degrees per second
+
+    private double historyDuration;
+    private double previousTime = 0;
+
+    class Storage<T> {
+        T datum;
+        double time;
+        Storage(T datum) {
+            this.datum = datum;
+            this.time = time();
+        }
+    }
+
+    public LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
+    public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
+
+    double time() { return nanoTime() * 1e-9; }
+
+    Filter() {
+        previousTime = time();
+    }
+
+    double normalizeAngle(double angle) {
+        while (angle >= Math.PI)
+            angle -= 2 * Math.PI;
+        while (angle < -Math.PI)
+            angle += 2 * Math.PI;
+        return angle;
+    }
+
+    void recordPose(Pose2d currentPose, Pose2d rawPose, boolean trustNewHeading) {
+        // Compute the residuals for the new pose and add them to the histories:
+        Vector2d positionResidual = rawPose.position.minus(currentPose.position);
+        positionResiduals.add(new Storage(positionResidual));
+
+        if (trustNewHeading) {
+            double headingResidual = normalizeAngle(rawPose.heading.log() - currentPose.heading.log());
+            headingResiduals.add(new Storage(headingResidual));
+        }
+    }
+
+    Pose2d filter(Pose2d currentPose) {
+        // Track the current time and the delta-t from the previous filter operation:
+        double time = time();
+        double dt = time - previousTime;
+        previousTime = time;
+
+        // Remove any residuals from the histories that are expired:
+        while ((positionResiduals.size() > 0) && (time - positionResiduals.get(0).time > POSITION_WINDOW_DURATION))
+            positionResiduals.removeFirst();
+        while ((headingResiduals.size() > 0) && (time - headingResiduals.get(0).time > HEADING_WINDOW_DURATION))
+            headingResiduals.removeFirst();
+
+        // Compute the averages of all the residuals:
+        Vector2d aggregatePositionResidual = new Vector2d(0, 0);
+        double aggregateHeaderResidual = 0;
+
+        for (Storage position: positionResiduals) {
+            aggregatePositionResidual = aggregatePositionResidual.plus((Vector2d) position.datum);
+        }
+        for (Storage heading: headingResiduals) {
+            aggregateHeaderResidual = aggregateHeaderResidual + (Double) heading.datum;
+        }
+
+        if (positionResiduals.size() != 0)
+            aggregatePositionResidual = aggregatePositionResidual.div(positionResiduals.size());
+        if (headingResiduals.size() != 0)
+            aggregateHeaderResidual = aggregateHeaderResidual / headingResiduals.size();
+
+        // Compute how much to correct the current position and heading, clamping to our maximum
+        // change rates:
+        Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
+        double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
+        if (distance > dt * MAX_POSITION_CHANGE_RATE) {
+            double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
+            positionCorrection = positionCorrection.times(clampFactor);
+        }
+        double headingCorrection = aggregateHeaderResidual;
+        if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
+            headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
+        }
+
+        // Offset everything in the history to account for the correction applied:
+        for (Storage position: positionResiduals) {
+            position.datum = positionCorrection.plus((Vector2d) position.datum);
+        }
+        for (Storage heading: headingResiduals) {
+            heading.datum = headingCorrection + (double) heading.datum;
+        }
+
+        // Correct the current pose to create the new pose:
+        return new Pose2d(
+                currentPose.position.plus(positionCorrection),
+                currentPose.heading.log() + headingCorrection);
+    }
+}
 
 /**
  * Pose refiner. Leverages AprilTags and the distance sensor to improve the accuracy of the
  * estimated pose.
  */
-public class Refiner {
+public class PoseEstimator {
     // True if doing April Tags latency calibration. Should be false normally:
     private static final boolean LATENCY_CALIBRATION = false;
 
@@ -46,6 +156,7 @@ public class Refiner {
     private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
 
     // Run-time state:
+    private Filter filter = new Filter();
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
@@ -57,7 +168,7 @@ public class Refiner {
     private String poseStatus = "";
 
     // False if the current robot pose hasn't been properly initialized:
-    private boolean reliablePose;
+    private boolean lockedInPose;
 
     // Structure defining the location of April Tags:
     class AprilTagLocation {
@@ -88,8 +199,8 @@ public class Refiner {
             new AprilTagLocation(10, -72,  43.0, 0, true),   // Blue audience wall, large
     };
 
-    public Refiner(HardwareMap hardwareMap, boolean reliablePose) {
-        this.reliablePose = reliablePose;
+    public PoseEstimator(HardwareMap hardwareMap, boolean lockedInPose) {
+        this.lockedInPose = lockedInPose;
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
@@ -258,7 +369,7 @@ public class Refiner {
             }
         }
 
-        // Track the FPS:
+        // Track the April Tag FPS:
         double intervalDuration = Loop.time() - windowStart;
         if (intervalDuration > 1.0) {
             fps = windowCount / intervalDuration;
@@ -313,7 +424,7 @@ public class Refiner {
 
             // If we already have a reliable pose, adopt the new pose only if it's close to
             // the old pose:
-            if ((visionPose == null) && (reliablePose) && (tagDetections != null)) {
+            if ((visionPose == null) && (lockedInPose) && (tagDetections != null)) {
                 // Set a default status:
                 if (poseCount == 0) {
                     poseStatus = "No vision pose found";
@@ -346,18 +457,14 @@ public class Refiner {
                 (visionPoses == null) ? 0 : visionPoses.size()));
         Loop.telemetry.addLine(poseStatus);
 
-        // Return null if there was no reliable vision pose:
-        if (visionPose == null)
-            return null;
+        if (visionPose != null) {
+            filter.recordPose(currentPose, visionPose.pose, excellentPose);
 
-        // Remember that the current pose is now trustworthy:
-        reliablePose = true;
+            // Remember that the current pose is now trustworthy:
+            lockedInPose = true; // @@@
+        }
 
-        if (excellentPose)
-            return visionPose.pose;
-        else
-            // Only use the position of the refined pose. Keep the old heading because that's quite
-            // reliable since it comes from the IMU:
-            return new Pose2d(visionPose.pose.position.x, visionPose.pose.position.y, currentPose.heading.log());
+        // Update the current pose based on the filter:
+        return filter.filter(currentPose);
     }
 }

@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Actions;
@@ -257,12 +256,12 @@ public class Driver extends LinearOpMode {
 
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         AutoParker parker = null;
-        Refiner refiner = null;
+        PoseEstimator poseEstimator = null;
         Led led = null;
         Wall wall = null;
 
         if (!FASTEST) {
-            refiner = new Refiner(hardwareMap, false);
+            poseEstimator = new PoseEstimator(hardwareMap, false);
             led = new Led(hardwareMap);
             wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
         }
@@ -363,8 +362,8 @@ public class Driver extends LinearOpMode {
             }
 
             // Refine the pose estimate using AprilTags:
-            if (refiner != null) {
-                Pose2d refinedPose = refiner.refinePose(drive.pose, drive);
+            if (poseEstimator != null) {
+                Pose2d refinedPose = poseEstimator.refinePose(drive.pose, drive);
                 if (refinedPose != null) {
                     led.setSteadyColor(Led.Color.GREEN);
                     led.setPulseColor(Led.Color.RED, 0.25);
@@ -417,8 +416,8 @@ public class Driver extends LinearOpMode {
         }
 
         // Cleanup:
-        if (refiner != null) {
-            refiner.close();
+        if (poseEstimator != null) {
+            poseEstimator.close();
         }
         if (led != null) {
             led.setSteadyColor(Led.Color.OFF);

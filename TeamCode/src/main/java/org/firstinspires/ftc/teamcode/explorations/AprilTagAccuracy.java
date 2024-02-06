@@ -1,8 +1,5 @@
 package org.firstinspires.ftc.teamcode.explorations;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.canvas.Canvas;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -13,7 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Led;
 import org.firstinspires.ftc.teamcode.Loop;
-import org.firstinspires.ftc.teamcode.Refiner;
+import org.firstinspires.ftc.teamcode.PoseEstimator;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -23,7 +20,7 @@ public class AprilTagAccuracy extends LinearOpMode {
     @Override
     public void runOpMode() {
         Led led = new Led(hardwareMap);
-        Refiner refiner = new Refiner(hardwareMap, false);
+        PoseEstimator poseEstimator = new PoseEstimator(hardwareMap, false);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
         waitForStart();
@@ -59,7 +56,7 @@ public class AprilTagAccuracy extends LinearOpMode {
 
             // Draw the pose history:
             drive.updatePoseEstimate();
-            Pose2d refinedPose = refiner.refinePose(drive.pose, drive);
+            Pose2d refinedPose = poseEstimator.refinePose(drive.pose, drive);
             if (refinedPose != null) {
                 led.setPulseColor(Led.Color.RED, 0.25);
                 drive.recordPose(refinedPose, 0);
