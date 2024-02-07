@@ -26,19 +26,22 @@ import java.util.List;
 
 
 /**
- * Apply a moving window average filter to the pose estimates.
+ * Apply a moving window average filter to the sampled poses.
  */
-class Filter {
+class FilterSampledPoses {
     static final double POSITION_WINDOW_DURATION = 2.0; // Seconds
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
+    static final int LOCKED_IN_HEADING_COUNT = 10; // Need 10 trusted heading reading before locking in
 
     static final double MAX_POSITION_CHANGE_RATE = 6; // Inches per second
     static final double MAX_HEADING_CHANGE_RATE = Math.toRadians(1); // Degrees per second
 
-    private double historyDuration;
-    private double previousTime = 0;
+    private double previousTime;
+    private double trustedHeadingCount = 0;
 
-    class Storage<T> {
+    public boolean lockedIn; // True if we highly trust the current headings
+
+    static class Storage<T> {
         T datum;
         double time;
         Storage(T datum) {
@@ -47,12 +50,15 @@ class Filter {
         }
     }
 
-    public LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
-    public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
+    private LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
+    private  LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
 
-    double time() { return nanoTime() * 1e-9; }
+    static double time() { return nanoTime() * 1e-9; }
 
-    Filter() {
+    // If lockedHeading is true then the rate of change of the heading will be tightly
+    // clamped from the very beginning:
+    FilterSampledPoses(boolean lockedIn) {
+        this.lockedIn = lockedIn;
         previousTime = time();
     }
 
@@ -64,14 +70,19 @@ class Filter {
         return angle;
     }
 
-    void recordPose(Pose2d currentPose, Pose2d rawPose, boolean trustNewHeading) {
+    void recordSample(Pose2d currentPose, Pose2d sampledPose, boolean trustedHeading) {
         // Compute the residuals for the new pose and add them to the histories:
-        Vector2d positionResidual = rawPose.position.minus(currentPose.position);
+        Vector2d positionResidual = sampledPose.position.minus(currentPose.position);
         positionResiduals.add(new Storage(positionResidual));
 
-        if (trustNewHeading) {
-            double headingResidual = normalizeAngle(rawPose.heading.log() - currentPose.heading.log());
+        // Even an untrusted heading is better than no heading at all:
+        if ((trustedHeading) || (headingResiduals.size() == 0)) {
+            double headingResidual = normalizeAngle(sampledPose.heading.log() - currentPose.heading.log());
             headingResiduals.add(new Storage(headingResidual));
+
+            trustedHeadingCount++;
+            if (trustedHeadingCount > LOCKED_IN_HEADING_COUNT)
+                lockedIn = true;
         }
     }
 
@@ -103,15 +114,16 @@ class Filter {
         if (headingResiduals.size() != 0)
             aggregateHeaderResidual = aggregateHeaderResidual / headingResiduals.size();
 
-        // Compute how much to correct the current position and heading, clamping to our maximum
-        // change rates:
+        // Compute how much to correct the current position and heading:
         Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
+        double headingCorrection = aggregateHeaderResidual;
+
+        // Clamp the change rates:
         double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
         if (distance > dt * MAX_POSITION_CHANGE_RATE) {
             double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
             positionCorrection = positionCorrection.times(clampFactor);
         }
-        double headingCorrection = aggregateHeaderResidual;
         if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
             headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
         }
@@ -156,7 +168,7 @@ public class PoseEstimator {
     private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
 
     // Run-time state:
-    private Filter filter = new Filter();
+    private FilterSampledPoses sampledPosesFilter;
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
@@ -166,9 +178,6 @@ public class PoseEstimator {
     private int windowCount;
     private double fps;
     private String poseStatus = "";
-
-    // False if the current robot pose hasn't been properly initialized:
-    private boolean lockedInPose;
 
     // Structure defining the location of April Tags:
     class AprilTagLocation {
@@ -200,7 +209,7 @@ public class PoseEstimator {
     };
 
     public PoseEstimator(HardwareMap hardwareMap, boolean lockedInPose) {
-        this.lockedInPose = lockedInPose;
+        sampledPosesFilter = new FilterSampledPoses(lockedInPose);
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
@@ -422,9 +431,8 @@ public class PoseEstimator {
                 }
             }
 
-            // If we already have a reliable pose, adopt the new pose only if it's close to
-            // the old pose:
-            if ((visionPose == null) && (lockedInPose) && (tagDetections != null)) {
+            // If visionPose is null, we didn't find a perfect pose, so lower our standards a little:
+            if ((visionPose == null) && (tagDetections != null)) {
                 // Set a default status:
                 if (poseCount == 0) {
                     poseStatus = "No vision pose found";
@@ -458,13 +466,15 @@ public class PoseEstimator {
         Loop.telemetry.addLine(poseStatus);
 
         if (visionPose != null) {
-            filter.recordPose(currentPose, visionPose.pose, excellentPose);
-
-            // Remember that the current pose is now trustworthy:
-            lockedInPose = true; // @@@
+            sampledPosesFilter.recordSample(currentPose, visionPose.pose, excellentPose);
         }
 
-        // Update the current pose based on the filter:
-        return filter.filter(currentPose);
+        // If the filter has enough sampled poses, return a filtered pose. Until then, just
+        // return the raw poses without any filtering:
+        if (sampledPosesFilter.lockedIn) {
+            return sampledPosesFilter.filter(currentPose);
+        } else {
+            return (visionPose != null) ? visionPose.pose : currentPose;
+        }
     }
 }
