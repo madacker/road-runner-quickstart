@@ -26,9 +26,9 @@ import java.util.List;
 
 
 /**
- * Apply a moving window average filter to the sampled poses.
+ * Maintain a history of residuals and apply a sliding window averaging filter.
  */
-class FilterSampledPoses {
+class ResidualFilter {
     static final double POSITION_WINDOW_DURATION = 2.0; // Seconds
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
     static final int LOCKED_IN_HEADING_COUNT = 10; // Need 10 trusted heading reading before locking in
@@ -36,11 +36,12 @@ class FilterSampledPoses {
     static final double MAX_POSITION_CHANGE_RATE = 6; // Inches per second
     static final double MAX_HEADING_CHANGE_RATE = Math.toRadians(1); // Degrees per second
 
-    private double previousTime;
-    private double trustedHeadingCount = 0;
+    private double previousTime; // Time of the most recent filter() call
+    private double trustedHeadingCount = 0; // Active count of trusted headings so far
 
     public boolean lockedIn; // True if we highly trust the current headings
 
+    // Time-stamped storage structure for positions and headings:
     static class Storage<T> {
         T datum;
         double time;
@@ -51,13 +52,13 @@ class FilterSampledPoses {
     }
 
     private LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
-    private  LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
+    private LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
 
     static double time() { return nanoTime() * 1e-9; }
 
     // If lockedHeading is true then the rate of change of the heading will be tightly
     // clamped from the very beginning:
-    FilterSampledPoses(boolean lockedIn) {
+    ResidualFilter(boolean lockedIn) {
         this.lockedIn = lockedIn;
         previousTime = time();
     }
@@ -92,7 +93,7 @@ class FilterSampledPoses {
         double dt = time - previousTime;
         previousTime = time;
 
-        // Remove any residuals from the histories that are expired:
+        // Remove all expired residuals from the histories:
         while ((positionResiduals.size() > 0) && (time - positionResiduals.get(0).time > POSITION_WINDOW_DURATION))
             positionResiduals.removeFirst();
         while ((headingResiduals.size() > 0) && (time - headingResiduals.get(0).time > HEADING_WINDOW_DURATION))
@@ -118,14 +119,16 @@ class FilterSampledPoses {
         Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
         double headingCorrection = aggregateHeaderResidual;
 
-        // Clamp the change rates:
-        double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
-        if (distance > dt * MAX_POSITION_CHANGE_RATE) {
-            double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
-            positionCorrection = positionCorrection.times(clampFactor);
-        }
-        if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
-            headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
+        // Once we're locked in, clamp the rate of any changes:
+        if (lockedIn) {
+            double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
+            if (distance > dt * MAX_POSITION_CHANGE_RATE) {
+                double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
+                positionCorrection = positionCorrection.times(clampFactor);
+            }
+            if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
+                headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
+            }
         }
 
         // Offset everything in the history to account for the correction applied:
@@ -164,11 +167,11 @@ public class PoseEstimator {
     private static final double CAMERA_CY = 355.34234068;
     private static final double CAMERA_LATENCY = 0.19; // Seconds
 
-    // Distance sensor characteristics:
-    private static final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
+    // Offset distance from sensor to center of robot:
+    private static final double DISTANCE_SENSOR_OFFSET = 8;
 
     // Run-time state:
-    private FilterSampledPoses sampledPosesFilter;
+    private ResidualFilter residualFilter;
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
     private DistanceSensor distanceSensor;
@@ -209,7 +212,7 @@ public class PoseEstimator {
     };
 
     public PoseEstimator(HardwareMap hardwareMap, boolean lockedInPose) {
-        sampledPosesFilter = new FilterSampledPoses(lockedInPose);
+        residualFilter = new ResidualFilter(lockedInPose);
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         initializeAprilTags(hardwareMap);
     }
@@ -466,15 +469,10 @@ public class PoseEstimator {
         Loop.telemetry.addLine(poseStatus);
 
         if (visionPose != null) {
-            sampledPosesFilter.recordSample(currentPose, visionPose.pose, excellentPose);
+            // Add the new vision pose to our filter history:
+            residualFilter.recordSample(currentPose, visionPose.pose, excellentPose);
         }
 
-        // If the filter has enough sampled poses, return a filtered pose. Until then, just
-        // return the raw poses without any filtering:
-        if (sampledPosesFilter.lockedIn) {
-            return sampledPosesFilter.filter(currentPose);
-        } else {
-            return (visionPose != null) ? visionPose.pose : currentPose;
-        }
+        return residualFilter.filter(currentPose);
     }
 }
