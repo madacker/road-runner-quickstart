@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import android.annotation.SuppressLint;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
@@ -16,6 +18,8 @@ import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 class AutoParker {
     MecanumDrive drive;              // Used to get pose and poseVelocity and set the motors
     Pose2d target;                   // Target pose
+    double facingOrientation;        // Orientation of robot to point to goal when far from goal
+    double turningDistance;          // Distance at which to start turning to final orientation
     double previousTime;             // Previous time in seconds
     Vector2d tangentVector;          // Normalized version of original tangent vector
     double radialSpeed;              // Inches/s, can be negative
@@ -30,9 +34,11 @@ class AutoParker {
         return angle;
     }
 
-    AutoParker(MecanumDrive drive, Pose2d target) {
+    AutoParker(MecanumDrive drive, Pose2d target, double facingOrientation, double turningDistance) {
         this.drive = drive;
         this.target = target;
+        this.facingOrientation = facingOrientation;
+        this.turningDistance = turningDistance;
 
         // Remember the time:
         this.previousTime = Actions.now();
@@ -43,6 +49,7 @@ class AutoParker {
         Vector2d radialVector = target.position.minus(drive.pose.position);
 
         // Tangent vector -90 degrees from radial:
+        // noinspection SuspiciousNameCombination
         tangentVector = new Vector2d(radialVector.y, -radialVector.x);
 
         // Normalize the tangent, being careful to protect against divide-by-zero:
@@ -77,9 +84,16 @@ class AutoParker {
         // Angular distance to the target:
         double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
 
-        // We're done if the distance is small enough!
+        // We're done if the distance is small enough to the goal!
         if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
             return false;
+
+        // When far away, point the robot to the goal instead of beginning to turn to its final
+        // orientation:
+        if (radialLength > turningDistance) {
+            double angleToGoal = Math.atan2(radialVector.x, radialVector.y);
+            angularDelta = normalizeAngle(angleToGoal - facingOrientation);
+        }
 
         double now = Actions.now();
         double deltaT = now - previousTime;
@@ -88,23 +102,23 @@ class AutoParker {
 
         // Decrease the magnitude of the tangent speed with a minimum value of zero:
         double tangentMagnitude = Math.max(0,
-                Math.abs(tangentSpeed) + drive.PARAMS.minProfileAccel * deltaT);
+                Math.abs(tangentSpeed) + MecanumDrive.PARAMS.minProfileAccel * deltaT);
 
         // Convert to the signed tangent speed:
         tangentSpeed = Math.signum(tangentSpeed) * tangentMagnitude;
 
         // Increase the speed towards the target:
-        double increasingRadialSpeed = radialSpeed + drive.PARAMS.maxProfileAccel * deltaT;
+        double increasingRadialSpeed = radialSpeed + MecanumDrive.PARAMS.maxProfileAccel * deltaT;
 
         // Compute the maximum possible speed towards the target, accounting for the speed along
         // the tangent:
-        double maxRadialSpeed = Math.hypot(tangentSpeed, drive.PARAMS.maxWheelVel);
+        double maxRadialSpeed = Math.hypot(tangentSpeed, MecanumDrive.PARAMS.maxWheelVel);
 
         // Calculate the maximum speed directly towards the target assuming constant
         // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
         // current velocity, u is the initial velocity, a is the acceleration, s is distance
         // traveled. We apply it in reverse:
-        double radialApproach = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * radialLength);
+        double radialApproach = Math.sqrt(2 * Math.abs(MecanumDrive.PARAMS.minProfileAccel) * radialLength);
 
         // Set the new radial speed as the minimum of the three:
         radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), radialApproach);
@@ -116,14 +130,14 @@ class AutoParker {
 
         // Calculate the angular velocity as a positive magnitude:
         if (angularDelta < 0) {
-            double increasingAngularSpeed = angularSpeed - drive.PARAMS.maxAngAccel * deltaT;
-            double maxAngularSpeed = -drive.PARAMS.maxAngVel;
-            double angularApproach = -Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
+            double increasingAngularSpeed = angularSpeed - MecanumDrive.PARAMS.maxAngAccel * deltaT;
+            double maxAngularSpeed = -MecanumDrive.PARAMS.maxAngVel;
+            double angularApproach = -Math.sqrt(2 * MecanumDrive.PARAMS.maxAngAccel * Math.abs(angularDelta));
             angularSpeed = Math.max(Math.max(increasingAngularSpeed, maxAngularSpeed), angularApproach);
         } else {
-            double increasingAngularSpeed = angularSpeed + drive.PARAMS.maxAngAccel * deltaT;
-            double maxAngularSpeed = drive.PARAMS.maxAngVel;
-            double angularApproach = Math.sqrt(2 * drive.PARAMS.maxAngAccel * Math.abs(angularDelta));
+            double increasingAngularSpeed = angularSpeed + MecanumDrive.PARAMS.maxAngAccel * deltaT;
+            double maxAngularSpeed = MecanumDrive.PARAMS.maxAngVel;
+            double angularApproach = Math.sqrt(2 * MecanumDrive.PARAMS.maxAngAccel * Math.abs(angularDelta));
             angularSpeed = Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
         }
 
@@ -201,7 +215,7 @@ class Wall {
         // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
         // current velocity, u is the initial velocity, a is the acceleration, s is distance
         // traveled. We apply it in reverse:
-        double maxApproachVelocity = Math.sqrt(2 * Math.abs(drive.PARAMS.minProfileAccel) * distance);
+        double maxApproachVelocity = Math.sqrt(2 * Math.abs(MecanumDrive.PARAMS.minProfileAccel) * distance);
         towardWallVelocity = Math.min(towardWallVelocity, maxApproachVelocity);
 
         // Constitute the revised velocity's component vectors:
@@ -243,6 +257,7 @@ public class Driver extends LinearOpMode {
         return stickValue * scale;
     }
 
+    @SuppressLint("DefaultLocale")
     @Override
     public void runOpMode() throws InterruptedException {
         double maxLinearAcceleration = 0;
@@ -268,14 +283,14 @@ public class Driver extends LinearOpMode {
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
         double fullAxialSpeed
-                = ((drive.voltageSensor.getVoltage() - drive.PARAMS.kS) / drive.PARAMS.kV)
-                * drive.PARAMS.inPerTick;
+                = ((drive.voltageSensor.getVoltage() - MecanumDrive.PARAMS.kS) / MecanumDrive.PARAMS.kV)
+                * MecanumDrive.PARAMS.inPerTick;
         double fullLateralSpeed
-                = fullAxialSpeed * drive.PARAMS.lateralInPerTick / drive.PARAMS.inPerTick;
+                = fullAxialSpeed * MecanumDrive.PARAMS.lateralInPerTick / MecanumDrive.PARAMS.inPerTick;
         // Rotations/s = fullAxialSpeed / (pi * wheelbase)
         // Radians/s = 2 * pi * rotations/s
         double fullAngularSpeed
-                = 2 * fullAxialSpeed / (drive.PARAMS.trackWidthTicks * drive.PARAMS.inPerTick);
+                = 2 * fullAxialSpeed / (MecanumDrive.PARAMS.trackWidthTicks * MecanumDrive.PARAMS.inPerTick);
 
         waitForStart();
 
@@ -293,7 +308,8 @@ public class Driver extends LinearOpMode {
                 parker = null;
             else {
                 if (parker == null)
-                    parker = new AutoParker(drive, new Pose2d(45, 36, Math.PI));
+                    parker = new AutoParker(drive, new Pose2d(45, 36, Math.PI),
+                            Math.PI, 500);
                 parkingActivated = parker.park();
             }
 

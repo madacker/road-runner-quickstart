@@ -11,6 +11,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import android.annotation.SuppressLint;
 import android.util.Size;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -29,11 +30,12 @@ import java.util.List;
  * Maintain a history of residuals and apply a sliding window averaging filter.
  */
 class ResidualFilter {
-    static final double POSITION_WINDOW_DURATION = 2.0; // Seconds
+    static final double POSITION_WINDOW_SIZE = 10; // Count of points
+    static final double POSITION_WATCHDOG_DURATION = 0.2; // Seconds
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
     static final int LOCKED_IN_HEADING_COUNT = 10; // Need 10 trusted heading reading before locking in
 
-    static final double MAX_POSITION_CHANGE_RATE = 6; // Inches per second
+    static final double MAX_POSITION_CHANGE_RATE = 18; // Inches per second
     static final double MAX_HEADING_CHANGE_RATE = Math.toRadians(1); // Degrees per second
 
     private double previousTime; // Time of the most recent filter() call
@@ -93,8 +95,14 @@ class ResidualFilter {
         double dt = time - previousTime;
         previousTime = time;
 
-        // Remove all expired residuals from the histories:
-        while ((positionResiduals.size() > 0) && (time - positionResiduals.get(0).time > POSITION_WINDOW_DURATION))
+        // If it's been some time since we got a new position residual, toss them all. We don't
+        // want to toss them one at a time because that simply biases everything to the
+        // most recent one:
+        if (time - positionResiduals.getLast().time > POSITION_WATCHDOG_DURATION)
+            positionResiduals.clear();
+
+        // Remove all individually expired residuals from the histories:
+        while ((positionResiduals.size() > 0) && (positionResiduals.size() > POSITION_WINDOW_SIZE))
             positionResiduals.removeFirst();
         while ((headingResiduals.size() > 0) && (time - headingResiduals.get(0).time > HEADING_WINDOW_DURATION))
             headingResiduals.removeFirst();
@@ -131,12 +139,12 @@ class ResidualFilter {
             }
         }
 
-        // Offset everything in the history to account for the correction applied:
+        // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage position: positionResiduals) {
-            position.datum = positionCorrection.plus((Vector2d) position.datum);
+            position.datum = positionCorrection.minus((Vector2d) position.datum);
         }
         for (Storage heading: headingResiduals) {
-            heading.datum = headingCorrection + (double) heading.datum;
+            heading.datum = headingCorrection - (double) heading.datum;
         }
 
         // Correct the current pose to create the new pose:
@@ -183,7 +191,7 @@ public class PoseEstimator {
     private String poseStatus = "";
 
     // Structure defining the location of April Tags:
-    class AprilTagLocation {
+    static class AprilTagLocation {
         int id;
         double x;
         double y;
@@ -347,6 +355,7 @@ public class PoseEstimator {
     /**
      *  Return a refined pose based on April Tags and the distance sensor.
      */
+    @SuppressLint("DefaultLocale")
     public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive) {
 
         // We arbitrarily decide that a pose has to be within this many inches to be reliable:
@@ -402,10 +411,11 @@ public class PoseEstimator {
             // a single pose, no matter how bad:
             visionPose = (visionPoses.size() != 0) ? visionPoses.get(0) : null;
         } else {
-            // We love it when there are 3 accurate poses - we always use it to set our current
-            // pose, regardless of the state of the old pose:
-            if (poseCount == 3) {
-                double maxDistance = 0;
+            // We love it when there are 3 accurate poses reasonably when reasonably close to
+            // the tag - we always use it to set our current pose, regardless of the state of the
+            // old pose, and we trust its heading result:
+            if ((poseCount == 3) && (tagDetections.get(0).ftcPose.bearing < 48)) {
+                double maxNeighborDistance = 0;
 
                 // Compute the distance between each pose and its neighbors:
                 double[] distances = new double[3];
@@ -414,20 +424,19 @@ public class PoseEstimator {
                         if (i != j) {
                             double distance = distance(visionPoses.get(i).pose, visionPoses.get(j).pose);
                             distances[i] += distance;
-                            maxDistance = Math.max(distance, maxDistance);
+                            maxNeighborDistance = Math.max(distance, maxNeighborDistance);
                         }
                     }
                 }
 
                 // If all three pose estimates are reasonably close, choose the one with the
                 // shortest distance to the other two:
-                if (maxDistance <= FINE_EPSILON) {
+                if (maxNeighborDistance <= FINE_EPSILON) {
                     double min = Math.min(Math.min(distances[0], distances[1]), distances[2]);
                     for (int i = 0; i < 3; i++) {
                         if (distances[i] == min) {
                             visionPose = visionPoses.get(i);
-                            // @@@ Are min and max here weird?
-                            poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxDistance);
+                            poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
                             excellentPose = true;
                         }
                     }
@@ -464,8 +473,7 @@ public class PoseEstimator {
 
         // Update some status:
         Loop.telemetry.addLine(String.format("Vision FPS: %.2f", fps));
-        Loop.telemetry.addLine(String.format("Vision pose count: %d",
-                (visionPoses == null) ? 0 : visionPoses.size()));
+        Loop.telemetry.addLine(String.format("Vision pose count: %d", visionPoses.size()));
         Loop.telemetry.addLine(poseStatus);
 
         if (visionPose != null) {
