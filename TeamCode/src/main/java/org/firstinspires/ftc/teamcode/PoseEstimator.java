@@ -30,7 +30,7 @@ import java.util.List;
  * Maintain a history of residuals and apply a sliding window averaging filter.
  */
 class ResidualFilter {
-    static final double POSITION_WINDOW_SIZE = 10; // Count of points
+    static final double POSITION_WINDOW_SIZE = 5; // Count of points
     static final double POSITION_WATCHDOG_DURATION = 0.2; // Seconds
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
     static final int LOCKED_IN_HEADING_COUNT = 10; // Need 10 trusted heading reading before locking in
@@ -189,6 +189,7 @@ public class PoseEstimator {
     private int windowCount;
     private double fps;
     private String poseStatus = "";
+    private double pipelineLatency = 0; // Milliseconds
 
     // Structure defining the location of April Tags:
     static class AprilTagLocation {
@@ -260,7 +261,7 @@ public class PoseEstimator {
         // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second (default)
         // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second (default)
         // Note: Decimation can be changed on-the-fly to adapt during a match.
-        //aprilTag.setDecimation(3);
+        aprilTag.setDecimation(3);
 
         // Create the vision portal by using a builder.
         VisionPortal.Builder builder = new VisionPortal.Builder();
@@ -359,7 +360,7 @@ public class PoseEstimator {
     public Pose2d refinePose(Pose2d currentPose, MecanumDrive drive) {
 
         // We arbitrarily decide that a pose has to be within this many inches to be reliable:
-        final double FINE_EPSILON = 2.0;
+        final double FINE_EPSILON = 5.0;
         final double COARSE_EPSILON = 10.0;
 
         // visualizeDistance(currentPose, canvas);
@@ -370,6 +371,7 @@ public class PoseEstimator {
         List<AprilTagDetection> tagDetections = aprilTag.getFreshDetections();
         if (tagDetections != null) {
             for (AprilTagDetection detection : tagDetections) {
+                pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 10e-6;
                 if (detection.metadata != null) {
                     AprilTagLocation tag = getTag(detection);
                     if (tag != null) {
@@ -454,6 +456,7 @@ public class PoseEstimator {
                     poseStatus = String.format("%d inadequate vision poses", poseCount);
                 }
                 if ((poseCount == 1) && (minDistance < FINE_EPSILON)) {
+                    // @@@ Check its size?
                     // If only a single tag is in view, adopt its pose only if it's relatively close
                     // to our current pose estimate:
                     poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).distance);
@@ -472,8 +475,8 @@ public class PoseEstimator {
         }
 
         // Update some status:
-        Loop.telemetry.addLine(String.format("Vision FPS: %.2f", fps));
-        Loop.telemetry.addLine(String.format("Vision pose count: %d", visionPoses.size()));
+        Loop.telemetry.addLine(String.format("Vision FPS: %.2f (ours), %.2f (theirs)", fps, visionPortal.getFps()));
+        Loop.telemetry.addLine(String.format("Vision pose count: %d, ms: %.2f", visionPoses.size(), pipelineLatency));
         Loop.telemetry.addLine(poseStatus);
 
         if (visionPose != null) {

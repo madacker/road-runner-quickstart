@@ -85,8 +85,8 @@ class AutoParker {
         double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
 
         // We're done if the distance is small enough to the goal!
-        if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
-            return false;
+//  @@@       if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
+//            return false;
 
         // When far away, point the robot to the goal instead of beginning to turn to its final
         // orientation:
