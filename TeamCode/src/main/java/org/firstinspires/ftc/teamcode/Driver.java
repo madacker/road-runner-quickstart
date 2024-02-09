@@ -75,7 +75,7 @@ class AutoParker {
         angularSpeed = velocity.angVel;
     }
 
-    // Returns true when parked, false when not parked yet:
+    // Returns false when done, true while still working on it:
     boolean park() {
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(drive.pose.position);
@@ -91,8 +91,8 @@ class AutoParker {
         // When far away, point the robot to the goal instead of beginning to turn to its final
         // orientation:
         if (radialLength > turningDistance) {
-            double angleToGoal = Math.atan2(radialVector.x, radialVector.y);
-            angularDelta = normalizeAngle(angleToGoal - facingOrientation);
+            double headingToGoal = Math.atan2(radialVector.y, radialVector.x) + facingOrientation;
+            angularDelta = normalizeAngle(headingToGoal - drive.pose.heading.log());
         }
 
         double now = Actions.now();
@@ -302,6 +302,8 @@ public class Driver extends LinearOpMode {
             if (led != null)
                 led.update();
 
+            // @@@ Do parking et al only once locked in!
+
             // The 'A' button activates the auto-parker:
             boolean parkingActivated = false;
             if (!gamepad1.a)
@@ -309,12 +311,12 @@ public class Driver extends LinearOpMode {
             else {
                 if (parker == null)
                     parker = new AutoParker(drive, new Pose2d(45, 36, Math.PI),
-                            Math.PI, 500);
+                            Math.PI, 5);
                 parkingActivated = parker.park();
             }
 
             // The 'left-bumper' button activates Road Runner homing:
-            boolean roadrunnerActivated = drive.doActionsWork();
+            boolean roadrunnerActivated = drive.doActionsWork(Loop.packet);
             if ((gamepad1.left_bumper) && (!roadrunnerActivated)) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
@@ -323,8 +325,7 @@ public class Driver extends LinearOpMode {
 
                     boolean toBackdrop = drive.pose.position.x < 6.0;
                     Action action;
-
-                    if (false) { // if (toBackdrop) {
+                    if (toBackdrop) {
                         // Go to the blue backdrop:
                         Pose2d keyPose = new Pose2d(-36, -36, Math.PI);
                         double startTangent = Math.atan2(

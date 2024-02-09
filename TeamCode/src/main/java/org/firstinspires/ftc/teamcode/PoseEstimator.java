@@ -96,12 +96,12 @@ class ResidualFilter {
         previousTime = time;
 
         // If it's been some time since we got a new position residual, toss them all. We don't
-        // want to toss them one at a time because that simply biases everything to the
+        // want to age them out one at a time because that simply biases everything to the
         // most recent one:
-        if (time - positionResiduals.getLast().time > POSITION_WATCHDOG_DURATION)
+        if ((positionResiduals.size() > 0) && (time - positionResiduals.getLast().time > POSITION_WATCHDOG_DURATION))
             positionResiduals.clear();
 
-        // Remove all individually expired residuals from the histories:
+        // Remove all aged-out residuals from the histories:
         while ((positionResiduals.size() > 0) && (positionResiduals.size() > POSITION_WINDOW_SIZE))
             positionResiduals.removeFirst();
         while ((headingResiduals.size() > 0) && (time - headingResiduals.get(0).time > HEADING_WINDOW_DURATION))

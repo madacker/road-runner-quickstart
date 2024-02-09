@@ -697,7 +697,6 @@ public final class MecanumDrive {
 
     // On every iteration of your robot loop, call 'doActionsWork'. Specify the packet
     // if you're drawing on the graph for FTC Dashboard:
-    public boolean doActionsWork() { return doActionsWork(null); }
     public boolean doActionsWork(TelemetryPacket packet) {
         LinkedList<Action> deletionList = new LinkedList<>();
         for (Action action: actionList) {
