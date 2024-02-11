@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Led;
-import org.firstinspires.ftc.teamcode.Loop;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.PoseEstimator;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -26,8 +26,8 @@ public class AprilTagAccuracy extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            Loop.start(telemetry);
-            boolean doingSweep = drive.doActionsWork(Loop.packet);
+            Globals.startLoop(telemetry);
+            boolean doingSweep = drive.doActionsWork(Globals.packet);
             if (!doingSweep) {
                 if (gamepad1.a) {
                     double SWEEP_ANGLE = 80; // Degrees
@@ -50,8 +50,8 @@ public class AprilTagAccuracy extends LinearOpMode {
 
             // Draw the best estimate pose:
             if (!doingSweep) {
-                Loop.canvas.setStroke("#3F51B5");
-                MecanumDrive.drawRobot(Loop.canvas, drive.pose);
+                Globals.canvas.setStroke("#3F51B5");
+                MecanumDrive.drawRobot(Globals.canvas, drive.pose);
             }
 
             // Draw the pose history:
@@ -66,8 +66,8 @@ public class AprilTagAccuracy extends LinearOpMode {
                     drive.pose = refinedPose;
                 }
             }
-            drive.drawPoseHistory(Loop.canvas);
-            Loop.end();
+            drive.drawPoseHistory(Globals.canvas);
+            Globals.endLoop();
         }
 
         TimeSplitter.logAllResults();

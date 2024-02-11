@@ -304,7 +304,7 @@ public class PoseEstimator {
             double x = odometryPose.position.x + distance * Math.cos(theta);
             double y = odometryPose.position.y + distance * Math.sin(theta);
 
-            Loop.canvas.fillRect(x - 1, y - 1, 3, 3);
+            Globals.canvas.fillRect(x - 1, y - 1, 3, 3);
         }
     }
 
@@ -378,8 +378,8 @@ public class PoseEstimator {
                         Pose2d datedVisionPose = computeRobotPose(detection, tag);
                         Pose2d visionPose = drive.applyTwistHistory(datedVisionPose, CAMERA_LATENCY);
 
-                        Loop.canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
-                        MecanumDrive.drawRobot(Loop.canvas, visionPose, 7);
+                        Globals.canvas.setStroke(tag.large ? "#00ff00" : "#c0c000");
+                        MecanumDrive.drawRobot(Globals.canvas, visionPose, 7);
 
                         double distance = Math.hypot(
                                 currentPose.position.x - visionPose.position.x,
@@ -393,10 +393,10 @@ public class PoseEstimator {
         }
 
         // Track the April Tag FPS:
-        double intervalDuration = Loop.time() - windowStart;
+        double intervalDuration = Globals.time() - windowStart;
         if (intervalDuration > 1.0) {
             fps = windowCount / intervalDuration;
-            windowStart = Loop.time();
+            windowStart = Globals.time();
             windowCount = 0;
         }
         if (tagDetections != null) {
@@ -475,9 +475,9 @@ public class PoseEstimator {
         }
 
         // Update some status:
-        Loop.telemetry.addLine(String.format("Vision FPS: %.2f (ours), %.2f (theirs)", fps, visionPortal.getFps()));
-        Loop.telemetry.addLine(String.format("Vision pose count: %d, ms: %.2f", visionPoses.size(), pipelineLatency));
-        Loop.telemetry.addLine(poseStatus);
+        Globals.telemetry.addLine(String.format("Vision FPS: %.2f (ours), %.2f (theirs)", fps, visionPortal.getFps()));
+        Globals.telemetry.addLine(String.format("Vision pose count: %d, ms: %.2f", visionPoses.size(), pipelineLatency));
+        Globals.telemetry.addLine(poseStatus);
 
         if (visionPose != null) {
             // Add the new vision pose to our filter history:

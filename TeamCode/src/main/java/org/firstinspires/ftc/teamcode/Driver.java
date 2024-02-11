@@ -295,7 +295,7 @@ public class Driver extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            Loop.start(telemetry);
+            Globals.startLoop(telemetry);
 
             // Update the telemetry pose and update the LED loop:
             drive.updatePoseEstimate();
@@ -316,7 +316,7 @@ public class Driver extends LinearOpMode {
             }
 
             // The 'left-bumper' button activates Road Runner homing:
-            boolean roadrunnerActivated = drive.doActionsWork(Loop.packet);
+            boolean roadrunnerActivated = drive.doActionsWork(Globals.packet);
             if ((gamepad1.left_bumper) && (!roadrunnerActivated)) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
@@ -392,13 +392,13 @@ public class Driver extends LinearOpMode {
             }
 
             // Draw the pose history:
-            drive.drawPoseHistory(Loop.canvas);
+            drive.drawPoseHistory(Globals.canvas);
 
             // Draw the refinement history:
 
             // Draw the best estimate pose:
-            Loop.canvas.setStroke("#3F51B5");
-            MecanumDrive.drawRobot(Loop.canvas, drive.pose);
+            Globals.canvas.setStroke("#3F51B5");
+            MecanumDrive.drawRobot(Globals.canvas, drive.pose);
 
             // Log interesting data:
             double linearSpeed = Math.hypot(drive.poseVelocity.linearVel.x, drive.poseVelocity.linearVel.y);
@@ -429,7 +429,7 @@ public class Driver extends LinearOpMode {
 //            packet.put("Angular theoretical", fullAngularSpeed);
 
             // Finish up:
-            Loop.end();
+            Globals.endLoop();
         }
 
         // Cleanup:
