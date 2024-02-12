@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.opticaltracking;
 
+import static java.lang.Thread.sleep;
+
 import com.qualcomm.robotcore.hardware.ControlSystem;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
@@ -36,16 +38,19 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         }
     }
 
+    // Special opcode for bulkWrite() encodings:
+    private final int WAIT = -1;
+
     // The SC18IS602B allows the 3 LSBs of the I2C address to be settable:
-    public final static I2cAddr ADDRESS_I2C_DEFAULT = I2cAddr.create7bit(0x28);
+    private final static I2cAddr ADDRESS_I2C_DEFAULT = I2cAddr.create7bit(0x28);
 
     // Bitmask that indicates the chip-select of the SC18IS602B SPI/I2C chip that is used for
     // communicating with the attached PAA5100 optical tracking chip:
-    public final static int SLAVE_SELECT_MASK = 0x1;
+    private final static int SLAVE_SELECT_MASK = 0x1;
 
     // I2C register definitions for the SC18IS602B and SPI register definitions for the
     // PAA5100:
-    public enum Register {
+    private enum Register {
         // Registers for the SC18IS602B I2C-to-SPI interface:
         I2C_SPI_READ_WRITE0(0x01),
         I2C_SPI_READ_WRITE1(0x02),
@@ -61,6 +66,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
         // Registers for the PMW3901/PAA5100 optical tracking sensor:
         SPI_ID(0x00), // Returns 0x49 for PAA5100
+        SPI_REVISION(0x01), // Returns 0x00 for PAA5100?
         SPI_DATA_READY(0x02),
         SPI_MOTION_BURST(0x16),
         SPI_POWER_UP_RESET(0x3a),
@@ -86,8 +92,223 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         this.deviceClient.engage();
     }
 
+    //----------------------------------------------------------------------------------------------
+    // This function takes an 8-bit address in the form 0x00 and returns an 8-bit value in the
+    // form 0x00.
+    int readRegister(int addr) {
+        // Bus writes:
+        //      I2C_ADDRESS
+        //      SLAVE_SELECT_MASK
+        //      <addr>
+        //      0xff (garbage)
+        // Bus reads:
+        //      I2C_ADDRESS
+        //      <addr>
+        //      <result>
+        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff };
+        this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
+        byte[] reads = this.deviceClient.read(2);
+        return TypeConversion.unsignedByteToInt(reads[1]);
+    }
+    // This function takes an 8-bit address and 8-bit data. Writes the given data to the given
+    // address.
+    void writeRegister(int addr, int data) {
+        // Write:
+        //      I2C_ADDRESS
+        //      SLAVE_SELECT_MASK
+        //      <addr>
+        //      <data>
+        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) data };
+        this.deviceClient.write(writes);
+    }
+    void bulkWrite(int[] data) {
+        for (int i = 0; i < data.length; i += 2) {
+            if (data[i] == WAIT) {
+                try {
+                    sleep(data[i + 1]);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                writeRegister(data[i], data[i + 1]);
+            }
+        }
+    }
+    void write(int addr, int datum) {
+        writeRegister(addr, datum);
+    }
+    int read(int addr) {
+        return readRegister(addr);
+    }
+    //----------------------------------------------------------------------------------------------
+
+    private void portedInitialize() {
+        writeRegister(Register.SPI_POWER_UP_RESET.bVal, 0x5a);
+        try {
+            sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        for (int i = 0; i < 5; i++) {
+            readRegister(Register.SPI_DATA_READY.bVal + i);
+        }
+
+        bulkWrite(new int[]{
+                0x7f, 0x00,
+                0x55, 0x01,
+                0x50, 0x07,
+
+                0x7f, 0x0e,
+                0x43, 0x10
+        });
+        if ((read(0x67) & 0b10000000) != 0) {
+            write(0x48, 0x04);
+        } else {
+            write(0x48, 0x02);
+        }
+        bulkWrite(new int[]{
+                0x7f, 0x00,
+                0x51, 0x7b,
+                0x50, 0x00,
+                0x55, 0x00,
+                0x7f, 0x0e
+        });
+        if (read(0x73) == 0x00) {
+            int c1 = read(0x70);
+            int c2 = read(0x71);
+            if (c1 <= 28) {
+                c1 += 14;
+            }
+            if (c1 > 28) {
+                c1 += 11;
+            }
+            c1 = Math.max(0, Math.min(0x3F, c1));
+            c2 = (c2 * 45); // 100
+            bulkWrite(new int[]{
+                    0x7f, 0x00,
+                    0x61, 0xad,
+                    0x51, 0x70,
+                    0x7f, 0x0e
+            });
+            write(0x70, c1);
+            write(0x71, c2);
+        }
+        bulkWrite(new int[]{
+            0x7f, 0x00,
+            0x61, 0xad,
+
+            0x7f, 0x03,
+            0x40, 0x00,
+
+            0x7f, 0x05,
+            0x41, 0xb3,
+            0x43, 0xf1,
+            0x45, 0x14,
+
+            0x5f, 0x34,
+            0x7b, 0x08,
+            0x5e, 0x34,
+            0x5b, 0x11,
+            0x6d, 0x11,
+            0x45, 0x17,
+            0x70, 0xe5,
+            0x71, 0xe5,
+
+            0x7f, 0x06,
+            0x44, 0x1b,
+            0x40, 0xbf,
+            0x4e, 0x3f,
+
+            0x7f, 0x08,
+            0x66, 0x44,
+            0x65, 0x20,
+            0x6a, 0x3a,
+            0x61, 0x05,
+            0x62, 0x05,
+
+            0x7f, 0x09,
+            0x4f, 0xaf,
+            0x5f, 0x40,
+            0x48, 0x80,
+            0x49, 0x80,
+            0x57, 0x77,
+            0x60, 0x78,
+            0x61, 0x78,
+            0x62, 0x08,
+            0x63, 0x50,
+
+            0x7f, 0x0a,
+            0x45, 0x60,
+
+            0x7f, 0x00,
+            0x4d, 0x11,
+            0x55, 0x80,
+            0x74, 0x21,
+            0x75, 0x1f,
+            0x4a, 0x78,
+            0x4b, 0x78,
+            0x44, 0x08,
+
+            0x45, 0x50,
+            0x64, 0xff,
+            0x65, 0x1f,
+
+            0x7f, 0x14,
+            0x65, 0x67,
+            0x66, 0x08,
+            0x63, 0x70,
+            0x6f, 0x1c,
+
+            0x7f, 0x15,
+            0x48, 0x48,
+
+            0x7f, 0x07,
+            0x41, 0x0d,
+            0x43, 0x14,
+            0x4b, 0x0e,
+            0x45, 0x0f,
+            0x44, 0x42,
+            0x4c, 0x80,
+
+            0x7f, 0x10,
+            0x5b, 0x02,
+
+            0x7f, 0x07,
+            0x40, 0x41,
+
+            WAIT, 0x0a,  // Wait 10ms
+
+            0x7f, 0x00,
+            0x32, 0x00,
+
+            0x7f, 0x07,
+            0x40, 0x40,
+
+            0x7f, 0x06,
+            0x68, 0xf0,
+            0x69, 0x00,
+
+            0x7f, 0x0d,
+            0x48, 0xc0,
+            0x6f, 0xd5,
+
+            0x7f, 0x00,
+            0x5b, 0xa0,
+            0x4e, 0xa8,
+            0x5a, 0x90,
+            0x40, 0x80,
+            0x73, 0x1f,
+
+            WAIT, 0x0a,  // Wait 10ms
+
+            0x73, 0x00
+        });
+    }
+
     @Override
     protected boolean doInitialize() {
+        portedInitialize();
+
         // Check chip ID:
         if (readRegister(0x00) != 0x49)
             return false;
@@ -108,36 +329,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     @Override
     public String getDeviceName() { return "Optical Tracking Sensor PAA5100/SC18IS602B"; }
-
-    // This function takes an 8-bit address in the form 0x00 and returns an 8-bit value in the
-    // form 0x00.
-    int readRegister(int addr) {
-        // Bus writes:
-        //      I2C_ADDRESS
-        //      SLAVE_SELECT_MASK
-        //      <addr>
-        //      0xff (garbage)
-        // Bus reads:
-        //      I2C_ADDRESS
-        //      <addr>
-        //      <result>
-        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff };
-        this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
-        byte[] reads = this.deviceClient.read(2);
-        return TypeConversion.unsignedByteToInt(reads[1]);
-    }
-
-    // This function takes an 8-bit address and 8-bit data. Writes the given data to the given
-    // address.
-    void writeRegister(int addr, int data) {
-        // Write:
-        //      I2C_ADDRESS
-        //      SLAVE_SELECT_MASK
-        //      <addr>
-        //      <data>
-        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) data };
-        this.deviceClient.write(writes);
-    }
 
     // Return true if the startup check succeeds, false otherwise:
     boolean startupCheck()
