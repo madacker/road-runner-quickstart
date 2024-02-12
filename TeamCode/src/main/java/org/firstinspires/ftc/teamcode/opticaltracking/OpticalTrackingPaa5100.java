@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.hardware.ControlSystem;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
+import com.qualcomm.robotcore.hardware.I2cWaitControl;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.TypeConversion;
@@ -36,7 +37,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     }
 
     // The SC18IS602B allows the 3 LSBs of the I2C address to be settable:
-    public final static I2cAddr I2C_ADDRESS = I2cAddr.create8bit(0x28);
+    public final static I2cAddr ADDRESS_I2C_DEFAULT = I2cAddr.create7bit(0x28);
 
     // Bitmask that indicates the chip-select of the SC18IS602B SPI/I2C chip that is used for
     // communicating with the attached PAA5100 optical tracking chip:
@@ -59,7 +60,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         I2C_GPIO_CONFIGURATION(0xf7),
 
         // Registers for the PMW3901/PAA5100 optical tracking sensor:
-        SPI_ID(0x00), // 0x49 according to https://os.mbed.com/teams/PixArt/code/5100_referenceCode//file/c8a2256e02c2/main.cpp/
+        SPI_ID(0x00), // Returns 0x49 for PAA5100
         SPI_DATA_READY(0x02),
         SPI_MOTION_BURST(0x16),
         SPI_POWER_UP_RESET(0x3a),
@@ -76,7 +77,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         super(deviceClient, deviceClientIsOwned);
 
         // Register our device at this I2C address:
-        this.deviceClient.setI2cAddress(I2C_ADDRESS);
+        this.deviceClient.setI2cAddress(ADDRESS_I2C_DEFAULT);
 
         // Register callback for USB cables getting unplugged:
         super.registerArmingStateCallback(false);
@@ -121,7 +122,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //      <addr>
         //      <result>
         byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff };
-        this.deviceClient.write(writes);
+        this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
         byte[] reads = this.deviceClient.read(2);
         return TypeConversion.unsignedByteToInt(reads[1]);
     }
