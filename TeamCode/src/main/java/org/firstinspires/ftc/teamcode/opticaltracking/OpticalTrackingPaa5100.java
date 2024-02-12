@@ -19,7 +19,8 @@ import com.qualcomm.robotcore.util.TypeConversion;
  * I2C to SPI bridge.
  *
  * <p>This code is based on
- * <a href="https://os.mbed.com/teams/PixArt/code/5100_referenceCode/file/782127a132a3/commHeaders/SPIcommFunctions.h/">PixArt reference firmware</a>.
+ * <a href="https://os.mbed.com/teams/PixArt/code/5100_referenceCode/file/782127a132a3/commHeaders/SPIcommFunctions.h/">PixArt reference firmware</a>
+ * and <a href="https://github.com/pimoroni/pmw3901-python/tree/master">GitHub python library</a>.
  * </p>
  * <hr>
  */
@@ -105,7 +106,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //      I2C_ADDRESS
         //      <addr>
         //      <result>
-        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff };
+        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0x00 };
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
         byte[] reads = this.deviceClient.read(2);
         return TypeConversion.unsignedByteToInt(reads[1]);
@@ -307,18 +308,17 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     @Override
     protected boolean doInitialize() {
+        // Initialize registers:
         portedInitialize();
 
         // Check chip ID:
         if (readRegister(0x00) != 0x49)
             return false;
 
-        // Do a quick check to see if chip startup succeeded:
-        if (!startupCheck())
-            return false;
+//        // Do a quick check to see if chip startup succeeded:
+//        if (!startupCheck())
+//            return false;
 
-        // Complete the initialization:
-        // @@@
         return true;
     }
 
@@ -341,7 +341,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         writeRegister(0x43, 0x10);
 
         if(readRegister(0x47) != 0x08) {
-            //Checks register 0x47 three times. If the value is incorrect 3 times, throw a fail condition.
+            // Checks register 0x47 three times. If the value is incorrect 3 times, throw a fail
+            // condition.
             for(int i=0; i<3; i++) {
                 if(readRegister(0x47) != 0x08) {
                     writeRegister(0x43, 0x10);
