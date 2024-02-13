@@ -6,16 +6,19 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
+import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import android.annotation.SuppressLint;
+import android.graphics.PointF;
 import android.util.Size;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -176,7 +179,7 @@ public class PoseEstimator {
     private static final double CAMERA_LATENCY = 0.19; // Seconds
 
     // Offset distance from sensor to center of robot:
-    private static final double DISTANCE_SENSOR_OFFSET = 8;
+    private static final double DISTANCE_SENSOR_OFFSET = 1;
 
     // Run-time state:
     private ResidualFilter residualFilter;
@@ -190,6 +193,7 @@ public class PoseEstimator {
     private double fps;
     private String poseStatus = "";
     private double pipelineLatency = 0; // Milliseconds
+    private TimeSplitter distanceTimer = TimeSplitter.create("getDistance");
 
     // Structure defining the location of April Tags:
     static class AprilTagLocation {
@@ -295,16 +299,30 @@ public class PoseEstimator {
         //visionPortal.stopStreaming();
     }
 
+    private final LinkedList<PointF> distanceHistory = new LinkedList<>();
+
     private void visualizeDistance(Pose2d odometryPose) {
+        distanceTimer.startSplit();
         double distance = distanceSensor.getDistance(DistanceUnit.INCH);
+        distanceTimer.endSplit();
+
         if (distance >= 0) {
             distance += DISTANCE_SENSOR_OFFSET;
 
-            double theta = odometryPose.heading.log();
+            double theta = odometryPose.heading.log() + Math.PI; // +180 degrees because facing backwards
             double x = odometryPose.position.x + distance * Math.cos(theta);
             double y = odometryPose.position.y + distance * Math.sin(theta);
 
-            Globals.canvas.fillRect(x - 1, y - 1, 3, 3);
+            distanceHistory.add(new PointF((float) x, (float) y));
+            if (distanceHistory.size() > 100) {
+                distanceHistory.removeFirst();
+            }
+        }
+
+        Globals.canvas.setStrokeWidth(1);
+        Globals.canvas.setFill("#808080");
+        for (PointF point: distanceHistory) {
+            Globals.canvas.fillRect(point.x, point.y, 1, 1);
         }
     }
 
@@ -363,7 +381,7 @@ public class PoseEstimator {
         final double FINE_EPSILON = 5.0;
         final double COARSE_EPSILON = 10.0;
 
-        // visualizeDistance(currentPose, canvas);
+        visualizeDistance(currentPose);
 
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;

@@ -7,18 +7,14 @@ import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
-import com.acmerobotics.roadrunner.Time;
-import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.roadrunner.ftc.FlightRecorder;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
-import org.firstinspires.ftc.teamcode.roadrunner.PoseMessage;
 
 import java.util.LinkedList;
 
@@ -28,12 +24,12 @@ public class DistanceTest extends LinearOpMode {
     private final LinkedList<PointF> distanceHistory = new LinkedList<>();
 
     public void drawDistances(Canvas c, Pose2d pose, double distance) {
-        final double DISTANCE_SENSOR_OFFSET = 8; // Offset from sensor to center of robot
+        final double DISTANCE_SENSOR_OFFSET = 1; // Offset from sensor to center of robot
 
         if (distance >= 0) {
             distance += DISTANCE_SENSOR_OFFSET;
 
-            double theta = pose.heading.log();
+            double theta = pose.heading.log() + Math.PI; // +180 degrees because facing backwards
             double x = pose.position.x + distance * Math.cos(theta);
             double y = pose.position.y + distance * Math.sin(theta);
 
@@ -55,6 +51,7 @@ public class DistanceTest extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
+        TimeSplitter timer = TimeSplitter.create("getDistance");
 
         waitForStart();
 
@@ -66,12 +63,14 @@ public class DistanceTest extends LinearOpMode {
             drive.setDrivePowers(powers);
             drive.updatePoseEstimate();
 
+            timer.startSplit();
             double distance = distanceSensor.getDistance(DistanceUnit.INCH);
+            timer.endSplit();
             if (distance == distanceSensor.distanceOutOfRange)
                 distance = -1;
 
             telemetry.addData("distance", distance);
-            telemetry.addData("distanceOutOfRange", distanceSensor.distanceOutOfRange);
+            // telemetry.addData("distanceOutOfRange", distanceSensor.distanceOutOfRange);
             telemetry.update();
 
             // Begin drawing:
@@ -89,5 +88,7 @@ public class DistanceTest extends LinearOpMode {
             FtcDashboard dashboard = FtcDashboard.getInstance();
             dashboard.sendTelemetryPacket(p);
         }
+
+        TimeSplitter.reportAllResults();
     }
 }

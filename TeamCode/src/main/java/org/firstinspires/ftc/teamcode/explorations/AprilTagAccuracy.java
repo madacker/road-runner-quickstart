@@ -70,6 +70,6 @@ public class AprilTagAccuracy extends LinearOpMode {
             Globals.endLoop();
         }
 
-        TimeSplitter.logAllResults();
+        TimeSplitter.reportAllResults();
     }
 }

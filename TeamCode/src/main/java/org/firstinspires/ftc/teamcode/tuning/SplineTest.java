@@ -36,6 +36,6 @@ public final class SplineTest extends LinearOpMode {
             throw new AssertionError();
         }
 
-        TimeSplitter.logAllResults();
+        TimeSplitter.reportAllResults();
     }
 }

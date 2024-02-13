@@ -152,7 +152,7 @@ public class TimeSplitter {
     /**
      * Log the results for *all* TimeSplitter objects that were created.
      */
-    synchronized public static void logAllResults() {
+    synchronized public static void reportAllResults() {
         TelemetryPacket packet = new TelemetryPacket();
         for (TimeSplitter t: TimeSplitter.list) {
             t.logResult(packet);

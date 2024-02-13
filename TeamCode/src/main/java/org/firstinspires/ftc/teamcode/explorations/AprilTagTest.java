@@ -147,7 +147,7 @@ public class AprilTagTest extends LinearOpMode {
         // Save more CPU resources when camera is no longer needed.
         visionPortal.close();
 
-        TimeSplitter.logAllResults(); // Look for "TimeSplitter" in Logcat
+        TimeSplitter.reportAllResults(); // Look for "TimeSplitter" in Logcat
 
     }   // end method runOpMode()
 

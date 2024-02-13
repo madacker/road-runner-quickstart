@@ -4,7 +4,6 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -225,7 +224,7 @@ public class Repro extends LinearOpMode {
 
         visionPortal.close();
 
-        TimeSplitter.logAllResults();
+        TimeSplitter.reportAllResults();
         telemetry.addLine("All done, terminating now!");
         telemetry.update();
     }

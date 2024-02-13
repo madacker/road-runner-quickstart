@@ -441,7 +441,7 @@ public class Driver extends LinearOpMode {
         }
 
         // Output summary:
-        TimeSplitter.logAllResults();
+        TimeSplitter.reportAllResults();
 
         TelemetryPacket packet = new TelemetryPacket();
         packet.addLine(String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
