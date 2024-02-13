@@ -166,7 +166,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     }
 
     //----------------------------------------------------------------------------------------------
-    // Do the secret-sauce initialization for the PA5100:
+    // Do the secret-sauce initialization for the PAA5100:
     private void secretSauce() {
         // The following portion is from __init__()
         writeRegister(Register.SPI_POWER_UP_RESET.bVal, 0x5a);
@@ -341,7 +341,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         });
     }
 
-    // Initialize the drive:
+    // Initialize the driver:
     @Override
     protected boolean doInitialize() {
         // Configure the SPI interface of the bridge:
