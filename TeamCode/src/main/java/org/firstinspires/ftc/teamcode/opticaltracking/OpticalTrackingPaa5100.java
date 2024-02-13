@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.opticaltracking;
 import static java.lang.Thread.sleep;
 
 import com.qualcomm.robotcore.hardware.ControlSystem;
+import com.qualcomm.robotcore.hardware.HardwareDeviceHealth;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
@@ -94,15 +95,25 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     }
 
     //----------------------------------------------------------------------------------------------
+    // Configure the SPI interface of the bridge:
+    void configureBridge() {
+        // Configure to the defaults as per the datasheet:
+        int order = 0; // Big endian
+        int mode = 0; // SPICLK LOW when idle, data clocked in on leading edge
+        int clockRate = 0; // 1843 kHz
+        this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal,
+                (order << 5) | (mode << 2) | (clockRate << 0));
+    }
+
     // This function takes an 8-bit address in the form 0x00 and returns an 8-bit value in the
     // form 0x00.
     int readRegister(int addr) {
-        // Bus writes:
+        // Write over the bus:
         //      I2C_ADDRESS
         //      SLAVE_SELECT_MASK
         //      <addr>
-        //      0xff (garbage)
-        // Bus reads:
+        //      0x00 (filler)
+        // Then read from the bus:
         //      I2C_ADDRESS
         //      <addr>
         //      <result>
@@ -111,10 +122,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         byte[] reads = this.deviceClient.read(2);
         return TypeConversion.unsignedByteToInt(reads[1]);
     }
+
     // This function takes an 8-bit address and 8-bit data. Writes the given data to the given
     // address.
     void writeRegister(int addr, int data) {
-        // Write:
+        // Write over the bus:
         //      I2C_ADDRESS
         //      SLAVE_SELECT_MASK
         //      <addr>
@@ -122,6 +134,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) data };
         this.deviceClient.write(writes);
     }
+
+    // Register write pairs of (address, datum):
     void bulkWrite(int[] data) {
         for (int i = 0; i < data.length; i += 2) {
             if (data[i] == WAIT) {
@@ -135,15 +149,19 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             }
         }
     }
+
     void write(int addr, int datum) {
         writeRegister(addr, datum);
     }
+
     int read(int addr) {
         return readRegister(addr);
     }
-    //----------------------------------------------------------------------------------------------
 
-    private void portedInitialize() {
+    //----------------------------------------------------------------------------------------------
+    // Do the secret-sauce initialization for the PA5100:
+    private void secretSauce() {
+        // The following portion is from __init__()
         writeRegister(Register.SPI_POWER_UP_RESET.bVal, 0x5a);
         try {
             sleep(500);
@@ -154,13 +172,14 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             readRegister(Register.SPI_DATA_READY.bVal + i);
         }
 
+        // The following portion is from PAA5100::_secret_sauce():
         bulkWrite(new int[]{
-                0x7f, 0x00,
-                0x55, 0x01,
-                0x50, 0x07,
+            0x7f, 0x00,
+            0x55, 0x01,
+            0x50, 0x07,
 
-                0x7f, 0x0e,
-                0x43, 0x10
+            0x7f, 0x0e,
+            0x43, 0x10
         });
         if ((read(0x67) & 0b10000000) != 0) {
             write(0x48, 0x04);
@@ -168,11 +187,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             write(0x48, 0x02);
         }
         bulkWrite(new int[]{
-                0x7f, 0x00,
-                0x51, 0x7b,
-                0x50, 0x00,
-                0x55, 0x00,
-                0x7f, 0x0e
+            0x7f, 0x00,
+            0x51, 0x7b,
+            0x50, 0x00,
+            0x55, 0x00,
+            0x7f, 0x0e
         });
         if (read(0x73) == 0x00) {
             int c1 = read(0x70);
@@ -186,10 +205,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             c1 = Math.max(0, Math.min(0x3F, c1));
             c2 = (c2 * 45); // 100
             bulkWrite(new int[]{
-                    0x7f, 0x00,
-                    0x61, 0xad,
-                    0x51, 0x70,
-                    0x7f, 0x0e
+                0x7f, 0x00,
+                0x61, 0xad,
+                0x51, 0x70,
+                0x7f, 0x0e
             });
             write(0x70, c1);
             write(0x71, c2);
@@ -305,11 +324,27 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             0x73, 0x00
         });
     }
+    // Start and stop the LEDs:
+    void setLedState(boolean enable) {
+        bulkWrite(new int[]{
+            WAIT, 0xF0,
+            0x7f, 0x14,
+            0x6f, (enable) ? 0x1c : 0x00,
+            0x7f, 0x00
+        });
+    }
 
+    // Initialize the drive:
     @Override
     protected boolean doInitialize() {
-        // Initialize registers:
-        portedInitialize();
+        // Configure the SPI interface of the bridge:
+        configureBridge();
+
+        // Initialize the optical tracking:
+        secretSauce();
+
+        // Check the I2C health:
+        HardwareDeviceHealth.HealthStatus status = deviceClient.getHealthStatus();
 
         // Check chip ID:
         if (readRegister(0x00) != 0x49)
@@ -353,6 +388,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         return startupFail < 3;
     }
 
+    // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
         // read/write 13 bytes
         //      0 - unused
