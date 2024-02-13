@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
 import com.qualcomm.robotcore.hardware.I2cWaitControl;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
+import com.qualcomm.robotcore.util.RobotLog;
 import com.qualcomm.robotcore.util.TypeConversion;
 /**
  * <hr>
@@ -42,6 +43,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Special opcode for bulkWrite() encodings:
     private final int WAIT = -1;
+
+    // String tag for logging:
+    protected String MYTAG = "PAA5100";
 
     // The SC18IS602B allows the 3 LSBs of the I2C address to be settable:
     private final static I2cAddr ADDRESS_I2C_DEFAULT = I2cAddr.create7bit(0x28);
@@ -120,6 +124,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0x00 };
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
         byte[] reads = this.deviceClient.read(2);
+
+        RobotLog.dd(MYTAG, String.format("ReadRegister: address 0x%x, datum 0x%x", reads[0], reads[1]));
+
         return TypeConversion.unsignedByteToInt(reads[1]);
     }
 
@@ -346,7 +353,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Check the I2C health:
         HardwareDeviceHealth.HealthStatus status = deviceClient.getHealthStatus();
 
-        // Check chip ID:
+        // Enable the LEDs:
+        setLedState(true);
+
+        // Check chip ID: @@@ Should be done before all initialization
         if (readRegister(0x00) != 0x49)
             return false;
 
