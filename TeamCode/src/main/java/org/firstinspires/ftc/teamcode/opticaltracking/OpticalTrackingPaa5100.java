@@ -103,43 +103,47 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     void configureBridge() {
         // Configure to the defaults as per the datasheet:
         int order = 0; // Big endian
-        int mode = 0; // SPICLK LOW when idle, data clocked in on leading edge
+        int mode = 3; // SPICLK HIGH when idle, data clocked in on trailing edge
         int clockRate = 0; // 1843 kHz
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal,
                 (order << 5) | (mode << 2) | (clockRate << 0));
     }
 
-    // This function takes an 8-bit address in the form 0x00 and returns an 8-bit value in the
-    // form 0x00.
-    int readRegister(int addr) {
+    // Write the 'writePayload' data to the SPI device and read back the result for every
+    // effective byte written (since the SPI interface is bidirectional):
+    byte[] bridgeTransfer(byte[] writePayload) {
         // Write over the bus:
         //      I2C_ADDRESS
         //      SLAVE_SELECT_MASK
-        //      <addr>
+        //      <spiAddr>
         //      0x00 (filler)
         // Then read from the bus:
         //      I2C_ADDRESS
-        //      <addr>
+        //      <spiAddr>
         //      <result>
-        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) 0x00 };
+
+        // Create an array that prepends the chip-select:
+        byte[] writes = new byte[writePayload.length + 1];
+        writes[0] = SLAVE_SELECT_MASK;
+        for (int i = 0; i < writePayload.length; i++)
+            writes[i + 1] = writePayload[i];
+
+        // Write the data and read back the new writePayload:
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
-        byte[] reads = this.deviceClient.read(2);
-
-        RobotLog.dd(MYTAG, String.format("ReadRegister: address 0x%x, datum 0x%x", reads[0], reads[1]));
-
-        return TypeConversion.unsignedByteToInt(reads[1]);
+        return this.deviceClient.read(writePayload.length);
     }
 
-    // This function takes an 8-bit address and 8-bit data. Writes the given data to the given
+    // This function takes an 8-bit address and returns an 8-bit value:
+    int readRegister(int addr) {
+        byte[] reads = bridgeTransfer(new byte[] { (byte) addr, 0 });
+        RobotLog.dd(MYTAG, String.format("ReadRegister: address 0x%x, datum 0x%x", reads[0], reads[1]));
+        return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
+    }
+
+    // This function takes an 8-bit address and 8-bit datum. Writes the given datum to the given
     // address.
-    void writeRegister(int addr, int data) {
-        // Write over the bus:
-        //      I2C_ADDRESS
-        //      SLAVE_SELECT_MASK
-        //      <addr>
-        //      <data>
-        byte[] writes = { SLAVE_SELECT_MASK, (byte) addr, (byte) data };
-        this.deviceClient.write(writes);
+    void writeRegister(int addr, int datum) {
+        bridgeTransfer(new byte[] { (byte) addr, (byte) datum });
     }
 
     // Register write pairs of (address, datum):
@@ -346,6 +350,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     protected boolean doInitialize() {
         // Configure the SPI interface of the bridge:
         configureBridge();
+
+        int chipId = readRegister(0x00);
 
         // Initialize the optical tracking:
         secretSauce();
