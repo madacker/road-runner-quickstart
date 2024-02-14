@@ -351,13 +351,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Configure the SPI interface of the bridge:
         configureBridge();
 
-        int chipId = readRegister(0x00);
+        // Get ID and version number in a single go:
+        byte[] ids = bridgeTransfer(new byte[]{ 0x00, 0x01 });
 
-        // Initialize the optical tracking:
+        // Initialize the optical tracking chip:
         secretSauce();
-
-        // Check the I2C health:
-        HardwareDeviceHealth.HealthStatus status = deviceClient.getHealthStatus();
 
         // Enable the LEDs:
         setLedState(true);
