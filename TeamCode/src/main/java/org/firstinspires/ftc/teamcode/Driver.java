@@ -276,7 +276,7 @@ public class Driver extends LinearOpMode {
         Wall wall = null;
 
         if (!FASTEST) {
-            poseEstimator = new PoseEstimator(hardwareMap, false);
+            poseEstimator = new PoseEstimator(hardwareMap, drive);
             led = new Led(hardwareMap);
             wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
         }
@@ -380,7 +380,8 @@ public class Driver extends LinearOpMode {
 
             // Refine the pose estimate using AprilTags:
             if (poseEstimator != null) {
-                Pose2d refinedPose = poseEstimator.refinePose(drive.pose, drive);
+                poseEstimator.update();
+                Pose2d refinedPose = poseEstimator.getPose();
                 if (refinedPose != null) {
                     led.setSteadyColor(Led.Color.GREEN);
                     led.setPulseColor(Led.Color.RED, 0.25);
