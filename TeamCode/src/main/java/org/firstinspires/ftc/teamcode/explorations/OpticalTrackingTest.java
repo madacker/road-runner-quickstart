@@ -19,7 +19,7 @@ public class OpticalTrackingTest extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
-        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical");
+        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
 
         waitForStart();
 

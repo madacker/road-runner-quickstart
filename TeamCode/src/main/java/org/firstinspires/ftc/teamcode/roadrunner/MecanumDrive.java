@@ -53,59 +53,21 @@ import java.util.List;
 @Config
 public final class MecanumDrive {
 
-    // This structure is used to record the pose history.
-    public class PoseEpoch {
-        Pose2d pose;
-        int flags;
-        public PoseEpoch(Pose2d pose, int flags) {
-            this.pose = pose;
-            this.flags = flags;
-        }
-    }
-
-    // This structure is used to record the odometry twist history:
-    public class TwistEpoch {
-        Twist2d twist;
-        double time;
-        public TwistEpoch(Twist2d twist, double time) {
-            this.twist = twist;
-            this.time = time;
-        }
-    }
-
-    public static String getBotName() {
-        InspectionState inspection=new InspectionState();
-        inspection.initializeLocal();
-        Log.d("roadrunner", String.format("Device name:" + inspection.deviceName));
-        return inspection.deviceName;
-    }
-    public static boolean isDevBot = getBotName().equals("DevBot");
-
     public static class Params {
-        public double inPerTick;
-        public double lateralInPerTick;
-        public double trackWidthTicks;
-
-        public double kS;
-        public double kV;
-        public double kA;
-
-        public double maxWheelVel;
-        public double minProfileAccel;
-        public double maxProfileAccel;
-
-        public double maxAngVel;
-        public double maxAngAccel;
-
-        public double axialGain;
-        public double lateralGain;
-        public double headingGain;
-
-        public double axialVelGain;
-        public double lateralVelGain;
-        public double headingVelGain;
-
         Params() {
+            // path profile parameters (in inches)
+            maxWheelVel = 50;
+            minProfileAccel = -30;
+            maxProfileAccel = 50;
+
+            // turn profile parameters (in radians)
+            maxAngVel = Math.PI / 2.5; // shared with path
+            maxAngAccel = Math.PI;
+
+            axialVelGain = 0.0;
+            lateralVelGain = 0.0;
+            headingVelGain = 0.0; // shared with turn
+
             if (isDevBot) {
                 // drive model parameters
                 inPerTick = 0.0225669957686882; // 96.0 / 4254.0;
@@ -137,21 +99,59 @@ public final class MecanumDrive {
                 lateralGain = 6.0;
                 headingGain = 2.0; // shared with turn
             }
+        }
 
-            // path profile parameters (in inches)
-            maxWheelVel = 50;
-            minProfileAccel = -30;
-            maxProfileAccel = 50;
+        public double inPerTick;
+        public double lateralInPerTick;
+        public double trackWidthTicks;
 
-            // turn profile parameters (in radians)
-            maxAngVel = Math.PI / 2.5; // shared with path
-            maxAngAccel = Math.PI;
+        public double kS;
+        public double kV;
+        public double kA;
 
-            axialVelGain = 0.0;
-            lateralVelGain = 0.0;
-            headingVelGain = 0.0; // shared with turn
+        public double maxWheelVel;
+        public double minProfileAccel;
+        public double maxProfileAccel;
+
+        public double maxAngVel;
+        public double maxAngAccel;
+
+        public double axialGain;
+        public double lateralGain;
+        public double headingGain;
+
+        public double axialVelGain;
+        public double lateralVelGain;
+        public double headingVelGain;
+    }
+
+    // This structure is used to record the pose history.
+    public class PoseEpoch {
+        Pose2d pose;
+        int flags;
+        public PoseEpoch(Pose2d pose, int flags) {
+            this.pose = pose;
+            this.flags = flags;
         }
     }
+
+    // This structure is used to record the odometry twist history:
+    public class TwistEpoch {
+        Twist2d twist;
+        double time;
+        public TwistEpoch(Twist2d twist, double time) {
+            this.twist = twist;
+            this.time = time;
+        }
+    }
+
+    public static String getBotName() {
+        InspectionState inspection=new InspectionState();
+        inspection.initializeLocal();
+        Log.d("roadrunner", String.format("Device name:" + inspection.deviceName));
+        return inspection.deviceName;
+    }
+    public static boolean isDevBot = getBotName().equals("DevBot");
 
     public static Params PARAMS = new Params();
 
@@ -169,9 +169,7 @@ public final class MecanumDrive {
             new ProfileAccelConstraint(PARAMS.minProfileAccel, PARAMS.maxProfileAccel);
 
     public final DcMotorEx leftFront, leftBack, rightBack, rightFront;
-
     public final VoltageSensor voltageSensor;
-
     public final IMU imu;
 
     public final Localizer localizer;
