@@ -34,8 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
-class DistanceRecord {
-    double distance; // Measured distance
+class DistanceResult {
+    double measurement; // Measured distance
     int sensorIndex; // SENSOR_DESCRIPTORS index
     int segmentIndex; // Target WALL_SEGMENTS index
     double latency; // Latency, in seconds
@@ -44,18 +44,17 @@ class DistanceRecord {
     Point point; // Point computed from the measurement and most recent pose information
     boolean valid; // True if the sensor result was valid and used
 
-    public DistanceRecord(int sensorIndex, int segmentIndex, double latency) {
+    public DistanceResult(int sensorIndex, int segmentIndex, double latency) {
         this.sensorIndex = sensorIndex;
         this.segmentIndex = segmentIndex;
         this.latency = latency;
     }
 }
 
-class HistoricalRecord {
-    double time; // Time, in seconds
-    Twist2d twist; // Odometry twist
-    Pose2d postOdometryPose; // Pose after having applied the twist
-    ArrayList<DistanceRecord> distances; // Distance sensor distances for this time interval, if any
+class AprilTagResult {
+    Pose2d pose; // Measured result
+    int cameraIndex; // CAMERA_DESCRIPTORS index
+    double latency; // Latency, in seconds
 }
 
 class Point {
@@ -83,6 +82,9 @@ class Point {
     public double distance(Point other) {
         return Math.hypot(other.x - this.x, other.y - this.y);
     }
+    public double length() {
+        return Math.hypot(x, y);
+    }
 }
 
 class Segment {
@@ -107,19 +109,36 @@ class Ray {
 class DistanceLocalizer {
 
     // Description of the distance sensor on the robot:
-    final SensorDescriptor[] SENSOR_DESCRIPTORS = {
+    static final SensorDescriptor[] SENSOR_DESCRIPTORS = {
         new SensorDescriptor("distance2", new Point(-3, -1), Math.PI)
     };
 
     // This is list is maintained one-to-one with SENSOR_DESCRIPTORS:
-    ArrayList<DistanceSensor> sensorHardware = new ArrayList<DistanceSensor>();
+    ArrayList<DistanceSensor> sensorHardware = new ArrayList<DistanceSensor>(); // @@@ Initialize
 
     // Average distance adder accounting for slope for backdrop intersections:
-    final double BACKDROP_SLOPE_DISTANCE = 2.0;
+    static final double BACKDROP_SLOPE_DISTANCE = 2.0;
+
+    // About 30 ms of effective latency for the REV distance sensors:
+    static final double LATENCY = 0.030; // 30ms
+
+    // Read a distance sensor at this interval, in seconds:
+    static final double READ_INTERVAL = 0.100; // 100ms
+
+    // Maximum distance, in inches, for us to trust a distance measurement:
+    static final double MAX_DISTANCE = 48;
+
+    // The measured result needs to be within this many inches of the expected result otherwise
+    // it will be discarded. This should be less than the dimension of any robot to account
+    // for other robots on the field coming between the sensor and the wall segment:
+    static final double CORRECTNESS_THRESHOLD = 12;
+
+    // The sensor's official field-of-view specification is 25 degrees:
+    static final double HALF_FOV = Math.toRadians(12.5);
 
     // Coordinates of the wall segments encircling the field, used for the distance sensor.
     // We leave gaps where the truss supports go.
-    final Segment[] WALL_SEGMENTS = {
+    static final Segment[] WALL_SEGMENTS = {
         // Clockwise starting in the upper-right corner:
         new Segment(72, 72, 3, 72),
         new Segment(-3, 72, -21, 72), // Top wall in between trusses
@@ -138,17 +157,8 @@ class DistanceLocalizer {
         new Segment(72, 48, 72, 72)
     };
 
-    // About 30 ms of effective latency for the REV distance sensors:
-    final double LATENCY = 0.030;
-
-    // Read a distance sensor at this interval, in seconds:
-    final double READ_INTERVAL = 0.1;
-
-    // Maximum distance, in inches, for us to trust a distance measurement:
-    final double MAX_DISTANCE = 48;
-
     // Structure for tracking sensor placements on the robot:
-    class SensorDescriptor {
+    static class SensorDescriptor {
         // Name of the sensor in the robot configuration:
         String name;
 
@@ -198,21 +208,19 @@ class DistanceLocalizer {
     }
 
     // The pose is used to determine which sensor to use:
-    DistanceRecord update(Pose2d pose) {
+    DistanceResult update(Pose2d pose) {
         double time = Globals.time();
         if (time - lastReadTime < READ_INTERVAL)
             return null;
 
         // Create an eligibility list of all sensors that point to a wall segment. We'll choose
         // the best of it next.
-        ArrayList<DistanceRecord> eligibleSensors = new ArrayList<>();
+        ArrayList<DistanceResult> eligibleSensors = new ArrayList<>();
         for (int sensorIndex = 0; sensorIndex < SENSOR_DESCRIPTORS.length; sensorIndex++) {
             SensorDescriptor sensor = SENSOR_DESCRIPTORS[sensorIndex];
 
-            // Direction that the sensor is pointing on the field:
-            double sensorAngle = sensor.theta + pose.heading.log();
-
             // Sensor offset from robot center in field coordinates:
+            double sensorAngle = sensor.theta + pose.heading.log();
             Point sensorOffset = sensor.offset.rotate(sensorAngle);
 
             // Ray representing the sensor's position and orientation on the field:
@@ -231,21 +239,21 @@ class DistanceLocalizer {
                 if (hitPoint != null) {
                     double distance = sensorPoint.distance(hitPoint);
                     if (distance < MAX_DISTANCE) {
-                        eligibleSensors.add(new DistanceRecord(sensorIndex, segmentIndex, LATENCY));
+                        eligibleSensors.add(new DistanceResult(sensorIndex, segmentIndex, LATENCY));
                     }
                 }
             }
         }
 
         // Choose what sensor to use:
-        DistanceRecord result;
+        DistanceResult result;
         int eligibleCount = eligibleSensors.size();
         if (eligibleCount == 0) {
             // There are no good candidates so simply do a different sensor than last time:
             currentSensorIndex++;
             if (currentSensorIndex >= SENSOR_DESCRIPTORS.length)
                 currentSensorIndex = 0;
-            result = new DistanceRecord(currentSensorIndex, 0, LATENCY);
+            result = new DistanceResult(currentSensorIndex, 0, LATENCY);
         } else {
             // If more than one eligible sensor, choose one that's different from the one
             // we used last time:
@@ -256,15 +264,65 @@ class DistanceLocalizer {
         currentSensorIndex = result.sensorIndex;
 
         // Query the hardware:
-        result.distance = sensorHardware.get(result.sensorIndex).getDistance(DistanceUnit.INCH);
+        result.measurement = sensorHardware.get(result.sensorIndex).getDistance(DistanceUnit.INCH);
         return result;
     }
 
-    static public Pose2d localize(Pose2d pose, DistanceRecord distance) {
-        // @@@ Verify the cone is on the target
-        // @@@ Here is where we calculate the effective point?
-        // @@@ Set 'valid' and all that
-        return new Pose2d(0, 0, 0);
+    /**
+     * Given a starting pose and a measured distance, calculate a corrected pose.
+     */
+    static public Pose2d localize(Pose2d pose, DistanceResult distance) {
+        boolean valid = false; // Assume failure, we'll convert to success later
+
+        SensorDescriptor sensor = SENSOR_DESCRIPTORS[distance.sensorIndex];
+        Segment segment = WALL_SEGMENTS[distance.segmentIndex];
+
+        // Sensor offset from robot center in field coordinates:
+        double sensorAngle = sensor.theta + pose.heading.log();
+        Point sensorOffset = sensor.offset.rotate(sensorAngle);
+
+        // Create the rays representing the edges of the field-of-view:
+        Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
+        Point sensorDirection1 = new Point(Math.cos(sensorAngle - HALF_FOV),
+                                           Math.sin(sensorAngle - HALF_FOV));
+        Point sensorDirection2 = new Point(Math.cos(sensorAngle + HALF_FOV),
+                                           Math.sin(sensorAngle + HALF_FOV));
+        Ray sensorRay1 = new Ray(sensorPoint, sensorDirection1);
+        Ray sensorRay2 = new Ray(sensorPoint, sensorDirection2);
+
+        // Use the results only if the entire field-of-view is contained within the target
+        // segment:
+        if ((raySegmentIntersection(sensorRay1, segment) != null) &&
+            (raySegmentIntersection(sensorRay2, segment) != null)) {
+
+            Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
+            Ray sensorRay = new Ray(sensorPoint, sensorDirection);
+
+            Point hitPoint = raySegmentIntersection(sensorRay, segment);
+            Point hitVector = new Point(pose.position.x, pose.position.y).subtract(hitPoint);
+            double expectedDistance = hitVector.length();
+
+            // Ignore measurements that are much shorter than expected (as can happen when
+            // another robot blocks the view) or much farther:
+            if (Math.abs(expectedDistance - distance.measurement) < CORRECTNESS_THRESHOLD) {
+                // Yay, it looks like a valid result. Push the pose out, or pull it in,
+                // accordingly:
+                double fixupFactor = distance.measurement / expectedDistance;
+                Point fixupVector = new Point(hitVector.x * fixupFactor, hitVector.y * fixupFactor);
+                Point newPosition = hitPoint.add(fixupVector);
+
+                pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
+                valid = true;
+            }
+        }
+
+        // Update telemetry:
+        distance.valid = valid;
+        distance.point = new Point(
+                pose.position.x + distance.measurement * Math.cos(pose.heading.log()),
+                pose.position.y + distance.measurement * Math.sin(pose.heading.log()));
+
+        return pose;
     }
 }
 
@@ -273,7 +331,7 @@ class AprilTagLocalizer {
     double latency; // @@@ Seconds for the camera currently being used?
 
     // @@@ Update pose and latency:
-    boolean update(HistoricalRecord record) { return false; }
+    boolean update() { return false; }
 }
 
 class Poser {
@@ -290,6 +348,13 @@ class Poser {
     private DistanceLocalizer distanceLocalizer;
     private AprilTagLocalizer aprilTagLocalizer;
 
+    class HistoricalRecord {
+        double time; // Time, in seconds
+        Twist2d twist; // Odometry twist
+        Pose2d postOdometryPose; // Pose after having applied the twist but before distances
+        ArrayList<DistanceResult> distances; // Distance sensor distances for this time interval, if any
+    }
+
     static Pose2d copyPose(Pose2d pose) {
         return new Pose2d(
                 new Vector2d(pose.position.x, pose.position.y),
@@ -298,7 +363,7 @@ class Poser {
 
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
-    private void changeHistory(double time, Pose2d newAprilTagPose, DistanceRecord newDistance) {
+    private void changeHistory(double time, Pose2d newAprilTagPose, DistanceResult newDistance) {
         if (history.size() == 0)
             return; // ===>
 
@@ -337,7 +402,7 @@ class Poser {
             iteratorRecord.postOdometryPose = pose;
 
             // Apply the distances:
-            for (DistanceRecord distance: iteratorRecord.distances) {
+            for (DistanceResult distance: iteratorRecord.distances) {
                 pose = DistanceLocalizer.localize(pose, distance);
             }
 
@@ -361,10 +426,10 @@ class Poser {
         history.addFirst(record);
 
         // Process April Tags and distance sensor data:
-        if (aprilTagLocalizer.update(record)) {
+        if (aprilTagLocalizer.update()) {
             changeHistory(time - aprilTagLocalizer.latency, aprilTagLocalizer.pose, null);
         }
-        DistanceRecord distance = distanceLocalizer.update(pose);
+        DistanceResult distance = distanceLocalizer.update(pose);
         if (distance != null) {
             changeHistory(time - distance.latency, null, distance);
         }

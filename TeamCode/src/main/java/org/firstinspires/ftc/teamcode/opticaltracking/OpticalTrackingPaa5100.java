@@ -357,7 +357,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Enable the LEDs:
         setLedState(true);
 
-        // Check chip ID: @@@ Should be done before all initialization
+        // Check chip ID:
         if (readRegister(0x00) != 0x49)
             return false;
 
@@ -401,7 +401,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
-        // read/write 13 bytes
+        // This uses individual register reads. Another option is to use burst mode which
+        // is composed of 13 bytes:
         //      0 - unused
         //      1 - dr (unsigned char)
         //      2 - obs (unsigned char)
