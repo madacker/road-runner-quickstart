@@ -329,6 +329,7 @@ public class Driver extends LinearOpMode {
         double maxAngularSpeed = 0;
         double previousAngularSpeed = 0;
 
+        Globals.initialize();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Poser poser = new Poser(hardwareMap, drive, null);
         Led led = new Led(hardwareMap);

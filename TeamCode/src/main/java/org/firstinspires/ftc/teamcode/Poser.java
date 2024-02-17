@@ -93,7 +93,7 @@ class Ray {
 class DistanceLocalizer {
     // Description of the distance sensor on the robot:
     static final SensorDescriptor[] SENSOR_DESCRIPTORS = {
-        new SensorDescriptor("distance2", new Point(-3, -1), Math.PI)
+        new SensorDescriptor("distance", new Point(-3, -1), Math.PI)
     };
 
     // This is list is maintained one-to-one with SENSOR_DESCRIPTORS:
@@ -212,6 +212,7 @@ class DistanceLocalizer {
         double time = Globals.time();
         if (time - lastReadTime < READ_INTERVAL)
             return null;
+        lastReadTime = time;
 
         // Create an eligibility list of all sensors that point to a wall segment. We'll choose
         // the best of it next.
@@ -317,7 +318,7 @@ class DistanceLocalizer {
                 Point fixupVector = new Point(hitVector.x * fixupFactor, hitVector.y * fixupFactor);
                 Point newPosition = hitPoint.add(fixupVector);
 
-                pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
+                // @@@@@@ pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
                 valid = true;
             }
         }
@@ -325,8 +326,8 @@ class DistanceLocalizer {
         // Update telemetry:
         distance.valid = valid;
         distance.point = new Point(
-                pose.position.x + distance.measurement * Math.cos(pose.heading.log()),
-                pose.position.y + distance.measurement * Math.sin(pose.heading.log()));
+                pose.position.x + sensorOffset.x + distance.measurement * Math.cos(sensorAngle),
+                pose.position.y + sensorOffset.y + distance.measurement * Math.sin(sensorAngle));
 
         return pose;
     }
@@ -785,7 +786,7 @@ public class Poser {
         // Now replay all of the history records back so we can recompute the poses up to the
         // current time:
         pose = (newAprilTagPose != null) ? newAprilTagPose : iteratorRecord.postTwistPose;
-        do {
+        while (true) {
             // Apply the odometry twist:
             pose = pose.plus(iteratorRecord.twist);
 
@@ -798,8 +799,10 @@ public class Poser {
             }
 
             // Go to the next newer record:
+            if (!iterator.hasPrevious())
+                break; // ====>
             iteratorRecord = iterator.previous();
-        } while (iteratorRecord != null);
+        }
     }
 
     // Draw the history visualizations:
@@ -813,30 +816,35 @@ public class Poser {
             c.strokeLine(segment.p1.x, segment.p1.y, segment.p2.x, segment.p2.y);
         }
 
-        // Go from oldest to newest:
-        ListIterator<HistoryRecord> iterator = history.listIterator(history.size());
-        HistoryRecord record = iterator.previous();
-        while (record != null) {
-            // Draw the pose trail:
-            c.setFill("#3F51B5");
-            c.fillRect(record.postTwistPose.position.x - 0.5,
-                       record.postTwistPose.position.y - 0.5, 1, 1);
+        if (history.size() != 0) {
+            // Go from oldest to newest:
+            ListIterator<HistoryRecord> iterator = history.listIterator(history.size());
+            HistoryRecord record = iterator.previous();
+            while (true) {
+                // Draw the pose trail:
+                c.setFill("#3F51B5");
+                c.fillRect(record.postTwistPose.position.x - 0.5,
+                        record.postTwistPose.position.y - 0.5, 1, 1);
 
-            // Draw the distance sensor results in gray (rejects) and green (accepted):
-            if (record.distances.size() != 0) {
-                for (DistanceLocalizer.Result distance: record.distances) {
-                    c.setFill((distance.valid) ? "#00ff00" : "#707070");
-                    c.fillRect(distance.point.x - 0.5, distance.point.y - 0.5, 1, 1);
+                // Draw the distance sensor results in gray (rejects) and green (accepted):
+                if (record.distances.size() != 0) {
+                    for (DistanceLocalizer.Result distance : record.distances) {
+                        c.setFill((distance.valid) ? "#00ff00" : "#d0d0d0");
+                        c.fillRect(distance.point.x - 0.5, distance.point.y - 0.5, 1, 1);
+                    }
                 }
-            }
 
-            // Draw the rejected April Tag poses as little grey circles:
-            for (Pose2d rejectPose: record.rejectedPoses) {
-                c.setStroke("#404040");
-                MecanumDrive.drawRobot(Globals.canvas, rejectPose, 4);
-            }
+                // Draw the rejected April Tag poses as little almost-white circles:
+                for (Pose2d rejectPose : record.rejectedPoses) {
+                    c.setStroke("#e0e0e0");
+                    MecanumDrive.drawRobot(Globals.canvas, rejectPose, 3);
+                }
 
-            record = iterator.previous();
+                // Go to the next newest record:
+                if (!iterator.hasPrevious())
+                    break;
+                record = iterator.previous();
+            }
         }
 
         // Finally, draw our current pose:
@@ -863,10 +871,12 @@ public class Poser {
             history.removeLast();
         }
 
+        isConfident = true; // @@@@@@@@@@
+
         // Process April Tags:
         AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, historyRecord);
         if (aprilTag != null) {
-            changeHistory(time - aprilTag.latency, aprilTag.pose, null);
+            // @@@ changeHistory(time - aprilTag.latency, aprilTag.pose, null);
             isConfident |= aprilTag.isConfident;
         }
 
