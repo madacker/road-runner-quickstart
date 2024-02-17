@@ -4,6 +4,8 @@
 
 package org.firstinspires.ftc.teamcode;
 
+// @@@ Visualize history
+
 import static java.lang.System.nanoTime;
 
 import com.acmerobotics.roadrunner.Pose2d;
@@ -52,9 +54,10 @@ class AprilTagResult {
     Pose2d pose; // Measured result
     int cameraIndex; // CAMERA_DESCRIPTORS index
     double latency; // Latency, in seconds
+    boolean isConfident; // True once there are enough excellent poses to be confident
 
-    public AprilTagResult(Pose2d pose, int cameraIndex, double latency) {
-        this.pose = pose; this.cameraIndex = cameraIndex; this.latency = latency;
+    public AprilTagResult(Pose2d pose, int cameraIndex, double latency, boolean isConfident) {
+        this.pose = pose; this.cameraIndex = cameraIndex; this.latency = latency; this.isConfident = isConfident;
     }
 }
 
@@ -340,10 +343,10 @@ class AprilTagLocalizer {
     final double COARSE_EPSILON = 10.0;
 
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
-    static final int HEADING_COUNT_CONFIDENCE_THRESHOLD = 10; // Need 10 trusted heading reading before being confident
+    static final int CONFIDENCE_THRESHOLD_COUNT = 10; // Need 10 excellent readings before being confident
 
     private String poseStatus = ""; // UI status message that is persisted
-    private double trustedHeadingCount = 0; // Active count of trusted headings so far
+    private double excellentHeadingCount = 0; // Active count of trusted headings so far
 
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
@@ -493,7 +496,7 @@ class AprilTagLocalizer {
 
     // Record an excellent pose for filtering purposes:
     void recordExcellentPose(Pose2d oldPose, Pose2d newPose) {
-        trustedHeadingCount++; // @@@ Gotta hook up reader
+        excellentHeadingCount++;
         double headingResidual = normalizeAngle(newPose.heading.log() - oldPose.heading.log());
         headingResiduals.addFirst(new FilterStorage(headingResidual)); // Newest to oldest
     }
@@ -568,7 +571,7 @@ class AprilTagLocalizer {
     }
 
     // Update loop for April Tags:
-    public AprilTagResult update(Pose2d currentPose, PoseEstimator.HistoryRecord historyRecord) {
+    public AprilTagResult update(Pose2d currentPose, Poser.HistoryRecord historyRecord) {
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
         double pipelineLatency = 0;
@@ -671,21 +674,20 @@ class AprilTagLocalizer {
         if (excellentPose)
             recordExcellentPose(currentPose, visionPose.pose);
 
-        return new AprilTagResult(filterHeading(visionPose.pose), 0, descriptor.latency);
+        boolean isConfident = (excellentHeadingCount > CONFIDENCE_THRESHOLD_COUNT);
+        Pose2d resultPose = filterHeading(visionPose.pose);
+        return new AprilTagResult(resultPose, 0, descriptor.latency, isConfident);
     }
 }
 
-class PoseEstimator {
+public class Poser {
+    // These public fields are updated after every call to update():
+    public boolean isConfident; // User-calibrated or enough excellent April-tag poses
+    public Pose2d pose; // Current pose
+    public PoseVelocity2d velocity; // Current velocity, robot-relative not field-relative
+
     // Keep the history around for this many seconds:
     private final static double HISTORY_DURATION = 2.0;
-
-    // True if the starting pose was calibrated by the user, or we have enough good AprilTag
-    // readings to be confident:
-    private boolean isConfident; // @@@ Need to hook up!
-
-    // Current pose and velocity:
-    private Pose2d pose;
-    private PoseVelocity2d poseVelocity;
 
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
@@ -713,7 +715,16 @@ class PoseEstimator {
         ArrayList<Pose2d> rejectedPoses = new ArrayList<>(); // @@@ Hook up
     }
 
-    PoseEstimator(HardwareMap hardwareMap, MecanumDrive drive) {
+    public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
+        if (initialPose != null) {
+            pose = initialPose;
+            isConfident = true;
+        } else {
+            pose = new Pose2d(0, 0, 0);
+            isConfident = false;
+        }
+        velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
@@ -776,11 +787,51 @@ class PoseEstimator {
         } while (iteratorRecord != null);
     }
 
+    private void visualize() {
+
+        // Draw the best estimate pose:
+//        Globals.canvas.setStroke("#3F51B5");
+//        MecanumDrive.drawRobot(Globals.canvas, drive.pose);
+
+
+//        if (false) {
+//            double[] xPoints = new double[poseHistory.size()];
+//            double[] yPoints = new double[poseHistory.size()];
+//            int i = 0;
+//
+//            for (MecanumDrive.PoseEpoch t : poseHistory) {
+//                xPoints[i] = t.pose.position.x;
+//                yPoints[i] = t.pose.position.y;
+//                i++;
+//            }
+//
+//            c.setStrokeWidth(1);
+//            c.setStroke("#3F51B5");
+//            c.strokePolyline(xPoints, yPoints);
+//        } else {
+//            c.setFill("#3F51B5");
+//            for (MecanumDrive.PoseEpoch t: poseHistory) {
+//                c.fillRect(t.pose.position.x - 0.5, t.pose.position.y - 0.5, 1, 1);
+//            }
+//        }
+//
+//        // Draw pose corrections in red:
+//        c.setStroke("#FF0000");
+//        for (int i = 1; i < poseHistory.size(); i++) {
+//            if (poseHistory.get(i).flags != 0) {
+//                c.strokeLine(poseHistory.get(i-1).pose.position.x,
+//                        poseHistory.get(i-1).pose.position.y,
+//                        poseHistory.get(i).pose.position.x,
+//                        poseHistory.get(i).pose.position.y);
+//            }
+//        }
+    }
+
     // Update the pose estimate:
     public void update() {
         double time = Globals.time();
         Twist2dDual<Time> dualTwist = odometryLocalizer.update();
-        poseVelocity = dualTwist.velocity().value();
+        velocity = dualTwist.velocity().value();
 
         // Update the current pose from odometry and create a tracking record:
         HistoryRecord historyRecord = new HistoryRecord();
@@ -799,6 +850,7 @@ class PoseEstimator {
         AprilTagResult aprilTag = aprilTagLocalizer.update(pose, historyRecord);
         if (aprilTag != null) {
             changeHistory(time - aprilTag.latency, aprilTag.pose, null);
+            isConfident |= aprilTag.isConfident;
         }
 
         // Process the distance sensor. Only change history if the current pose estimate is
@@ -807,17 +859,8 @@ class PoseEstimator {
         if ((isConfident) && (distance != null)) {
             changeHistory(time - distance.latency, null, distance);
         }
-    }
 
-    // Return the current pose:
-    public Pose2d getPose() {
-        return copyPose(pose);
-    }
-
-    // Return the current pose velocity:
-    public PoseVelocity2d getPoseVelocity() {
-        return new PoseVelocity2d(new Vector2d(poseVelocity.linearVel.x, poseVelocity.linearVel.y),
-                poseVelocity.angVel);
+        visualize();
     }
 
     // Close when done:

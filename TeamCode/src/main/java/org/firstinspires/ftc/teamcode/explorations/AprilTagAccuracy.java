@@ -8,9 +8,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.Led;
 import org.firstinspires.ftc.teamcode.Globals;
-import org.firstinspires.ftc.teamcode.PoseEstimator;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -19,15 +17,14 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        Led led = new Led(hardwareMap);
-        PoseEstimator poseEstimator = new PoseEstimator(hardwareMap, false);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
         waitForStart();
 
         while (opModeIsActive()) {
             Globals.startLoop(telemetry);
-            boolean doingSweep = drive.doActionsWork(Globals.packet);
+            drive.updatePoseEstimate();
+            boolean doingSweep = drive.doActionsWork(drive.pose, drive.poseVelocity, Globals.packet);
             if (!doingSweep) {
                 if (gamepad1.a) {
                     double SWEEP_ANGLE = 80; // Degrees
@@ -54,19 +51,6 @@ public class AprilTagAccuracy extends LinearOpMode {
                 MecanumDrive.drawRobot(Globals.canvas, drive.pose);
             }
 
-            // Draw the pose history:
-            drive.updatePoseEstimate();
-            Pose2d refinedPose = poseEstimator.refinePose(drive.pose, drive);
-            if (refinedPose != null) {
-                led.setPulseColor(Led.Color.RED, 0.25);
-                drive.recordPose(refinedPose, 0);
-
-                // Don't reset the pose while doing a sweep:
-                if (!doingSweep) {
-                    drive.pose = refinedPose;
-                }
-            }
-            drive.drawPoseHistory(Globals.canvas);
             Globals.endLoop();
         }
 

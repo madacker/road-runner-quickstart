@@ -286,7 +286,7 @@ public class TuneRoadRunner extends LinearOpMode {
         while (opModeIsActive() && !ui.cancel()) {
             TelemetryPacket packet = new TelemetryPacket();
             ui.showMessage("Press B to stop");
-            boolean more = drive.doActionsWork(packet);
+            boolean more = drive.doActionsWork(drive.pose, drive.poseVelocity, packet);
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
             if (!more) {
                 // We successfully completed the Action!

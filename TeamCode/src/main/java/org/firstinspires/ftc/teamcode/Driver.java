@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import static java.lang.System.nanoTime;
+
 import android.annotation.SuppressLint;
 
 import com.acmerobotics.dashboard.FtcDashboard;
@@ -11,12 +13,72 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
+class Led {
+    public enum Color { OFF, RED, GREEN };
+
+    private Color pulseColor = Color.OFF;
+    private Color steadyColor = Color.OFF;
+    private double pulseEndTime = -1.0; // Seconds
+
+    private DigitalChannel redLed;
+    private DigitalChannel greenLed;
+
+    public Led(HardwareMap hardwareMap) {
+        redLed = hardwareMap.get(DigitalChannel.class, "red");
+        greenLed = hardwareMap.get(DigitalChannel.class, "green");
+
+        // The mode defaults to 'input':
+        redLed.setMode(DigitalChannel.Mode.OUTPUT);
+        greenLed.setMode(DigitalChannel.Mode.OUTPUT);
+
+        setSteadyColor(Color.OFF);
+    }
+
+    private void setColor(Color color) {
+        boolean redOn = false;
+        boolean greenOn = false;
+        if (color == Color.RED) {
+            redOn = true;
+        } else if (color == Color.GREEN) {
+            greenOn = true;
+        }
+        redLed.setState(!redOn);
+        greenLed.setState(!greenOn);
+    }
+
+    private boolean isPulseActive() {
+        return ((pulseEndTime != -1.0) && (nanoTime() * 1e-9 < pulseEndTime));
+    }
+
+    public void setSteadyColor(Color color) {
+        steadyColor = color;
+        if (!isPulseActive())
+            setColor(color);
+    }
+
+    public void setPulseColor(Color color, double  seconds) {
+        pulseColor = color;
+        pulseEndTime = nanoTime() * 1e-9 + seconds; // Seconds
+        setColor(color);
+    }
+
+    public void update() {
+        if ((pulseEndTime != -1.0) && (!isPulseActive())) {
+            pulseEndTime = -1.0;
+            setColor(steadyColor);
+        }
+    }
+}
+
 class AutoParker {
-    MecanumDrive drive;              // Used to get pose and poseVelocity and set the motors
+    Poser poser;                     // Get the pose and pose velocity
+    MecanumDrive drive;              // Used to set the motors
     Pose2d target;                   // Target pose
     double facingOrientation;        // Orientation of robot to point to goal when far from goal
     double turningDistance;          // Distance at which to start turning to final orientation
@@ -34,7 +96,8 @@ class AutoParker {
         return angle;
     }
 
-    AutoParker(MecanumDrive drive, Pose2d target, double facingOrientation, double turningDistance) {
+    AutoParker(Poser poser, MecanumDrive drive, Pose2d target, double facingOrientation, double turningDistance) {
+        this.poser = poser;
         this.drive = drive;
         this.target = target;
         this.facingOrientation = facingOrientation;
@@ -46,7 +109,7 @@ class AutoParker {
         // Position --------------------------------------------------------------------------------
 
         // Radial vector towards the target:
-        Vector2d radialVector = target.position.minus(drive.pose.position);
+        Vector2d radialVector = target.position.minus(poser.pose.position);
 
         // Tangent vector -90 degrees from radial:
         // noinspection SuspiciousNameCombination
@@ -58,7 +121,7 @@ class AutoParker {
             tangentVector = tangentVector.div(tangentLength);
 
         // Convert the velocity to field-relative coordinates:
-        PoseVelocity2d velocity = drive.pose.times(drive.poseVelocity);
+        PoseVelocity2d velocity = poser.pose.times(poser.velocity);
 
         // Compute the current speed:
         double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
@@ -78,11 +141,11 @@ class AutoParker {
     // Returns false when done, true while still working on it:
     boolean park() {
         // Radial vector towards the target:
-        Vector2d radialVector = target.position.minus(drive.pose.position);
+        Vector2d radialVector = target.position.minus(poser.pose.position);
         double radialLength = radialVector.norm();
 
         // Angular distance to the target:
-        double angularDelta = normalizeAngle(target.heading.log() - drive.pose.heading.log());
+        double angularDelta = normalizeAngle(target.heading.log() - poser.pose.heading.log());
 
         // We're done if the distance is small enough to the goal!
 //  @@@       if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
@@ -92,7 +155,7 @@ class AutoParker {
         // orientation:
         if (radialLength > turningDistance) {
             double headingToGoal = Math.atan2(radialVector.y, radialVector.x) + facingOrientation;
-            angularDelta = normalizeAngle(headingToGoal - drive.pose.heading.log());
+            angularDelta = normalizeAngle(headingToGoal - poser.pose.heading.log());
         }
 
         double now = Actions.now();
@@ -145,7 +208,7 @@ class AutoParker {
 
         // Add the component velocities to get our new velocity:
         PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), angularSpeed);
-        drive.setDrivePowers(null, velocity);
+        drive.setDrivePowers(poser.pose, poser.velocity, null, velocity);
 
         // Remember stuff for the next iteration:
         previousTime = now;
@@ -173,15 +236,14 @@ class AutoParker {
 }
 
 class Wall {
+    Poser poser;
     MecanumDrive drive;
     Vector2d wallPoint;
     Vector2d wallVector;
 
     // The wall will repulse any robot approaching from the left of the vector.
-    Wall(MecanumDrive drive, Vector2d point, Vector2d vector) {
-        this.drive = drive;
-        wallPoint = point;
-        wallVector = vector;
+    Wall(Poser poser, MecanumDrive drive, Vector2d point, Vector2d vector) {
+        this.poser = poser; this.drive = drive; wallPoint = point; wallVector = vector;
     }
 
     // The velocity must be field-relative, calibrated inches/s and radians/s:
@@ -205,8 +267,8 @@ class Wall {
         double alongWallVelocity = Math.sin(towardWallAngle) * velocityMagnitude;
 
         // Compute the distance to the wall:
-        double dx = wallPoint.x - drive.pose.position.x;
-        double dy = wallPoint.y - drive.pose.position.y;
+        double dx = wallPoint.x - poser.pose.position.x;
+        double dy = wallPoint.y - poser.pose.position.y;
         double pointToPointDistance = Math.hypot(dy, dx);
         double pointToPointAngle = Math.atan2(dy, dx);
         double distance = Math.cos(pointToPointAngle - towardWallAngle) * pointToPointDistance;
@@ -236,8 +298,6 @@ class Wall {
 
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
-    final boolean FASTEST = false;
-
     // Shape the stick input for more precision at slow speeds:
     public double shapeStick(double stickValue) {
         return Math.signum(stickValue) * Math.pow(stickValue, 2.0);
@@ -270,16 +330,10 @@ public class Driver extends LinearOpMode {
         double previousAngularSpeed = 0;
 
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Poser poser = new Poser(hardwareMap, drive, null);
+        Led led = new Led(hardwareMap);
         AutoParker parker = null;
-        PoseEstimator poseEstimator = null;
-        Led led = null;
-        Wall wall = null;
-
-        if (!FASTEST) {
-            poseEstimator = new PoseEstimator(hardwareMap, drive);
-            led = new Led(hardwareMap);
-            wall = new Wall(drive, new Vector2d(-72, -36), new Vector2d(24, -24));
-        }
+        Wall wall = new Wall(poser, drive, new Vector2d(-72, -36), new Vector2d(24, -24));
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
         double fullAxialSpeed
@@ -298,40 +352,40 @@ public class Driver extends LinearOpMode {
             Globals.startLoop(telemetry);
 
             // Update the telemetry pose and update the LED loop:
-            drive.updatePoseEstimate();
-            if (led != null)
-                led.update();
+            poser.update();
+            led.update();
 
-            // @@@ Do parking et al only once locked in!
+            if (poser.isConfident)
+                led.setSteadyColor(Led.Color.RED);
 
             // The 'A' button activates the auto-parker:
             boolean parkingActivated = false;
             if (!gamepad1.a)
                 parker = null;
             else {
-                if (parker == null)
-                    parker = new AutoParker(drive, new Pose2d(45, 36, Math.PI),
+                if ((parker == null) && (poser.isConfident))
+                    parker = new AutoParker(poser, drive, new Pose2d(45, 36, Math.PI),
                             Math.PI, 48);
                 parkingActivated = parker.park();
             }
 
             // The 'left-bumper' button activates Road Runner homing:
-            boolean roadrunnerActivated = drive.doActionsWork(Globals.packet);
-            if ((gamepad1.left_bumper) && (!roadrunnerActivated)) {
+            boolean roadrunnerActivated = drive.doActionsWork(poser.pose, poser.velocity, Globals.packet);
+            if ((gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isConfident)) {
                 // Ensure that velocity is zero-ish:
-                if ((Math.abs(drive.poseVelocity.linearVel.x) < 0.1) &&
-                    (Math.abs(drive.poseVelocity.linearVel.y) < 0.1) &&
-                    (Math.abs(drive.poseVelocity.angVel) < 0.1)) {
+                if ((Math.abs(poser.velocity.linearVel.x) < 0.1) &&
+                    (Math.abs(poser.velocity.linearVel.y) < 0.1) &&
+                    (Math.abs(poser.velocity.angVel) < 0.1)) {
 
-                    boolean toBackdrop = drive.pose.position.x < 6.0;
+                    boolean toBackdrop = poser.pose.position.x < 6.0;
                     Action action;
                     if (toBackdrop) {
                         // Go to the blue backdrop:
                         Pose2d keyPose = new Pose2d(-36, -36, Math.PI);
                         double startTangent = Math.atan2(
-                                keyPose.position.y - drive.pose.position.y,
-                                keyPose.position.x - drive.pose.position.x);
-                        action = drive.actionBuilder(drive.pose)
+                                keyPose.position.y - poser.pose.position.y,
+                                keyPose.position.x - poser.pose.position.x);
+                        action = drive.actionBuilder(poser.pose)
                                 .setTangent(startTangent)
                                 .splineToSplineHeading(keyPose, 0)
                                 .splineTo(new Vector2d(12, -36), 0)
@@ -341,9 +395,9 @@ public class Driver extends LinearOpMode {
                         // Go to the blue wing:
                         Pose2d keyPose = new Pose2d(12, -36, Math.PI);
                         double startTangent = Math.atan2(
-                                keyPose.position.y - drive.pose.position.y,
-                                keyPose.position.x - drive.pose.position.x);
-                        action = drive.actionBuilder(drive.pose)
+                                keyPose.position.y - poser.pose.position.y,
+                                keyPose.position.x - poser.pose.position.x);
+                        action = drive.actionBuilder(poser.pose)
                                 .setTangent(startTangent)
                                 .splineToSplineHeading(keyPose, Math.PI)
                                 .splineTo(new Vector2d(-36, -36), Math.PI)
@@ -363,12 +417,12 @@ public class Driver extends LinearOpMode {
                             scaleStick(-gamepad1.left_stick_x, fullLateralSpeed)),
                             scaleStick(-gamepad1.right_stick_x, fullAngularSpeed));
 
-                    PoseVelocity2d fieldVelocity = drive.pose.times(calibratedVelocity);
+                    PoseVelocity2d fieldVelocity = poser.pose.times(calibratedVelocity);
 
-                    if (wall != null)
+                    if ((wall != null) && (poser.isConfident))
                         wall.repulse(fieldVelocity); // @@@
 
-                    drive.setDrivePowers(null, fieldVelocity);
+                    drive.setDrivePowers(poser.pose, poser.velocity, null, fieldVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
                             shapeStick(-gamepad1.left_stick_y),
@@ -378,31 +432,8 @@ public class Driver extends LinearOpMode {
                 }
             }
 
-            // Refine the pose estimate using AprilTags:
-            if (poseEstimator != null) {
-                poseEstimator.update();
-                Pose2d refinedPose = poseEstimator.getPose();
-                if (refinedPose != null) {
-                    led.setSteadyColor(Led.Color.GREEN);
-                    led.setPulseColor(Led.Color.RED, 0.25);
-
-                    // Set the new pose and record it:
-                    drive.pose = refinedPose;
-                    drive.recordPose(refinedPose, 1);
-                }
-            }
-
-            // Draw the pose history:
-            drive.drawPoseHistory(Globals.canvas);
-
-            // Draw the refinement history:
-
-            // Draw the best estimate pose:
-            Globals.canvas.setStroke("#3F51B5");
-            MecanumDrive.drawRobot(Globals.canvas, drive.pose);
-
             // Log interesting data:
-            double linearSpeed = Math.hypot(drive.poseVelocity.linearVel.x, drive.poseVelocity.linearVel.y);
+            double linearSpeed = Math.hypot(poser.velocity.linearVel.x, poser.velocity.linearVel.y);
             double linearSpeedDelta = linearSpeed - previousLinearSpeed;
             if (linearSpeedDelta > 0) {
                 maxLinearAcceleration = Math.max(linearSpeedDelta, maxLinearAcceleration);
@@ -412,7 +443,7 @@ public class Driver extends LinearOpMode {
             previousLinearSpeed = linearSpeed;
             maxLinearSpeed = Math.max(linearSpeed, maxLinearSpeed);
 
-            double angularSpeed = Math.abs(drive.poseVelocity.angVel);
+            double angularSpeed = Math.abs(poser.velocity.angVel);
             double angularSpeedDelta = angularSpeed - previousAngularSpeed;
             if (angularSpeedDelta > 0) {
                 maxAngularAcceleration = Math.max(angularSpeedDelta, maxAngularAcceleration);
@@ -434,8 +465,8 @@ public class Driver extends LinearOpMode {
         }
 
         // Cleanup:
-        if (poseEstimator != null) {
-            poseEstimator.close();
+        if (poser != null) {
+            poser.close();
         }
         if (led != null) {
             led.setSteadyColor(Led.Color.OFF);

@@ -125,26 +125,6 @@ public final class MecanumDrive {
         public double headingVelGain;
     }
 
-    // This structure is used to record the pose history.
-    public class PoseEpoch {
-        Pose2d pose;
-        int flags;
-        public PoseEpoch(Pose2d pose, int flags) {
-            this.pose = pose;
-            this.flags = flags;
-        }
-    }
-
-    // This structure is used to record the odometry twist history:
-    public class TwistEpoch {
-        Twist2d twist;
-        double time;
-        public TwistEpoch(Twist2d twist, double time) {
-            this.twist = twist;
-            this.time = time;
-        }
-    }
-
     public static String getBotName() {
         InspectionState inspection=new InspectionState();
         inspection.initializeLocal();
@@ -175,9 +155,6 @@ public final class MecanumDrive {
     public final Localizer localizer;
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
-
-    public final LinkedList<PoseEpoch> poseHistory = new LinkedList<>();
-    public final LinkedList<TwistEpoch> twistHistory = new LinkedList<>();
 
     public class DriveLocalizer implements Localizer {
         public final Encoder leftFront, leftBack, rightBack, rightFront;
@@ -336,6 +313,8 @@ public final class MecanumDrive {
      * robot down.
      */
     public void setDrivePowers(
+            Pose2d pose,
+            PoseVelocity2d poseVelocity,
             // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
             PoseVelocity2d stickVelocity,
             // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
@@ -458,7 +437,7 @@ public final class MecanumDrive {
 
             Pose2dDual<Time> txWorldTarget = timeTrajectory.get(t);
 
-            PoseVelocity2d robotVelRobot = updatePoseEstimate();
+            PoseVelocity2d robotVelRobot = poseVelocity;
 
             PoseVelocity2dDual<Time> command = new HolonomicController(
                     PARAMS.axialGain, PARAMS.lateralGain, PARAMS.headingGain,
@@ -484,14 +463,11 @@ public final class MecanumDrive {
 
             // only draw when active; only one drive action should be active at a time
             Canvas c = p.fieldOverlay();
-            drawPoseHistory(c);
 
             c.setStroke("#4CAF50");
             drawRobot(c, txWorldTarget.value()); // Draw target pose
 
-            c.setStroke("#3F51B5");
-            drawRobot(c, pose); // Draw current pose estimate
-
+            // Preview the path:
             c.setStroke("#4CAF50FF");
             c.setStrokeWidth(1);
             c.strokePolyline(xPoints, yPoints);
@@ -537,7 +513,7 @@ public final class MecanumDrive {
 
             Pose2dDual<Time> txWorldTarget = turn.get(t);
 
-            PoseVelocity2d robotVelRobot = updatePoseEstimate();
+            PoseVelocity2d robotVelRobot = poseVelocity;
 
             PoseVelocity2dDual<Time> command = new HolonomicController(
                     PARAMS.axialGain, PARAMS.lateralGain, PARAMS.headingGain,
@@ -556,16 +532,9 @@ public final class MecanumDrive {
             FlightRecorder.write("TARGET_POSE", new PoseMessage(txWorldTarget.value()));
 
             Canvas c = p.fieldOverlay();
-            drawPoseHistory(c);
 
-//            c.setStroke("#4CAF50");
-//            drawRobot(c, txWorldTarget.value());
-//
-//            c.setStroke("#3F51B5");
-//            drawRobot(c, pose);
-//
-//            c.setStroke("#7C4DFFFF");
-//            c.fillCircle(turn.beginPose.position.x, turn.beginPose.position.y, 2);
+            c.setStroke("#4CAF50");
+            drawRobot(c, txWorldTarget.value());
 
             return true;
         }
@@ -577,86 +546,13 @@ public final class MecanumDrive {
         }
     }
 
-    public static double time() {
-        return nanoTime() * 1e-9;
-    }
-
-    public PoseVelocity2d updatePoseEstimate() {
-        double time = time();
+    public void updatePoseEstimate() {
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
-
-        // Add to the twist history, discarding any over 1 second old:
-        twistHistory.add(new TwistEpoch(twist.value(), time));
-        while (time - twistHistory.get(0).time > 1.0) {
-            twistHistory.removeFirst();
-        }
-
-        // Add to the pose history, with a fixed cap:
-        poseHistory.add(new PoseEpoch(pose, 0));
-        while (poseHistory.size() > 100) {
-            poseHistory.removeFirst();
-        }
 
         FlightRecorder.write("ESTIMATED_POSE", new PoseMessage(pose));
 
         poseVelocity = twist.velocity().value();
-        return poseVelocity;
-    }
-
-    // Take an old pose and update it to the current time using the odometry twist
-    // history:
-    public Pose2d applyTwistHistory(Pose2d pose, double seconds) {
-        double time = time();
-
-        // Apply from oldest to newest:
-        for (TwistEpoch epoch: twistHistory) {
-            if (time - epoch.time <= seconds) {
-                pose = pose.plus(epoch.twist);
-            }
-        }
-
-        return pose;
-    }
-
-    public void drawPoseHistory(Canvas c) {
-
-        if (false) {
-            double[] xPoints = new double[poseHistory.size()];
-            double[] yPoints = new double[poseHistory.size()];
-            int i = 0;
-
-            for (PoseEpoch t : poseHistory) {
-                xPoints[i] = t.pose.position.x;
-                yPoints[i] = t.pose.position.y;
-                i++;
-            }
-
-            c.setStrokeWidth(1);
-            c.setStroke("#3F51B5");
-            c.strokePolyline(xPoints, yPoints);
-        } else {
-            c.setFill("#3F51B5");
-            for (PoseEpoch t: poseHistory) {
-                c.fillRect(t.pose.position.x - 0.5, t.pose.position.y - 0.5, 1, 1);
-            }
-        }
-
-        // Draw pose corrections in red:
-        c.setStroke("#FF0000");
-        for (int i = 1; i < poseHistory.size(); i++) {
-            if (poseHistory.get(i).flags != 0) {
-                c.strokeLine(poseHistory.get(i-1).pose.position.x,
-                             poseHistory.get(i-1).pose.position.y,
-                             poseHistory.get(i).pose.position.x,
-                             poseHistory.get(i).pose.position.y);
-            }
-        }
-    }
-
-    // Set the new pose, marking it in the pose history as a discontinuity:
-    public void recordPose(Pose2d pose, int flags) {
-        poseHistory.add(new PoseEpoch(pose, flags));
     }
 
     public static void drawRobot(Canvas c, Pose2d t, double robotRadius) {
@@ -695,7 +591,9 @@ public final class MecanumDrive {
 
     // On every iteration of your robot loop, call 'doActionsWork'. Specify the packet
     // if you're drawing on the graph for FTC Dashboard:
-    public boolean doActionsWork(TelemetryPacket packet) {
+    public boolean doActionsWork(Pose2d pose, PoseVelocity2d poseVelocity, TelemetryPacket packet) {
+        this.pose = pose;
+        this.poseVelocity = poseVelocity;
         LinkedList<Action> deletionList = new LinkedList<>();
         for (Action action: actionList) {
             // Once the Action returns false, the action is done:
