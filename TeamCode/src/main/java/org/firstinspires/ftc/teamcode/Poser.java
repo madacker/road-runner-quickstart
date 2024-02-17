@@ -32,34 +32,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
-class DistanceResult {
-    double measurement; // Measured distance
-    int sensorIndex; // SENSOR_DESCRIPTORS index
-    int segmentIndex; // Target WALL_SEGMENTS index
-    double latency; // Latency, in seconds
-
-    // These are for telemetry purposes:
-    Point point; // Point computed from the measurement and most recent pose information
-    boolean valid; // True if the sensor result was valid and used
-
-    public DistanceResult(int sensorIndex, int segmentIndex, double latency) {
-        this.sensorIndex = sensorIndex;
-        this.segmentIndex = segmentIndex;
-        this.latency = latency;
-    }
-}
-
-class AprilTagResult {
-    Pose2d pose; // Measured result
-    int cameraIndex; // CAMERA_DESCRIPTORS index
-    double latency; // Latency, in seconds
-    boolean isConfident; // True once there are enough excellent poses to be confident
-
-    public AprilTagResult(Pose2d pose, int cameraIndex, double latency, boolean isConfident) {
-        this.pose = pose; this.cameraIndex = cameraIndex; this.latency = latency; this.isConfident = isConfident;
-    }
-}
-
 /**
  * Math helper for points and vectors:
  */
@@ -116,12 +88,12 @@ class Ray {
 }
 
 /**
- * Class for localizing distance sensor.
+ * Distance sensor localizer.
  */
 class DistanceLocalizer {
     // Description of the distance sensor on the robot:
-    static final DistanceDescriptor[] SENSOR_DESCRIPTORS = {
-        new DistanceDescriptor("distance2", new Point(-3, -1), Math.PI)
+    static final SensorDescriptor[] SENSOR_DESCRIPTORS = {
+        new SensorDescriptor("distance2", new Point(-3, -1), Math.PI)
     };
 
     // This is list is maintained one-to-one with SENSOR_DESCRIPTORS:
@@ -169,13 +141,31 @@ class DistanceLocalizer {
     };
 
     // Structure for describing distance sensors on the robot:
-    static class DistanceDescriptor {
+    static class SensorDescriptor {
         String name; // Device name of the sensor in the robot configuration:
         Point offset; // Offset in inches from center of rotation, robot facing forward
         double theta; // Orientation of the sensor in radians
 
-        public DistanceDescriptor(String name, Point offset, double theta) {
+        public SensorDescriptor(String name, Point offset, double theta) {
             this.name = name; this.offset = offset; this.theta = theta;
+        }
+    }
+
+    // Structure for returning results from update():
+    static class Result {
+        double measurement; // Measured distance
+        int sensorIndex; // SENSOR_DESCRIPTORS index
+        int segmentIndex; // Target WALL_SEGMENTS index
+        double latency; // Latency, in seconds
+
+        // These are for telemetry purposes:
+        Point point; // Point computed from the measurement and most recent pose information
+        boolean valid; // True if the sensor result was valid and used
+
+        public Result(int sensorIndex, int segmentIndex, double latency) {
+            this.sensorIndex = sensorIndex;
+            this.segmentIndex = segmentIndex;
+            this.latency = latency;
         }
     }
 
@@ -184,7 +174,7 @@ class DistanceLocalizer {
 
     // Create the distance sensor objects:
     DistanceLocalizer(HardwareMap hardwareMap) {
-        for (DistanceDescriptor descriptor: SENSOR_DESCRIPTORS) {
+        for (SensorDescriptor descriptor: SENSOR_DESCRIPTORS) {
             sensorHardware.add(hardwareMap.get(DistanceSensor.class, descriptor.name));
         }
     }
@@ -217,16 +207,16 @@ class DistanceLocalizer {
     }
 
     // The pose is used to determine which sensor to use:
-    DistanceResult update(Pose2d pose) {
+    Result update(Pose2d pose) {
         double time = Globals.time();
         if (time - lastReadTime < READ_INTERVAL)
             return null;
 
         // Create an eligibility list of all sensors that point to a wall segment. We'll choose
         // the best of it next.
-        ArrayList<DistanceResult> eligibleSensors = new ArrayList<>();
+        ArrayList<Result> eligibleSensors = new ArrayList<>();
         for (int sensorIndex = 0; sensorIndex < SENSOR_DESCRIPTORS.length; sensorIndex++) {
-            DistanceDescriptor sensor = SENSOR_DESCRIPTORS[sensorIndex];
+            SensorDescriptor sensor = SENSOR_DESCRIPTORS[sensorIndex];
 
             // Sensor offset from robot center in field coordinates:
             double sensorAngle = sensor.theta + pose.heading.log();
@@ -248,21 +238,21 @@ class DistanceLocalizer {
                 if (hitPoint != null) {
                     double distance = sensorPoint.distance(hitPoint);
                     if (distance < MAX_DISTANCE) {
-                        eligibleSensors.add(new DistanceResult(sensorIndex, segmentIndex, LATENCY));
+                        eligibleSensors.add(new Result(sensorIndex, segmentIndex, LATENCY));
                     }
                 }
             }
         }
 
         // Choose what sensor to use:
-        DistanceResult result;
+        Result result;
         int eligibleCount = eligibleSensors.size();
         if (eligibleCount == 0) {
             // There are no good candidates so simply do a different sensor than last time:
             currentSensorIndex++;
             if (currentSensorIndex >= SENSOR_DESCRIPTORS.length)
                 currentSensorIndex = 0;
-            result = new DistanceResult(currentSensorIndex, 0, LATENCY);
+            result = new Result(currentSensorIndex, 0, LATENCY);
         } else {
             // If more than one eligible sensor, choose one that's different from the one
             // we used last time:
@@ -277,13 +267,11 @@ class DistanceLocalizer {
         return result;
     }
 
-    /**
-     * Given a starting pose and a measured distance, calculate a corrected pose.
-     */
-    static public Pose2d localize(Pose2d pose, DistanceResult distance) {
+    // Given a starting pose and a measured distance, calculate a corrected pose.
+    static public Pose2d localize(Pose2d pose, Result distance) {
         boolean valid = false; // Assume failure, we'll convert to success later
 
-        DistanceDescriptor sensor = SENSOR_DESCRIPTORS[distance.sensorIndex];
+        SensorDescriptor sensor = SENSOR_DESCRIPTORS[distance.sensorIndex];
         Segment segment = WALL_SEGMENTS[distance.segmentIndex];
 
         // Sensor offset from robot center in field coordinates:
@@ -336,6 +324,9 @@ class DistanceLocalizer {
     }
 }
 
+/**
+ * Localizer for April Tags.
+ */
 class AprilTagLocalizer {
     // We arbitrarily decide that a pose has to be within this many inches to be reliable:
     final double FINE_EPSILON = 5.0;
@@ -350,17 +341,17 @@ class AprilTagLocalizer {
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
 
-    final AprilTagLocation[] tagLocations = {
-            new AprilTagLocation(1, 62.875, 42.750, 180, false), // Blue left backdrop, small
-            new AprilTagLocation(2, 62.875, 36.625, 180, false), // Blue middle backdrop, small
-            new AprilTagLocation(3, 62.875, 30.625, 180, false), // Blue right backdrop, small
-            new AprilTagLocation(4, 62.875, -30.625, 180, false), // Red left backdrop, small
-            new AprilTagLocation(5, 62.875, -36.750, 180, false), // Red middle backdrop, small
-            new AprilTagLocation(6, 62.875, -42.625, 180, false), // Red right backdrop, small
-            new AprilTagLocation(7, -72, -43.0, 0, true),   // Red audience wall, large
-            new AprilTagLocation(8, -72, -37.5, 0, false),  // Red audience wall, small
-            new AprilTagLocation(9, -72, 37.5, 0, false),  // Blue audience wall, small
-            new AprilTagLocation(10, -72, 43.0, 0, true),   // Blue audience wall, large
+    final Location[] tagLocations = {
+            new Location(1, 62.875, 42.750, 180, false), // Blue left backdrop, small
+            new Location(2, 62.875, 36.625, 180, false), // Blue middle backdrop, small
+            new Location(3, 62.875, 30.625, 180, false), // Blue right backdrop, small
+            new Location(4, 62.875, -30.625, 180, false), // Red left backdrop, small
+            new Location(5, 62.875, -36.750, 180, false), // Red middle backdrop, small
+            new Location(6, 62.875, -42.625, 180, false), // Red right backdrop, small
+            new Location(7, -72, -43.0, 0, true),   // Red audience wall, large
+            new Location(8, -72, -37.5, 0, false),  // Red audience wall, small
+            new Location(9, -72, 37.5, 0, false),  // Blue audience wall, small
+            new Location(10, -72, 43.0, 0, true),   // Blue audience wall, large
     };
 
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
@@ -387,15 +378,27 @@ class AprilTagLocalizer {
     }
 
     // Structure defining the location of April Tags:
-    static class AprilTagLocation {
+    static class Location {
         int id;
         double x;
         double y;
         double degrees;
         boolean large;
 
-        AprilTagLocation(int id, double x, double y, double degrees, boolean large) {
+        Location(int id, double x, double y, double degrees, boolean large) {
             this.id = id; this.x = x; this.y = y; this.degrees = degrees; this.large = large;
+        }
+    }
+
+    // Structure for returning results from update():
+    static class Result {
+        Pose2d pose; // Measured result
+        int cameraIndex; // CAMERA_DESCRIPTORS index
+        double latency; // Latency, in seconds
+        boolean isConfident; // True once there are enough excellent poses to be confident
+
+        public Result(Pose2d pose, int cameraIndex, double latency, boolean isConfident) {
+            this.pose = pose; this.cameraIndex = cameraIndex; this.latency = latency; this.isConfident = isConfident;
         }
     }
 
@@ -528,8 +531,8 @@ class AprilTagLocalizer {
     }
 
     // Find the tag associated with this detection:
-    private AprilTagLocation getTag(AprilTagDetection detection) {
-        for (AprilTagLocation t : tagLocations) {
+    private Location getTag(AprilTagDetection detection) {
+        for (Location t : tagLocations) {
             if (t.id == detection.id)
                 return t;
         }
@@ -537,7 +540,7 @@ class AprilTagLocalizer {
     }
 
     // Compute the robot's field-relative pose from the April-tag-relative pose.
-    private Pose2d computeRobotPose(AprilTagDetection detection, AprilTagLocation tag) {
+    private Pose2d computeRobotPose(AprilTagDetection detection, Location tag) {
         CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
 
         double dx = detection.ftcPose.x + descriptor.offset.x;
@@ -556,9 +559,9 @@ class AprilTagLocalizer {
     static class VisionPose {
         Pose2d pose; // Field-relative robot pose
         double distance; // Distance from current pose
-        AprilTagLocation tag; // Tag that determined this pose
+        Location tag; // Tag that determined this pose
 
-        VisionPose(Pose2d pose, double distance, AprilTagLocation tag) {
+        VisionPose(Pose2d pose, double distance, Location tag) {
             this.pose = pose; this.distance = distance; this.tag = tag;
         }
     }
@@ -569,7 +572,7 @@ class AprilTagLocalizer {
     }
 
     // Update loop for April Tags:
-    public AprilTagResult update(Pose2d currentPose, Poser.HistoryRecord historyRecord) {
+    public Result update(Pose2d currentPose, Poser.HistoryRecord historyRecord) {
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
         double pipelineLatency = 0;
@@ -580,7 +583,7 @@ class AprilTagLocalizer {
             for (AprilTagDetection detection : tagDetections) {
                 pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 10e-6;
                 if (detection.metadata != null) {
-                    AprilTagLocation tag = getTag(detection);
+                    Location tag = getTag(detection);
                     if (tag != null) {
                         Pose2d visionPose = computeRobotPose(detection, tag);
                         double distance = Math.hypot(
@@ -676,10 +679,14 @@ class AprilTagLocalizer {
 
         boolean isConfident = (excellentPoseCount > CONFIDENCE_THRESHOLD_COUNT);
         Pose2d resultPose = filterHeading(visionPose.pose);
-        return new AprilTagResult(resultPose, 0, descriptor.latency, isConfident);
+        return new Result(resultPose, 0, descriptor.latency, isConfident);
     }
 }
 
+/**
+ * Master localizer for doing pose estimates. Incorporates odometry, April Tags and distance
+ * sensors.
+ */
 public class Poser {
     // These public fields are updated after every call to update():
     public boolean isConfident; // User-calibrated or enough excellent April-tag poses
@@ -709,7 +716,7 @@ public class Poser {
         Pose2d postTwistPose;
 
         // Distance sensor distances for this time interval, if any:
-        ArrayList<DistanceResult> distances = new ArrayList<>();
+        ArrayList<DistanceLocalizer.Result> distances = new ArrayList<>();
 
         // Rejected April Tag poses for telemetry purposes:
         ArrayList<Pose2d> rejectedPoses = new ArrayList<>();
@@ -739,7 +746,7 @@ public class Poser {
 
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
-    private void changeHistory(double time, Pose2d newAprilTagPose, DistanceResult newDistance) {
+    private void changeHistory(double time, Pose2d newAprilTagPose, DistanceLocalizer.Result newDistance) {
         if (history.size() == 0)
             return; // ===>
 
@@ -778,7 +785,7 @@ public class Poser {
             iteratorRecord.postTwistPose = pose;
 
             // Apply the distances:
-            for (DistanceResult distance: iteratorRecord.distances) {
+            for (DistanceLocalizer.Result distance: iteratorRecord.distances) {
                 pose = DistanceLocalizer.localize(pose, distance);
             }
 
@@ -802,7 +809,7 @@ public class Poser {
 
             // Draw the distance sensor results in gray (rejects) and green (accepted):
             if (record.distances.size() != 0) {
-                for (DistanceResult distance: record.distances) {
+                for (DistanceLocalizer.Result distance: record.distances) {
                     c.setFill((distance.valid) ? "#00ff00" : "#707070");
                     c.fillRect(distance.point.x - 0.5, distance.point.y - 0.5, 1, 1);
                 }
@@ -842,7 +849,7 @@ public class Poser {
         }
 
         // Process April Tags:
-        AprilTagResult aprilTag = aprilTagLocalizer.update(pose, historyRecord);
+        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, historyRecord);
         if (aprilTag != null) {
             changeHistory(time - aprilTag.latency, aprilTag.pose, null);
             isConfident |= aprilTag.isConfident;
@@ -850,7 +857,7 @@ public class Poser {
 
         // Process the distance sensor. Only change history if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
-        DistanceResult distance = distanceLocalizer.update(pose);
+        DistanceLocalizer.Result distance = distanceLocalizer.update(pose);
         if ((isConfident) && (distance != null)) {
             changeHistory(time - distance.latency, null, distance);
         }
