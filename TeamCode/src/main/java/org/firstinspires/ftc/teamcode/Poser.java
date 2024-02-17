@@ -169,7 +169,8 @@ class DistanceLocalizer {
         }
     }
 
-    int currentSensorIndex; // Index into sensorPlacements of the current sensor
+    int currentSensorIndex; // SENSOR_DESCRIPTORS index for the current sensor
+    int currentSegmentIndex = -1; // WALL_SEGMENTS index for the current segment, -1 is uninitialized
     double lastReadTime; // Time of the last read of a sensor
 
     // Create the distance sensor objects:
@@ -260,11 +261,18 @@ class DistanceLocalizer {
             if ((result.sensorIndex == currentSensorIndex) && (eligibleCount > 1))
                 result = eligibleSensors.get(1);
         }
+
         currentSensorIndex = result.sensorIndex;
+        currentSegmentIndex = result.segmentIndex;
 
         // Query the hardware:
         result.measurement = sensorHardware.get(result.sensorIndex).getDistance(DistanceUnit.INCH);
         return result;
+    }
+
+    // Get the most recently used wall segment:
+    public Segment getCurrentSegment() {
+        return (currentSegmentIndex != -1) ? WALL_SEGMENTS[currentSegmentIndex] : null;
     }
 
     // Given a starting pose and a measured distance, calculate a corrected pose.
@@ -798,6 +806,13 @@ public class Poser {
     private void visualize() {
         Canvas c = Globals.canvas;
 
+        // Draw the current distance localizer segment:
+        Segment segment = distanceLocalizer.getCurrentSegment();
+        if (segment != null) {
+            c.setStroke("#800080"); // Purple
+            c.strokeLine(segment.p1.x, segment.p1.y, segment.p2.x, segment.p2.y);
+        }
+
         // Go from oldest to newest:
         ListIterator<HistoryRecord> iterator = history.listIterator(history.size());
         HistoryRecord record = iterator.previous();
@@ -817,7 +832,7 @@ public class Poser {
 
             // Draw the rejected April Tag poses as little grey circles:
             for (Pose2d rejectPose: record.rejectedPoses) {
-                c.setFill("#404040");
+                c.setStroke("#404040");
                 MecanumDrive.drawRobot(Globals.canvas, rejectPose, 4);
             }
 
