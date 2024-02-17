@@ -787,9 +787,6 @@ public class Poser {
         // current time:
         pose = (newAprilTagPose != null) ? newAprilTagPose : iteratorRecord.postTwistPose;
         while (true) {
-            // Apply the odometry twist:
-            pose = pose.plus(iteratorRecord.twist);
-
             // Update the post-odometry pose:
             iteratorRecord.postTwistPose = pose;
 
@@ -802,6 +799,9 @@ public class Poser {
             if (!iterator.hasPrevious())
                 break; // ====>
             iteratorRecord = iterator.previous();
+
+            // Apply the odometry twist:
+            pose = pose.plus(iteratorRecord.twist);
         }
     }
 
