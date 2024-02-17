@@ -4,10 +4,9 @@
 
 package org.firstinspires.ftc.teamcode;
 
-// @@@ Visualize history
-
 import static java.lang.System.nanoTime;
 
+import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Rotation2d;
@@ -346,7 +345,7 @@ class AprilTagLocalizer {
     static final int CONFIDENCE_THRESHOLD_COUNT = 10; // Need 10 excellent readings before being confident
 
     private String poseStatus = ""; // UI status message that is persisted
-    private double excellentHeadingCount = 0; // Active count of trusted headings so far
+    private double excellentPoseCount = 0; // Active count of trusted headings so far
 
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
@@ -496,7 +495,6 @@ class AprilTagLocalizer {
 
     // Record an excellent pose for filtering purposes:
     void recordExcellentPose(Pose2d oldPose, Pose2d newPose) {
-        excellentHeadingCount++;
         double headingResidual = normalizeAngle(newPose.heading.log() - oldPose.heading.log());
         headingResiduals.addFirst(new FilterStorage(headingResidual)); // Newest to oldest
     }
@@ -585,9 +583,6 @@ class AprilTagLocalizer {
                     AprilTagLocation tag = getTag(detection);
                     if (tag != null) {
                         Pose2d visionPose = computeRobotPose(detection, tag);
-
-                        // @@@ Need to visualize!
-
                         double distance = Math.hypot(
                                 currentPose.position.x - visionPose.position.x,
                                 currentPose.position.y - visionPose.position.y);
@@ -602,7 +597,6 @@ class AprilTagLocalizer {
         // This will be the vision pose that we recommend to update the current pose:
         VisionPose visionPose = null;
         int poseCount = visionPoses.size();
-        boolean excellentPose = false;
 
         // We love it when there are 3 accurate poses reasonably when reasonably close to
         // the tag - we always use it to set our current pose, regardless of the state of the
@@ -628,9 +622,10 @@ class AprilTagLocalizer {
                 double min = Math.min(Math.min(distances[0], distances[1]), distances[2]);
                 for (int i = 0; i < 3; i++) {
                     if (distances[i] == min) {
+                        excellentPoseCount++;
                         visionPose = visionPoses.get(i);
+                        recordExcellentPose(currentPose, visionPose.pose);
                         poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
-                        excellentPose = true;
                     }
                 }
             }
@@ -664,17 +659,22 @@ class AprilTagLocalizer {
             }
         }
 
+        // Handle some telemetry and visualization logging:
         Globals.telemetry.addLine(String.format("Vision FPS: %.2f", visionPortal.getFps()));
         Globals.telemetry.addLine(String.format("Vision pose count: %d, ms: %.2f", visionPoses.size(), pipelineLatency));
         Globals.telemetry.addLine(poseStatus);
 
+        for (VisionPose rejectPose: visionPoses) {
+            if (rejectPose != visionPose) {
+                historyRecord.rejectedPoses.add(rejectPose.pose);
+            }
+        }
+
+        // Return our results:
         if (visionPose == null)
             return null;
 
-        if (excellentPose)
-            recordExcellentPose(currentPose, visionPose.pose);
-
-        boolean isConfident = (excellentHeadingCount > CONFIDENCE_THRESHOLD_COUNT);
+        boolean isConfident = (excellentPoseCount > CONFIDENCE_THRESHOLD_COUNT);
         Pose2d resultPose = filterHeading(visionPose.pose);
         return new AprilTagResult(resultPose, 0, descriptor.latency, isConfident);
     }
@@ -712,7 +712,7 @@ public class Poser {
         ArrayList<DistanceResult> distances = new ArrayList<>();
 
         // Rejected April Tag poses for telemetry purposes:
-        ArrayList<Pose2d> rejectedPoses = new ArrayList<>(); // @@@ Hook up
+        ArrayList<Pose2d> rejectedPoses = new ArrayList<>();
     }
 
     public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
@@ -787,44 +787,39 @@ public class Poser {
         } while (iteratorRecord != null);
     }
 
+    // Draw the history visualizations:
     private void visualize() {
+        Canvas c = Globals.canvas;
 
-        // Draw the best estimate pose:
-//        Globals.canvas.setStroke("#3F51B5");
-//        MecanumDrive.drawRobot(Globals.canvas, drive.pose);
+        // Go from oldest to newest:
+        ListIterator<HistoryRecord> iterator = history.listIterator(history.size());
+        HistoryRecord record = iterator.previous();
+        while (record != null) {
+            // Draw the pose trail:
+            c.setFill("#3F51B5");
+            c.fillRect(record.postTwistPose.position.x - 0.5,
+                       record.postTwistPose.position.y - 0.5, 1, 1);
 
+            // Draw the distance sensor results in gray (rejects) and green (accepted):
+            if (record.distances.size() != 0) {
+                for (DistanceResult distance: record.distances) {
+                    c.setFill((distance.valid) ? "#00ff00" : "#707070");
+                    c.fillRect(distance.point.x - 0.5, distance.point.y - 0.5, 1, 1);
+                }
+            }
 
-//        if (false) {
-//            double[] xPoints = new double[poseHistory.size()];
-//            double[] yPoints = new double[poseHistory.size()];
-//            int i = 0;
-//
-//            for (MecanumDrive.PoseEpoch t : poseHistory) {
-//                xPoints[i] = t.pose.position.x;
-//                yPoints[i] = t.pose.position.y;
-//                i++;
-//            }
-//
-//            c.setStrokeWidth(1);
-//            c.setStroke("#3F51B5");
-//            c.strokePolyline(xPoints, yPoints);
-//        } else {
-//            c.setFill("#3F51B5");
-//            for (MecanumDrive.PoseEpoch t: poseHistory) {
-//                c.fillRect(t.pose.position.x - 0.5, t.pose.position.y - 0.5, 1, 1);
-//            }
-//        }
-//
-//        // Draw pose corrections in red:
-//        c.setStroke("#FF0000");
-//        for (int i = 1; i < poseHistory.size(); i++) {
-//            if (poseHistory.get(i).flags != 0) {
-//                c.strokeLine(poseHistory.get(i-1).pose.position.x,
-//                        poseHistory.get(i-1).pose.position.y,
-//                        poseHistory.get(i).pose.position.x,
-//                        poseHistory.get(i).pose.position.y);
-//            }
-//        }
+            // Draw the rejected April Tag poses as little grey circles:
+            for (Pose2d rejectPose: record.rejectedPoses) {
+                c.setFill("#404040");
+                MecanumDrive.drawRobot(Globals.canvas, rejectPose, 4);
+            }
+
+            record = iterator.previous();
+        }
+
+        // Finally, draw our current pose:
+        c.setStroke("#3F51B5");
+        MecanumDrive.drawRobot(c, pose, 9);
     }
 
     // Update the pose estimate:
