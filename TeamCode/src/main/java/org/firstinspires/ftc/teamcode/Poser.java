@@ -16,10 +16,12 @@ import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.IMU;
 
 import android.util.Size;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -373,7 +375,7 @@ class AprilTagLocalizer {
     // Structure for describing cameras on the robot:
     static class CameraDescriptor {
         String name; // Device name in the robot's configuration
-        Point offset; // Offset in inches from center of rotation, robot facing forward
+        Point offset; // Offset in inches from center of rotation, relative to the camera itself
         double theta; // Orientation of the sensor in radians
         Size resolution; // Resolution in pixels
         double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
@@ -590,7 +592,7 @@ class AprilTagLocalizer {
         List<AprilTagDetection> tagDetections = aprilTag.getFreshDetections();
         if (tagDetections != null) {
             for (AprilTagDetection detection : tagDetections) {
-                pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 10e-6;
+                pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-6;
                 if (detection.metadata != null) {
                     Location tag = getTag(detection);
                     if (tag != null) {
@@ -707,8 +709,10 @@ public class Poser {
 
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
+    private double originalYaw; // Radians
 
     // Component localizers:
+    private IMU imu;
     private Localizer odometryLocalizer;
     private DistanceLocalizer distanceLocalizer;
     private AprilTagLocalizer aprilTagLocalizer;
@@ -741,9 +745,12 @@ public class Poser {
         }
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
+        imu = drive.imu;
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
+
+        originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
     }
 
     // Copy a pose:
@@ -805,7 +812,7 @@ public class Poser {
         }
     }
 
-    // Draw the history visualizations:
+    // Draw the history visualizations for FTC Dashboard:
     private void visualize() {
         Canvas c = Globals.canvas;
 
@@ -840,6 +847,10 @@ public class Poser {
                     MecanumDrive.drawRobot(Globals.canvas, rejectPose, 3);
                 }
 
+                // Draw the good April Tag pose in green:
+                c.setStroke("#a0ffa0");
+                MecanumDrive.drawRobot(Globals.canvas, record.postTwistPose, 3);
+
                 // Go to the next newest record:
                 if (!iterator.hasPrevious())
                     break;
@@ -871,12 +882,10 @@ public class Poser {
             history.removeLast();
         }
 
-        isConfident = true; // @@@@@@@@@@
-
         // Process April Tags:
         AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, historyRecord);
         if (aprilTag != null) {
-            // @@@ changeHistory(time - aprilTag.latency, aprilTag.pose, null);
+            changeHistory(time - aprilTag.latency, aprilTag.pose, null);
             isConfident |= aprilTag.isConfident;
         }
 
@@ -887,10 +896,21 @@ public class Poser {
             changeHistory(time - distance.latency, null, distance);
         }
 
+        // Output telemetry about the yaw:
+        double imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
+        double poseYaw = pose.heading.log();
+        double degreesCorrection = Math.toDegrees(poseYaw - imuYaw);
+        while (degreesCorrection <= -45)
+            degreesCorrection += 90;
+        while (degreesCorrection > 45)
+            degreesCorrection -= 90;
+        Globals.telemetry.addLine(String.format("Yaw correction: %.2f°", degreesCorrection));
+
+        // Update the FTC Dashboard field map:
         visualize();
     }
 
-    // Close when done:
+    // Close when done running our OpMode:
     void close() {
         aprilTagLocalizer.close();
     }

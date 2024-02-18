@@ -300,21 +300,31 @@ class Wall {
 public class Driver extends LinearOpMode {
     // Shape the stick input for more precision at slow speeds:
     public double shapeStick(double stickValue) {
-        return Math.signum(stickValue) * Math.pow(stickValue, 2.0);
+        double result = Math.signum(stickValue) * Math.abs(Math.pow(stickValue, 4.0));
+        result = Math.min(result, 1.0);
+        result = Math.max(result, -1.0);
+        return result;
     }
 
     // Scale the stick input to a shaped result that accounts for the dead zone:
-    public double scaleStick(double stickValue, double scale) {
-        final double DEAD_ZONE = 0.15; // Assume 15%, not forgetting that the range is [-1, 1]
-        if (Math.abs(stickValue) <= DEAD_ZONE)
-            return 0;
+    public double scaleStick(double inputValue, double scale) {
+//        final double DEAD_ZONE = 0.10; // Assume 15%, not forgetting that the range is [-1, 1]
+//        if (Math.abs(inputValue) <= DEAD_ZONE) {
+//            Globals.telemetry.addLine(String.format("Raw stick: %.2f, Result: --", inputValue));
+//            return 0;
+//        }
 
         // Shape the result:
-        stickValue = shapeStick(stickValue);
-        // Push away from the dead zone:
-        stickValue = (1.0 - DEAD_ZONE) * stickValue + Math.signum(stickValue) * DEAD_ZONE;
+        double shapedValue = shapeStick(inputValue);
+
+//        // Push away from the dead zone:
+//        shapedValue = (1.0 - DEAD_ZONE) * shapedValue + Math.signum(shapedValue) * DEAD_ZONE;
+
+        Globals.telemetry.addLine(String.format("Raw stick: %.2f, Result: %.2f, Scale to: %.2f",
+                inputValue, shapedValue, scale));
+
         // Return the scaled result:
-        return stickValue * scale;
+        return shapedValue * scale;
     }
 
     @SuppressLint("DefaultLocale")
