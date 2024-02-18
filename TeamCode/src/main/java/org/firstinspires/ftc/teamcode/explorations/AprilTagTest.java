@@ -94,6 +94,14 @@ public class AprilTagTest extends LinearOpMode {
 
     private TimeSplitter durationSplit = TimeSplitter.create("Loop duration");
 
+    // Shape the stick input for more precision at slow speeds:
+    public double shapeStick(double stickValue) {
+        if (stickValue == 0)
+            return 0;
+        double result = Math.signum(stickValue) * Math.abs(Math.pow(stickValue, 2.0));
+        return result / 2.0 + Math.signum(result) * 0.15;
+    }
+
     @Override
     public void runOpMode() {
 
@@ -113,10 +121,10 @@ public class AprilTagTest extends LinearOpMode {
 
             drive.setDrivePowers(new PoseVelocity2d(
                     new Vector2d(
-                            -gamepad1.left_stick_y,
-                            -gamepad1.left_stick_x
+                            shapeStick(-gamepad1.left_stick_y),
+                            shapeStick(-gamepad1.left_stick_x)
                     ),
-                    -gamepad1.right_stick_x
+                    shapeStick(-gamepad1.right_stick_x)
             ));
 
             drive.updatePoseEstimate();
@@ -245,8 +253,8 @@ public class AprilTagTest extends LinearOpMode {
         Pose2d recommendedPose = null;
 
         // Camera location on the robot:
-        final double CAMERA_OFFSET_Y = 8.0;
-        final double CAMERA_OFFSET_X = 0.0;
+        final double CAMERA_OFFSET_X = 8.0; // 0.0;
+        final double CAMERA_OFFSET_Y = -5.75; // 8.0;
 
         AprilTagLocation[] tagLocations = {
                 new AprilTagLocation(1,62.875,   42.750, 180, false), // Blue left backdrop, small
@@ -274,8 +282,8 @@ public class AprilTagTest extends LinearOpMode {
                 }
 
                 Pose2d pose;
-                double dx = detection.ftcPose.x + CAMERA_OFFSET_X;
-                double dy = detection.ftcPose.y + CAMERA_OFFSET_Y;
+                double dx = detection.ftcPose.x - CAMERA_OFFSET_X;
+                double dy = detection.ftcPose.y - CAMERA_OFFSET_Y;
                 double distance = Math.sqrt(dx * dx + dy * dy);
 
                 double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));

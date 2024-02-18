@@ -351,14 +351,15 @@ class AprilTagLocalizer {
 
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
+    private double pipelineLatency;
 
     final Location[] tagLocations = {
-            new Location(1, 62.875, 42.750, 180, false), // Blue left backdrop, small
-            new Location(2, 62.875, 36.625, 180, false), // Blue middle backdrop, small
-            new Location(3, 62.875, 30.625, 180, false), // Blue right backdrop, small
-            new Location(4, 62.875, -30.625, 180, false), // Red left backdrop, small
-            new Location(5, 62.875, -36.750, 180, false), // Red middle backdrop, small
-            new Location(6, 62.875, -42.625, 180, false), // Red right backdrop, small
+            new Location(1, 62.875, 42.750, Math.toRadians(180), false), // Blue left backdrop, small
+            new Location(2, 62.875, 36.625, Math.toRadians(180), false), // Blue middle backdrop, small
+            new Location(3, 62.875, 30.625, Math.toRadians(180), false), // Blue right backdrop, small
+            new Location(4, 62.875, -30.625, Math.toRadians(180), false), // Red left backdrop, small
+            new Location(5, 62.875, -36.750, Math.toRadians(180), false), // Red middle backdrop, small
+            new Location(6, 62.875, -42.625, Math.toRadians(180), false), // Red right backdrop, small
             new Location(7, -72, -43.0, 0, true),   // Red audience wall, large
             new Location(8, -72, -37.5, 0, false),  // Red audience wall, small
             new Location(9, -72, 37.5, 0, false),  // Blue audience wall, small
@@ -393,11 +394,11 @@ class AprilTagLocalizer {
         int id;
         double x;
         double y;
-        double degrees;
+        double theta; // Degrees
         boolean large;
 
-        Location(int id, double x, double y, double degrees, boolean large) {
-            this.id = id; this.x = x; this.y = y; this.degrees = degrees; this.large = large;
+        Location(int id, double x, double y, double theta, boolean large) {
+            this.id = id; this.x = x; this.y = y; this.theta = theta; this.large = large;
         }
     }
 
@@ -554,15 +555,15 @@ class AprilTagLocalizer {
     private Pose2d computeRobotPose(AprilTagDetection detection, Location tag) {
         CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
 
-        double dx = detection.ftcPose.x + descriptor.offset.x;
-        double dy = detection.ftcPose.y + descriptor.offset.y;
+        double dx = detection.ftcPose.x - descriptor.offset.x;
+        double dy = detection.ftcPose.y - descriptor.offset.y;
         double distance = Math.sqrt(dx * dx + dy * dy);
 
-        double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
+        double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + tag.theta);
         double x = tag.x + Math.cos(gamma) * distance;
         double y = tag.y + Math.sin(gamma) * distance;
 
-        double theta = Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees) + descriptor.theta;
+        double theta = Math.toRadians(detection.ftcPose.yaw) + tag.theta + descriptor.theta;
         return new Pose2d(new Vector2d(x, y), Math.PI - theta);
     }
 
@@ -586,7 +587,6 @@ class AprilTagLocalizer {
     public Result update(Pose2d currentPose, Poser.HistoryRecord historyRecord) {
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minDistance = Float.MAX_VALUE;
-        double pipelineLatency = 0;
         CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
 
         List<AprilTagDetection> tagDetections = aprilTag.getFreshDetections();
@@ -674,8 +674,8 @@ class AprilTagLocalizer {
         }
 
         // Handle some telemetry and visualization logging:
-        Globals.telemetry.addLine(String.format("Vision FPS: %.2f", visionPortal.getFps()));
-        Globals.telemetry.addLine(String.format("Vision pose count: %d, ms: %.2f", visionPoses.size(), pipelineLatency));
+        Globals.telemetry.addLine(String.format("Vision FPS: %.2f, latency: %.1fms", visionPortal.getFps(), pipelineLatency));
+        Globals.telemetry.addLine(String.format("Vision pose count: %d", visionPoses.size()));
         Globals.telemetry.addLine(poseStatus);
 
         for (VisionPose rejectPose: visionPoses) {
