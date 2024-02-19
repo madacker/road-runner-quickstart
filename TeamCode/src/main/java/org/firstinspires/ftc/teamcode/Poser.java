@@ -140,29 +140,31 @@ class SlidingWindowFilter {
 
     // Filter the prediction and measurements and return a posterior:
     @NonNull Pose2d filter(
+            double time, // Globals.time() for when the filtering should be done
             @NonNull Pose2d odometryPose, // Odometry measured pose
             @Nullable Pose2d distanceSensorPose, // Distance-sensor measured pose
             @Nullable Pose2d aprilTagPose, // April-tag
-            boolean confidentAprilTag) {
+            boolean confidentAprilTag) { // True if confident in the April-tag
 
-        // Track the current time and the delta-t from the previous filter operation:
-        double time = Globals.time();
-        double dt = time - previousTime;
-        previousTime = time;
+        // We might have gone back in time so remove any newer results:
+        while ((positionResiduals.size() > 0) && (positionResiduals.getFirst().time >= time))
+            positionResiduals.removeFirst();
+        while ((headingResiduals.size() > 0) && (headingResiduals.getFirst().time >= time))
+            headingResiduals.removeFirst();
 
-        // If it's been some time since we got a new position residual, toss them all. We don't
-        // want to age them out one at a time because that simply biases everything to the
-        // most recent one:
+        // If the newest residuals are too stale (meany it's been a long time since we got a
+        // new one), toss them all. We don't want to age them out one at a time because that
+        // simply biases everything to the most recent one:
         if ((positionResiduals.size() > 0) &&
-                (time - positionResiduals.getLast().time > POSITION_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
+                (time - positionResiduals.getFirst().time > POSITION_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
             positionResiduals.clear();
         }
         if ((headingResiduals.size() > 0) &&
-                (time - headingResiduals.getLast().time > HEADING_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
+                (time - headingResiduals.getFirst().time > HEADING_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
             headingResiduals.clear();
         }
 
-        // Remove all aged-out residuals from the histories:
+        // Remove all residuals that are too old:
         while ((positionResiduals.size() > 0) && (time - positionResiduals.getLast().time > POSITION_WINDOW_DURATION))
             positionResiduals.removeLast(); // Newest to oldest
         while ((headingResiduals.size() > 0) && (time - headingResiduals.getLast().time > HEADING_WINDOW_DURATION))
@@ -206,17 +208,23 @@ class SlidingWindowFilter {
         Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
         double headingCorrection = aggregateHeaderResidual;
 
-        // Once we're locked in, clamp the rate of any changes:
-        if (isConfident) {
-            double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
-            if (distance > dt * MAX_POSITION_CHANGE_RATE) {
-                double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
-                positionCorrection = positionCorrection.times(clampFactor);
-            }
-            if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
-                headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
-            }
-        }
+        // @@@ Think about clamping rate change
+
+//        // Track the current time and the delta-t from the previous filter operation:
+//        double dt = time - previousTime;
+//        previousTime = time;
+//
+//        // Once we're locked in, clamp the rate of any changes:
+//        if (isConfident) {
+//            double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
+//            if (distance > dt * MAX_POSITION_CHANGE_RATE) {
+//                double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
+//                positionCorrection = positionCorrection.times(clampFactor);
+//            }
+//            if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
+//                headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
+//            }
+//        }
 
         // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage<Vector2d> position: positionResiduals) {
@@ -236,6 +244,12 @@ class SlidingWindowFilter {
     boolean isConfident() {
         return isConfident;
     }
+
+    // Output telemetry:
+    void telemetry() {
+        Globals.telemetry.addLine(String.format("Position residuals: %d, heading residuals: %d",
+                positionResiduals.size(), headingResiduals.size()));
+    }
 }
 
 /**
@@ -244,7 +258,7 @@ class SlidingWindowFilter {
 class DistanceLocalizer {
     // Description of the distance sensor on the robot:
     static final SensorDescriptor[] DISTANCE_SENSOR_DESCRIPTORS = {
-        new SensorDescriptor("distance", new Point(-3, -1), Math.PI)
+        new SensorDescriptor("distance", new Point(-3, -2), Math.PI)
     };
 
     // This is list is maintained one-to-one with SENSOR_DESCRIPTORS:
@@ -259,7 +273,7 @@ class DistanceLocalizer {
     // Read a distance sensor at this interval, in seconds:
     static final double READ_INTERVAL = 0.100; // 100ms
 
-    // Maximum distance, in inches, for us to trust a distance measurement:
+    // Maximum distance, in inches, for us to trust a distance sensor measurement:
     static final double MAX_DISTANCE = 48;
 
     // The measured result needs to be within this many inches of the expected result otherwise
@@ -469,7 +483,7 @@ class DistanceLocalizer {
                 Point fixupVector = new Point(hitVector.x * fixupFactor, hitVector.y * fixupFactor);
                 Point newPosition = hitPoint.add(fixupVector);
 
-                // @@@@@@ pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
+                pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
                 valid = true;
             }
         }
@@ -488,9 +502,12 @@ class DistanceLocalizer {
  * Localizer for April Tags.
  */
 class AprilTagLocalizer {
-    // We arbitrarily decide that a pose has to be within this many inches to be reliable:
+    // We arbitrarily decide that a pose has to be within this many inches of the old to be reliable:
     final double FINE_EPSILON = 5.0;
-    final double COARSE_EPSILON = 10.0;
+    final double COARSE_EPSILON = 24.0;
+
+    // Arbitrary reliable range:
+    final double RELIABLE_RANGE = 60.0;
 
     private String poseStatus = ""; // UI status message that is persisted
 
@@ -660,11 +677,12 @@ class AprilTagLocalizer {
     // Interim data structure used to track poses determined by the AprilTags:
     static class VisionPose {
         Pose2d pose; // Field-relative robot pose
-        double residual; // Distance from current pose
+        double residual; // Distance from current pose, in inches
+        double range; // Distance from April Tag, in inches
         Location tag; // Tag that determined this pose
 
-        VisionPose(Pose2d pose, double residual, Location tag) {
-            this.pose = pose; this.residual = residual; this.tag = tag;
+        VisionPose(Pose2d pose, double residual, double range, Location tag) {
+            this.pose = pose; this.residual = residual; this.range = range; this.tag = tag;
         }
     }
 
@@ -692,7 +710,7 @@ class AprilTagLocalizer {
                                 currentPose.position.y - visionPose.position.y);
 
                         minResidual = Math.min(minResidual, residual);
-                        visionPoses.add(new VisionPose(visionPose, residual, tag));
+                        visionPoses.add(new VisionPose(visionPose, residual, detection.ftcPose.range, tag));
                     }
                 }
             }
@@ -706,7 +724,7 @@ class AprilTagLocalizer {
         // the tag - we always use it to set our current pose, regardless of the state of the
         // old pose, and we trust its heading result:
         boolean isExcellentPose = false;
-        if ((poseCount == 3) && (tagDetections.get(0).ftcPose.range < 48)) {
+        if ((poseCount == 3) && (tagDetections.get(0).ftcPose.range < RELIABLE_RANGE)) {
             double maxNeighborDistance = 0;
 
             // Compute the distance between each pose and its neighbors:
@@ -745,7 +763,7 @@ class AprilTagLocalizer {
             } else {
                 poseStatus = String.format("%d inadequate vision poses", poseCount);
             }
-            if ((poseCount == 1) && (minResidual < FINE_EPSILON)) {
+            if ((poseCount == 1) && (minResidual < FINE_EPSILON) && (visionPoses.get(0).range < RELIABLE_RANGE)) {
                 // @@@ Check its size?
                 // If only a single tag is in view, adopt its pose only if it's relatively close
                 // to our current pose estimate:
@@ -755,7 +773,7 @@ class AprilTagLocalizer {
                 // If multiple tags are in view, choose the closest one to our current pose
                 // (reasoning that it's unlikely that *both* are wildly bogus).
                 for (VisionPose candidatePose : visionPoses) {
-                    if (candidatePose.residual == minResidual) {
+                    if ((candidatePose.residual == minResidual) && (candidatePose.range < RELIABLE_RANGE)) {
                         visionPose = candidatePose;
                         poseStatus = String.format("Good one in %d vision pose, %.2f", visionPoses.size(), candidatePose.residual);
                     }
@@ -770,8 +788,8 @@ class AprilTagLocalizer {
 
         Pose2d resultPose = (visionPose != null) ? visionPose.pose : null;
         ArrayList<Pose2d> rejectList = new ArrayList<>();
-        for (VisionPose rejectPose: visionPoses) {
-            if (rejectPose != visionPose) {
+        if (visionPose == null) {
+            for (VisionPose rejectPose : visionPoses) {
                 rejectList.add(rejectPose.pose);
             }
         }
@@ -836,6 +854,29 @@ public class Poser {
                 new Rotation2d(pose.heading.real, pose.heading.imag));
     }
 
+    // Combine the various poses in a historical record:
+    Pose2d filterHistoryRecord(HistoryRecord record) {
+        Pose2d odometryPose = record.posteriorPose.plus(record.twist);
+        Pose2d distanceSensorPose = null;
+        Pose2d aprilTagPose = null;
+        boolean confidentAprilTag = false;
+
+        if (record.aprilTag != null) {
+            aprilTagPose = record.aprilTag.pose; // Could be null
+            confidentAprilTag = record.aprilTag.isConfident;
+        }
+        if (record.distance != null) {
+            // If there's an April Tag, roll the distance calculation into that one:
+            if (aprilTagPose != null) {
+                aprilTagPose = DistanceLocalizer.localize(aprilTagPose, record.distance);
+            } else {
+                distanceSensorPose = DistanceLocalizer.localize(odometryPose, record.distance);
+            }
+        }
+
+        return filter.filter(record.time, odometryPose, distanceSensorPose, aprilTagPose, confidentAprilTag);
+    }
+
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
     private void changeHistory(
@@ -881,31 +922,14 @@ public class Poser {
         // Now replay all of the history records back so we can recompute the poses up to the
         // current time:
         while (true) {
-            Pose2d odometryPose = iteratorRecord.posteriorPose.plus(iteratorRecord.twist);
-            Pose2d distanceSensorPose = null;
-            Pose2d aprilTagPose = null;
-            boolean confidentAprilTag = false;
-
-            if (iteratorRecord.aprilTag != null) {
-                aprilTagPose = iteratorRecord.aprilTag.pose; // Could be null
-                confidentAprilTag = iteratorRecord.aprilTag.isConfident;
-            }
-            if (iteratorRecord.distance != null) {
-                // If there's an April Tag, roll the distance calculation into that one:
-                if (aprilTagPose != null) {
-                    aprilTagPose = DistanceLocalizer.localize(aprilTagPose, iteratorRecord.distance);
-                } else {
-                    distanceSensorPose = DistanceLocalizer.localize(odometryPose, iteratorRecord.distance);
-                }
-            }
-
-            pose = filter.filter(odometryPose, distanceSensorPose, aprilTagPose, confidentAprilTag);
+            pose = filterHistoryRecord(iteratorRecord);
             if (!iterator.hasPrevious())
                 break; // ====>
 
             iteratorRecord = iterator.previous();
-            iteratorRecord.posteriorPose = copyPose(pose); // Update record to the newly calculated pose
+            iteratorRecord.posteriorPose = copyPose(pose);
         }
+
     }
 
     // Draw the history visualizations for FTC Dashboard:
@@ -946,7 +970,7 @@ public class Poser {
 
                     if (record.aprilTag.pose != null) {
                         // Draw confident April Tags in green, not so confident in yellow:
-                        c.setStroke(record.aprilTag.isConfident ? "#00ff00" : "#ffff00");
+                        c.setStroke(record.aprilTag.isConfident ? "#00ff00" : "#a0a000");
                         MecanumDrive.drawRobot(Globals.canvas, record.aprilTag.pose, 3);
                     }
                 }
@@ -970,10 +994,11 @@ public class Poser {
         velocity = dualTwist.velocity().value();
 
         // Create a tracking record:
-        history.addFirst(new HistoryRecord(time, pose, dualTwist.value()));
+        HistoryRecord record = new HistoryRecord(time, pose, dualTwist.value());
+        history.addFirst(record);
 
-        // Update the pose
-        pose = pose.plus(dualTwist.value());
+        // Update the pose accordingly. This may get recomputed via 'changeHistory' below:
+        pose = filterHistoryRecord(record);
 
         // Delete old history records:
         while (time - history.getLast().time > HISTORY_DURATION) {
@@ -993,7 +1018,9 @@ public class Poser {
             changeHistory(time - distance.latency, null, distance);
         }
 
-        // Output telemetry about the yaw:
+        // Output telemetry and visualizations:
+        visualize();
+        filter.telemetry();
         double imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
         double poseYaw = pose.heading.log();
         double degreesCorrection = Math.toDegrees(poseYaw - imuYaw);
@@ -1001,10 +1028,8 @@ public class Poser {
             degreesCorrection += 90;
         while (degreesCorrection > 45)
             degreesCorrection -= 90;
-        Globals.telemetry.addLine(String.format("Yaw correction: %.2f°", degreesCorrection));
-
-        // Update the FTC Dashboard field map:
-        visualize();
+        Globals.telemetry.addLine(String.format("Yaw correction: %.2f°, IMU yaw: %.2f°",
+                degreesCorrection, Math.toDegrees(imuYaw)));
     }
 
     // Close when done running our OpMode:

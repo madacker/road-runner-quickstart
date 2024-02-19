@@ -300,7 +300,7 @@ class Wall {
 public class Driver extends LinearOpMode {
     // Shape the stick input for more precision at slow speeds:
     public double shapeStick(double stickValue) {
-        double result = Math.signum(stickValue) * Math.abs(Math.pow(stickValue, 4.0));
+        double result = Math.signum(stickValue) * Math.abs(Math.pow(stickValue, 2.0));
         result = Math.min(result, 1.0);
         result = Math.max(result, -1.0);
         return result;
@@ -320,8 +320,8 @@ public class Driver extends LinearOpMode {
 //        // Push away from the dead zone:
 //        shapedValue = (1.0 - DEAD_ZONE) * shapedValue + Math.signum(shapedValue) * DEAD_ZONE;
 
-        Globals.telemetry.addLine(String.format("Raw stick: %.2f, Result: %.2f, Scale to: %.2f",
-                inputValue, shapedValue, scale));
+//        Globals.telemetry.addLine(String.format("Raw stick: %.2f, Result: %.2f, Scale to: %.2f",
+//                inputValue, shapedValue, scale));
 
         // Return the scaled result:
         return shapedValue * scale;
@@ -374,10 +374,12 @@ public class Driver extends LinearOpMode {
             if (!gamepad1.a)
                 parker = null;
             else {
-                if ((parker == null) && (poser.isConfident()))
-                    parker = new AutoParker(poser, drive, new Pose2d(45, 36, Math.PI),
-                            Math.PI, 48);
-                parkingActivated = parker.park();
+                if (poser.isConfident()) {
+                    if (parker == null)
+                        parker = new AutoParker(poser, drive, new Pose2d(45, 36, Math.PI),
+                                Math.PI, 48);
+                    parkingActivated = parker.park();
+                }
             }
 
             // The 'left-bumper' button activates Road Runner homing:
