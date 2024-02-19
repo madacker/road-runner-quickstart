@@ -190,10 +190,10 @@ class SlidingWindowFilter {
         Vector2d aggregatePositionResidual = new Vector2d(0, 0);
         double aggregateHeaderResidual = 0;
 
-        for (Storage position: positionResiduals) {
+        for (Storage<Vector2d> position: positionResiduals) {
             aggregatePositionResidual = aggregatePositionResidual.plus((Vector2d) position.residual);
         }
-        for (Storage heading: headingResiduals) {
+        for (Storage<Double> heading: headingResiduals) {
             aggregateHeaderResidual = aggregateHeaderResidual + (Double) heading.residual;
         }
 
@@ -219,10 +219,10 @@ class SlidingWindowFilter {
         }
 
         // Negatively offset everything in the history to account for the offset we're adding:
-        for (Storage position: positionResiduals) {
+        for (Storage<Vector2d> position: positionResiduals) {
             position.residual = positionCorrection.minus((Vector2d) position.residual);
         }
-        for (Storage heading: headingResiduals) {
+        for (Storage<Double> heading: headingResiduals) {
             heading.residual = headingCorrection - (double) heading.residual;
         }
 
@@ -553,7 +553,7 @@ class AprilTagLocalizer {
         boolean isConfident; // Confidence in this pose
         int cameraIndex; // CAMERA_DESCRIPTORS index
         double latency; // Latency, in seconds
-        ArrayList<Pose2d> rejectList = new ArrayList<>(); // Rejected April Tag poses for telemetry purposes
+        ArrayList<Pose2d> rejectList; // Rejected April Tag poses for telemetry purposes
 
         public Result(Pose2d pose, boolean isConfident, int cameraIndex, double latency, ArrayList<Pose2d> rejectList) {
             this.pose = pose; this.isConfident = isConfident; this.cameraIndex = cameraIndex; this.latency = latency; this.rejectList = rejectList;
