@@ -366,7 +366,7 @@ public class Driver extends LinearOpMode {
             poser.update();
             led.update();
 
-            if (poser.isConfident)
+            if (poser.isConfident())
                 led.setSteadyColor(Led.Color.RED);
 
             // The 'A' button activates the auto-parker:
@@ -374,7 +374,7 @@ public class Driver extends LinearOpMode {
             if (!gamepad1.a)
                 parker = null;
             else {
-                if ((parker == null) && (poser.isConfident))
+                if ((parker == null) && (poser.isConfident()))
                     parker = new AutoParker(poser, drive, new Pose2d(45, 36, Math.PI),
                             Math.PI, 48);
                 parkingActivated = parker.park();
@@ -382,7 +382,7 @@ public class Driver extends LinearOpMode {
 
             // The 'left-bumper' button activates Road Runner homing:
             boolean roadrunnerActivated = drive.doActionsWork(poser.pose, poser.velocity, Globals.packet);
-            if ((gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isConfident)) {
+            if ((gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isConfident())) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(poser.velocity.linearVel.x) < 0.1) &&
                     (Math.abs(poser.velocity.linearVel.y) < 0.1) &&
@@ -430,7 +430,7 @@ public class Driver extends LinearOpMode {
 
                     PoseVelocity2d fieldVelocity = poser.pose.times(calibratedVelocity);
 
-                    if ((wall != null) && (poser.isConfident))
+                    if ((wall != null) && (poser.isConfident()))
                         wall.repulse(fieldVelocity); // @@@
 
                     drive.setDrivePowers(poser.pose, poser.velocity, null, fieldVelocity);
