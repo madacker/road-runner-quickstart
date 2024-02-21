@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
 import com.qualcomm.robotcore.hardware.I2cWaitControl;
+import com.qualcomm.robotcore.hardware.TimestampedData;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.RobotLog;
@@ -101,12 +102,24 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     //----------------------------------------------------------------------------------------------
     // Configure the SPI interface of the bridge:
     void configureBridge() {
-        // Configure to the defaults as per the datasheet:
-        int order = 0; // Big endian
-        int mode = 3; // SPICLK HIGH when idle, data clocked in on trailing edge
-        int clockRate = 0; // 1843 kHz
-        this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal,
-                (order << 5) | (mode << 2) | (clockRate << 0));
+        // Clock rate: 0 = 1843 kHz
+        //             1 = 461 kHz
+        //             2 = 115 kHz
+        //             3 = 58 kHz
+        int clockRate = 2;
+
+        // Mode: 0 = SPICLK low when idle, data clocked on leading edge
+        //       1 = SPICLK low when idle, data clocked on trailing edge
+        //       2 = SPICLK high when idle, data clocked on trailing edge
+        //       3 = SPICLK high when idle, data clocked on leading edge
+        int mode = 3;
+
+        // Order: 0 = MSB is first, 1 = LSB is first
+        int order = 0;
+
+        int configuration = (order << 5) | (mode << 2) | (clockRate << 0);
+        RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
+        this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
     }
 
     // Write the 'writePayload' data to the SPI device and read back the result for every
@@ -131,12 +144,15 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Write the data and read back the new writePayload:
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
         return this.deviceClient.read(writePayload.length);
+
+//        TimestampedData timestamp = this.deviceClient.readTimeStamped(writePayload.length); // @@@
+//        return timestamp.data;
     }
 
     // This function takes an 8-bit address and returns an 8-bit value:
     int readRegister(int addr) {
         byte[] reads = bridgeTransfer(new byte[] { (byte) addr, 0 });
-        RobotLog.dd(MYTAG, String.format("ReadRegister: address 0x%x, datum 0x%x", reads[0], reads[1]));
+        RobotLog.dd(MYTAG, String.format("ReadRegister address: 0x%x, length: %d, result: 0x%x", addr, reads.length, reads[1]));
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
 
@@ -173,6 +189,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     // Do the secret-sauce initialization for the PAA5100:
     private void secretSauce() {
         // The following portion is from __init__()
+        // Here we're seeing 0x50 0x0f 0x3x 0x5a
         writeRegister(Register.SPI_POWER_UP_RESET.bVal, 0x5a);
         try {
             sleep(500);
@@ -180,6 +197,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             throw new RuntimeException(e);
         }
         for (int i = 0; i < 5; i++) {
+            // Here we're seeing:
+            //     Write 50, 0f, 02, 00
+            //     Read 51, 00, 00, 00 // @@@ Why that length?
             readRegister(Register.SPI_DATA_READY.bVal + i);
         }
 
@@ -350,6 +370,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     protected boolean doInitialize() {
         // Configure the SPI interface of the bridge:
         configureBridge();
+
+        readRegister(0x00); // @@@
 
         // Initialize the optical tracking chip:
         secretSauce();

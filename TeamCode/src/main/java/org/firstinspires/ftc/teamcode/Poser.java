@@ -449,15 +449,15 @@ class DistanceLocalizer {
         Segment segment = WALL_SEGMENTS[distance.segmentIndex];
 
         // Sensor offset from robot center in field coordinates:
-        double sensorAngle = sensor.theta + pose.heading.log();
-        Point sensorOffset = sensor.offset.rotate(sensorAngle);
+        double sensorFieldAngle = sensor.theta + pose.heading.log();
+        Point sensorFieldOffset = sensor.offset.rotate(sensorFieldAngle);
 
         // Create the rays representing the edges of the field-of-view:
-        Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
-        Point sensorDirection1 = new Point(Math.cos(sensorAngle - HALF_FOV),
-                                           Math.sin(sensorAngle - HALF_FOV));
-        Point sensorDirection2 = new Point(Math.cos(sensorAngle + HALF_FOV),
-                                           Math.sin(sensorAngle + HALF_FOV));
+        Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorFieldOffset);
+        Point sensorDirection1 = new Point(Math.cos(sensorFieldAngle - HALF_FOV),
+                                           Math.sin(sensorFieldAngle - HALF_FOV));
+        Point sensorDirection2 = new Point(Math.cos(sensorFieldAngle + HALF_FOV),
+                                           Math.sin(sensorFieldAngle + HALF_FOV));
         Ray sensorRay1 = new Ray(sensorPoint, sensorDirection1);
         Ray sensorRay2 = new Ray(sensorPoint, sensorDirection2);
 
@@ -466,7 +466,7 @@ class DistanceLocalizer {
         if ((raySegmentIntersection(sensorRay1, segment) != null) &&
             (raySegmentIntersection(sensorRay2, segment) != null)) {
 
-            Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
+            Point sensorDirection = new Point(Math.cos(sensorFieldAngle), Math.sin(sensorFieldAngle));
             Ray sensorRay = new Ray(sensorPoint, sensorDirection);
 
             Point hitPoint = raySegmentIntersection(sensorRay, segment);
@@ -491,8 +491,8 @@ class DistanceLocalizer {
         // Update telemetry:
         distance.valid = valid;
         distance.point = new Point(
-                pose.position.x + sensorOffset.x + distance.measurement * Math.cos(sensorAngle),
-                pose.position.y + sensorOffset.y + distance.measurement * Math.sin(sensorAngle));
+                pose.position.x + sensorFieldOffset.x + distance.measurement * Math.cos(sensorFieldAngle),
+                pose.position.y + sensorFieldOffset.y + distance.measurement * Math.sin(sensorFieldAngle));
 
         return pose;
     }
@@ -511,7 +511,7 @@ class AprilTagLocalizer {
 
     private String poseStatus = ""; // UI status message that is persisted
 
-    private AprilTagProcessor aprilTag;
+    private AprilTagProcessor aprilTagProcessor;
     private VisionPortal visionPortal;
     private double pipelineLatency;
 
@@ -532,7 +532,7 @@ class AprilTagLocalizer {
             new CameraDescriptor("webcam2", new Point(8.0, -5.75), Math.PI,
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
-                    0.19) // Seconds
+                    0.19, 75)
     };
 
     // Structure for describing cameras on the robot:
@@ -543,11 +543,12 @@ class AprilTagLocalizer {
         Size resolution; // Resolution in pixels
         double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
         double latency; // End-to-end April Tag processing latency, in seconds
+        double fov; // Horizontal field of view
 
-        public CameraDescriptor(String name, Point offset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency) {
+        public CameraDescriptor(String name, Point offset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency, double fov) {
             this.name = name; this.offset = offset; this.theta = theta; this.resolution = resolution;
             this.fx = fx; this.fy = fy; this.cx = cx; this.cy = cy;
-            this.latency = latency;
+            this.latency = latency; this.fov = fov;
         }
     }
 
@@ -601,7 +602,7 @@ class AprilTagLocalizer {
             processorBuilder.setLensIntrinsics(descriptor.fx, descriptor.fy, descriptor.cx, descriptor.cy);
         }
 
-        aprilTag = processorBuilder.build();
+        aprilTagProcessor = processorBuilder.build();
 
         // Adjust Image Decimation to trade-off detection-range for detection-rate.
         // eg: Some typical detection data using a Logitech C920 WebCam
@@ -610,7 +611,7 @@ class AprilTagLocalizer {
         // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second (default)
         // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second (default)
         // Note: Decimation can be changed on-the-fly to adapt during a match.
-        aprilTag.setDecimation(3);
+        aprilTagProcessor.setDecimation(3);
 
         // Create the vision portal by using a builder.
         VisionPortal.Builder builder = new VisionPortal.Builder();
@@ -632,7 +633,7 @@ class AprilTagLocalizer {
         //builder.setAutoStopLiveView(false);
 
         // Set and enable the processor.
-        builder.addProcessor(aprilTag);
+        builder.addProcessor(aprilTagProcessor);
 
         // Build the Vision Portal, using the above settings.
         visionPortal = builder.build();
@@ -697,7 +698,7 @@ class AprilTagLocalizer {
         double minResidual = Float.MAX_VALUE;
         CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
 
-        List<AprilTagDetection> tagDetections = aprilTag.getFreshDetections();
+        List<AprilTagDetection> tagDetections = aprilTagProcessor.getFreshDetections();
         if (tagDetections != null) {
             for (AprilTagDetection detection : tagDetections) {
                 pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-6;
@@ -788,8 +789,8 @@ class AprilTagLocalizer {
 
         Pose2d resultPose = (visionPose != null) ? visionPose.pose : null;
         ArrayList<Pose2d> rejectList = new ArrayList<>();
-        if (visionPose == null) {
-            for (VisionPose rejectPose : visionPoses) {
+        for (VisionPose rejectPose : visionPoses) {
+            if (rejectPose != visionPose) {
                 rejectList.add(rejectPose.pose);
             }
         }
@@ -943,6 +944,9 @@ public class Poser {
             c.strokeLine(segment.p1.x, segment.p1.y, segment.p2.x, segment.p2.y);
         }
 
+        // Draw the camera's field of view:
+
+
         if (history.size() != 0) {
             // Go from oldest to newest:
             ListIterator<HistoryRecord> iterator = history.listIterator(history.size());
@@ -960,12 +964,19 @@ public class Poser {
                             1, 1);
                 }
 
-                // Draw the rejected April Tag poses as little almost-white circles:
+                // Draw April Tag poses, if present:
                 if (record.aprilTag != null) {
-                    // Draw the rejected poses in red:
+                    // Draw any distant rejected poses in red:
                     for (Pose2d rejectPose : record.aprilTag.rejectList) {
-                        c.setStroke("#ff0000");
-                        MecanumDrive.drawRobot(Globals.canvas, rejectPose, 3);
+                        double distance = Float.MAX_VALUE;
+                        if (record.aprilTag.pose != null) {
+                            Vector2d difference = rejectPose.position.minus(record.aprilTag.pose.position);
+                            distance = Math.hypot(difference.x, difference.y);
+                        }
+                        if (distance > 6) {
+                            c.setStroke("#ff0000");
+                            MecanumDrive.drawRobot(Globals.canvas, rejectPose, 3);
+                        }
                     }
 
                     if (record.aprilTag.pose != null) {

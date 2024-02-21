@@ -17,8 +17,8 @@ public class OpticalTrackingTest extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
+        Globals.initialize();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
 
         waitForStart();
@@ -32,14 +32,6 @@ public class OpticalTrackingTest extends LinearOpMode {
 
             drive.setDrivePowers(powers);
             drive.updatePoseEstimate();
-
-            double distance = distanceSensor.getDistance(DistanceUnit.INCH);
-            if (distance == distanceSensor.distanceOutOfRange)
-                distance = -1;
-
-            telemetry.addData("distance", distance);
-            telemetry.addData("distanceOutOfRange", distanceSensor.distanceOutOfRange);
-            telemetry.update();
 
             // Draw the Mecanum robot pose:
             Globals.canvas.setStroke("#3F51B5");
