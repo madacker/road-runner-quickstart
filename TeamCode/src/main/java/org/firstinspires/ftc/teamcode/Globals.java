@@ -65,4 +65,13 @@ public class Globals {
     public static double time() {
         return nanoTime() * 1e-9;
     }
+
+    // Normalize an angle to [180, -180):
+    static double normalizeAngle(double angle) {
+        while (angle > Math.PI)
+            angle -= 2 * Math.PI;
+        while (angle <= -Math.PI)
+            angle += 2 * Math.PI;
+        return angle;
+    }
 }

@@ -129,15 +129,6 @@ class SlidingWindowFilter {
         previousTime = Globals.time();
     }
 
-    // Normalize an angle to [180, -180):
-    static double normalizeAngle(double angle) {
-        while (angle > Math.PI)
-            angle -= 2 * Math.PI;
-        while (angle <= -Math.PI)
-            angle += 2 * Math.PI;
-        return angle;
-    }
-
     // Filter the prediction and measurements and return a posterior:
     @NonNull Pose2d filter(
             double time, // Globals.time() for when the filtering should be done
@@ -180,7 +171,7 @@ class SlidingWindowFilter {
         // Add confident April Tags to the headings history:
         if (confidentAprilTag) {
             assert(aprilTagPose != null);
-            double headingResidual = normalizeAngle(aprilTagPose.heading.log() - odometryPose.heading.log());
+            double headingResidual = Globals.normalizeAngle(aprilTagPose.heading.log() - odometryPose.heading.log());
             headingResiduals.addFirst(new Storage<>(headingResidual)); // Newest to oldest
 
             confidentAprilTagCount++;
@@ -193,10 +184,10 @@ class SlidingWindowFilter {
         double aggregateHeaderResidual = 0;
 
         for (Storage<Vector2d> position: positionResiduals) {
-            aggregatePositionResidual = aggregatePositionResidual.plus((Vector2d) position.residual);
+            aggregatePositionResidual = aggregatePositionResidual.plus(position.residual);
         }
         for (Storage<Double> heading: headingResiduals) {
-            aggregateHeaderResidual = aggregateHeaderResidual + (Double) heading.residual;
+            aggregateHeaderResidual = aggregateHeaderResidual + heading.residual;
         }
 
         if (positionResiduals.size() != 0)
@@ -228,10 +219,10 @@ class SlidingWindowFilter {
 
         // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage<Vector2d> position: positionResiduals) {
-            position.residual = positionCorrection.minus((Vector2d) position.residual);
+            position.residual = positionCorrection.minus(position.residual);
         }
         for (Storage<Double> heading: headingResiduals) {
-            heading.residual = headingCorrection - (double) heading.residual;
+            heading.residual = headingCorrection - heading.residual;
         }
 
         // Correct the current pose to create the new pose:
@@ -373,7 +364,7 @@ class DistanceLocalizer {
     }
 
     // The pose is used to determine which sensor to use:
-    Result update(Pose2d pose) {
+    Result update(Pose2d pose) { // Returns null if no readings
         double time = Globals.time();
         if (time - lastReadTime < READ_INTERVAL)
             return null;
@@ -509,13 +500,48 @@ class AprilTagLocalizer {
     // Arbitrary reliable range:
     final double RELIABLE_RANGE = 60.0;
 
+    private CameraState[] cameras = new CameraState[CAMERA_DESCRIPTORS.length];
+    int activeCamera = -1; // Currently active camera, -1 if none is
+    private double pipelineLatency; // Pipeline latency of most recent result
     private String poseStatus = ""; // UI status message that is persisted
 
-    private AprilTagProcessor aprilTagProcessor;
-    private VisionPortal visionPortal;
-    private double pipelineLatency;
+    // Camera state:
+    static class CameraState {
+        AprilTagProcessor aprilTagProcessor;
+        VisionPortal visionPortal;
+        CameraDescriptor descriptor;
 
-    final Location[] tagLocations = {
+        public CameraState(AprilTagProcessor aprilTagProcessor, VisionPortal visionPortal, CameraDescriptor descriptor) {
+            this.aprilTagProcessor = aprilTagProcessor; this.visionPortal = visionPortal; this.descriptor = descriptor;
+        }
+    }
+
+    // Descriptions of attached cameras:
+    static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
+            new CameraDescriptor("webcam2", new Point(8.0, -5.75), Math.PI,
+                    new Size(1280, 720),
+                    906.940247073, 906.940247073, 670.833056673, 355.34234068,
+                    0.19, Math.toRadians(75))
+    };
+
+    // Structure for describing cameras on the robot:
+    static class CameraDescriptor {
+        String name; // Device name in the robot's configuration
+        Point offset; // Offset in inches from center of rotation, relative to the camera's orientation
+        double theta; // Orientation of the sensor on the robot, in radians
+        Size resolution; // Resolution in pixels
+        double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
+        double latency; // End-to-end April Tag processing latency, in seconds
+        double fov; // Horizontal field of view, in radians
+
+        public CameraDescriptor(String name, Point offset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency, double fov) {
+            this.name = name; this.offset = offset; this.theta = theta; this.resolution = resolution;
+            this.fx = fx; this.fy = fy; this.cx = cx; this.cy = cy;
+            this.latency = latency; this.fov = fov;
+        }
+    }
+
+    final Location[] TAG_LOCATIONS = {
             new Location(1, 62.875, 42.750, Math.toRadians(180), false), // Blue left backdrop, small
             new Location(2, 62.875, 36.625, Math.toRadians(180), false), // Blue middle backdrop, small
             new Location(3, 62.875, 30.625, Math.toRadians(180), false), // Blue right backdrop, small
@@ -527,30 +553,6 @@ class AprilTagLocalizer {
             new Location(9, -72, 37.5, 0, false),  // Blue audience wall, small
             new Location(10, -72, 43.0, 0, true),   // Blue audience wall, large
     };
-
-    static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
-            new CameraDescriptor("webcam2", new Point(8.0, -5.75), Math.PI,
-                    new Size(1280, 720),
-                    906.940247073, 906.940247073, 670.833056673, 355.34234068,
-                    0.19, 75)
-    };
-
-    // Structure for describing cameras on the robot:
-    static class CameraDescriptor {
-        String name; // Device name in the robot's configuration
-        Point offset; // Offset in inches from center of rotation, relative to the camera itself
-        double theta; // Orientation of the sensor in radians
-        Size resolution; // Resolution in pixels
-        double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
-        double latency; // End-to-end April Tag processing latency, in seconds
-        double fov; // Horizontal field of view
-
-        public CameraDescriptor(String name, Point offset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency, double fov) {
-            this.name = name; this.offset = offset; this.theta = theta; this.resolution = resolution;
-            this.fx = fx; this.fy = fy; this.cx = cx; this.cy = cy;
-            this.latency = latency; this.fov = fov;
-        }
-    }
 
     // Structure defining the location of April Tags:
     static class Location {
@@ -578,8 +580,16 @@ class AprilTagLocalizer {
         }
     }
 
+    // Constructor:
     AprilTagLocalizer(HardwareMap hardwareMap) {
-        CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
+        for (int i = 0; i < CAMERA_DESCRIPTORS.length; i++) {
+            cameras[i] = initializeCamera(i, hardwareMap);
+        }
+    }
+
+    // Create the AprilTagProcessor and VisionPortal objects for the specified camera:
+    CameraState initializeCamera(int cameraIndex, HardwareMap hardwareMap) {
+        CameraDescriptor descriptor = CAMERA_DESCRIPTORS[cameraIndex];
 
         // Create the AprilTag processor.
         AprilTagProcessor.Builder processorBuilder = new AprilTagProcessor.Builder();
@@ -602,7 +612,7 @@ class AprilTagLocalizer {
             processorBuilder.setLensIntrinsics(descriptor.fx, descriptor.fy, descriptor.cx, descriptor.cy);
         }
 
-        aprilTagProcessor = processorBuilder.build();
+        AprilTagProcessor aprilTagProcessor = processorBuilder.build();
 
         // Adjust Image Decimation to trade-off detection-range for detection-rate.
         // eg: Some typical detection data using a Logitech C920 WebCam
@@ -622,37 +632,40 @@ class AprilTagLocalizer {
         builder.setCameraResolution(descriptor.resolution);
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
-        //builder.enableLiveView(true);
+        // builder.enableLiveView(true);
 
         // Set the stream format; MJPEG uses less bandwidth than default YUY2.
-        //builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
+        // builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
 
         // Choose whether or not LiveView stops if no processors are enabled.
         // If set "true", monitor shows solid orange screen if no processors enabled.
         // If set "false", monitor shows camera view without annotations.
-        //builder.setAutoStopLiveView(false);
+        // builder.setAutoStopLiveView(false);
 
         // Set and enable the processor.
         builder.addProcessor(aprilTagProcessor);
 
         // Build the Vision Portal, using the above settings.
-        visionPortal = builder.build();
+        VisionPortal visionPortal = builder.build();
 
         // Disable or re-enable the aprilTag processor at any time.
-        //visionPortal.setProcessorEnabled(aprilTag, true);
+        // visionPortal.setProcessorEnabled(aprilTag, true);
 
         // Stop streaming to save processing performance:
-        //visionPortal.stopStreaming();
+        // visionPortal.stopStreaming();
+
+        return new CameraState(aprilTagProcessor, visionPortal, descriptor);
     }
 
     // Close when shutting down:
     void close() {
-        visionPortal.close();
+        for (CameraState camera: cameras)
+            camera.visionPortal.close();
     }
 
     // Find the tag associated with this detection:
     private Location getTag(AprilTagDetection detection) {
-        for (Location t : tagLocations) {
+        for (Location t : TAG_LOCATIONS) {
             if (t.id == detection.id)
                 return t;
         }
@@ -660,9 +673,7 @@ class AprilTagLocalizer {
     }
 
     // Compute the robot's field-relative pose from the April-tag-relative pose.
-    private Pose2d computeRobotPose(AprilTagDetection detection, Location tag) {
-        CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
-
+    private Pose2d computeRobotPose(AprilTagDetection detection, Location tag, CameraDescriptor descriptor) {
         double dx = detection.ftcPose.x - descriptor.offset.x;
         double dy = detection.ftcPose.y - descriptor.offset.y;
         double distance = Math.sqrt(dx * dx + dy * dy);
@@ -692,27 +703,76 @@ class AprilTagLocalizer {
         return Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
     }
 
+    // Manage the activation of the cameras
+    private CameraState updateActiveCamera(Pose2d pose, boolean confident) { // Returns null if no active camera
+        activeCamera = -1; // Default to none
+        if (!confident) {
+            // Always keep the primary camera active when locking into a good pose:
+            activeCamera = 0;
+        } else {
+            // Determine the camera with the closest view of a tag:
+            double minDistance = Double.MAX_VALUE;
+            for (Location location: TAG_LOCATIONS) {
+                Vector2d vectorToTag = new Vector2d(
+                        location.x - pose.position.x,
+                        location.y - pose.position.y);
+                double tagAngle = Math.atan2(vectorToTag.y, vectorToTag.x); // Rise over run
+                for (int i = 0; i < cameras.length; i++) {
+                    // Check to see if the tag is in the cone for this camera:
+                    CameraDescriptor camera = CAMERA_DESCRIPTORS[i];
+                    double cameraAngle = pose.heading.log() + camera.theta;
+                    double rightAngle = cameraAngle - camera.fov / 2;
+                    double leftAngle = cameraAngle + camera.fov / 2;
+                    double deltaRight = Globals.normalizeAngle(tagAngle - rightAngle);
+                    double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
+                    if ((deltaRight > 0) && (deltaLeft > 0)) {
+                        double distance = Math.hypot(vectorToTag.x, vectorToTag.y);
+                        if (distance < minDistance) {
+                            activeCamera = i;
+                            minDistance = distance;
+                        }
+                    }
+                }
+            }
+
+            // Disable if the closest tag is further than this amount:
+            if (minDistance > 72) { // @@@ Constant
+                activeCamera = -1;
+            }
+        }
+
+        for (int i = 0; i < cameras.length; i++) {
+            boolean enable = (i == activeCamera);
+            cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, enable);
+        }
+        return (activeCamera == -1) ? null : cameras[activeCamera];
+    }
+
     // Update loop for April Tags:
-    public Result update(Pose2d currentPose) {
+    public Result update(Pose2d currentPose, boolean confident) { // Returns null if no new updates
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minResidual = Float.MAX_VALUE;
-        CameraDescriptor descriptor = CAMERA_DESCRIPTORS[0];
 
-        List<AprilTagDetection> tagDetections = aprilTagProcessor.getFreshDetections();
-        if (tagDetections != null) {
-            for (AprilTagDetection detection : tagDetections) {
-                pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-6;
-                if (detection.metadata != null) {
-                    Location tag = getTag(detection);
-                    if (tag != null) {
-                        Pose2d visionPose = computeRobotPose(detection, tag);
-                        double residual = Math.hypot(
-                                currentPose.position.x - visionPose.position.x,
-                                currentPose.position.y - visionPose.position.y);
+        CameraState camera = updateActiveCamera(currentPose, confident);
+        if (camera == null)
+            return null; // ====>
 
-                        minResidual = Math.min(minResidual, residual);
-                        visionPoses.add(new VisionPose(visionPose, residual, detection.ftcPose.range, tag));
-                    }
+        List<AprilTagDetection> tagDetections = camera.aprilTagProcessor.getFreshDetections();
+        if (tagDetections == null)
+            return null; // ====>
+
+        for (AprilTagDetection detection : tagDetections) {
+            pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-6;
+            if (detection.metadata != null) {
+                Location tag = getTag(detection);
+                if (tag != null) {
+                    Pose2d visionPose = computeRobotPose(detection, tag, camera.descriptor);
+                    double residual = Math.hypot(
+                            currentPose.position.x - visionPose.position.x,
+                            currentPose.position.y - visionPose.position.y);
+
+                    minResidual = Math.min(minResidual, residual);
+                    visionPoses.add(new VisionPose(visionPose, residual, detection.ftcPose.range, tag));
                 }
             }
         }
@@ -755,7 +815,7 @@ class AprilTagLocalizer {
         }
 
         // If visionPose is null, we didn't find a perfect pose, so lower our standards a little:
-        if ((visionPose == null) && (tagDetections != null)) {
+        if (visionPose == null)  {
             // Set a default status:
             if (poseCount == 0) {
                 poseStatus = "No vision pose found";
@@ -783,7 +843,7 @@ class AprilTagLocalizer {
         }
 
         // Handle some telemetry and visualization logging:
-        Globals.telemetry.addLine(String.format("Vision FPS: %.2f, latency: %.1fms", visionPortal.getFps(), pipelineLatency));
+        Globals.telemetry.addLine(String.format("Vision FPS: %.2f, latency: %.1fms", camera.visionPortal.getFps(), pipelineLatency));
         Globals.telemetry.addLine(String.format("Vision pose count: %d", visionPoses.size()));
         Globals.telemetry.addLine(poseStatus);
 
@@ -795,7 +855,7 @@ class AprilTagLocalizer {
             }
         }
 
-        return new Result(resultPose, isExcellentPose, 0, descriptor.latency, rejectList);
+        return new Result(resultPose, isExcellentPose, activeCamera, camera.descriptor.latency, rejectList);
     }
 }
 
@@ -944,8 +1004,24 @@ public class Poser {
             c.strokeLine(segment.p1.x, segment.p1.y, segment.p2.x, segment.p2.y);
         }
 
-        // Draw the camera's field of view:
+        // Draw the active camera's field of view:
+        if (aprilTagLocalizer.activeCamera != -1) {
+            // @@@ Make this a helper?
+            AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
+            Point cameraOffset = descriptor.offset.rotate(pose.heading.log());
+            Point cameraOrigin = new Point(pose.position.x + cameraOffset.x, pose.position.y + cameraOffset.y);
+            double cameraAngle = pose.heading.log() + descriptor.theta;
+            double rayLength = 100;
+            double halfFov = descriptor.fov / 2.0;
 
+            c.setStroke("#a0a0a0"); // Grey
+            c.strokeLine(cameraOrigin.x, cameraOrigin.y,
+                    cameraOrigin.x + rayLength * Math.cos(cameraAngle + halfFov),
+                    cameraOrigin.y + rayLength * Math.sin(cameraAngle + halfFov));
+            c.strokeLine(cameraOrigin.x, cameraOrigin.y,
+                    cameraOrigin.x + rayLength * Math.cos(cameraAngle - halfFov),
+                    cameraOrigin.y + rayLength * Math.sin(cameraAngle - halfFov));
+        }
 
         if (history.size() != 0) {
             // Go from oldest to newest:
@@ -1017,7 +1093,7 @@ public class Poser {
         }
 
         // Process April Tags:
-        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose);
+        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, filter.isConfident());
         if (aprilTag != null) {
             changeHistory(time - aprilTag.latency, aprilTag, null);
         }
