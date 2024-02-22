@@ -19,28 +19,28 @@ public class Globals {
     public static Canvas canvas;                // FTC Dashboard telemetry drawing
 
     private static TimeSplitter splitter;       // Performance timer
-    private static Telemetry initialTelemetry;  // Non-null if initialize() has been called
+    private static Telemetry opmodeTelemetry;   // Non-null if initialize() has been called
 
     // Initialize all of our static state just in case we previously crashed:
-    public static void initialize(Telemetry telemetry) {
-        telemetry = null;
-        packet = null;
-        canvas = null;
-        splitter = TimeSplitter.create("> Loop");
-        initialTelemetry = telemetry;
+    public static void initialize(Telemetry opmodeTelemetry) {
+        opmodeTelemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
 
-        telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
+        Globals.opmodeTelemetry = opmodeTelemetry;
+        Globals.telemetry = null;
+        Globals.packet = null;
+        Globals.canvas = null;
+        Globals.splitter = TimeSplitter.create("> Loop");
     }
 
     // Mark the start of the sensor loop.
     public static void startLoop() {
-        if (Globals.initialTelemetry == null) {
+        if (Globals.opmodeTelemetry == null) {
             throw new IllegalArgumentException("Forgot to call Globals.initialize()");
         }
         if (Globals.packet != null) {
             throw new IllegalArgumentException("Missing Loop.end() call");
         }
-        Globals.telemetry = initialTelemetry;
+        Globals.telemetry = opmodeTelemetry;
         Globals.packet = new TelemetryPacket();
         Globals.canvas = packet.fieldOverlay();
         Globals.splitter.startSplit();

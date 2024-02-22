@@ -112,7 +112,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //       1 = SPICLK low when idle, data clocked on trailing edge
         //       2 = SPICLK high when idle, data clocked on trailing edge
         //       3 = SPICLK high when idle, data clocked on leading edge
-        int mode = 3;
+        int mode = 0; // Needs to be idle-low
 
         // Order: 0 = MSB is first, 1 = LSB is first
         int order = 0;
@@ -120,6 +120,27 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         int configuration = (order << 5) | (mode << 2) | (clockRate << 0);
         RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
+
+        // Manually enable the chip select pins:
+        //    0 = disable GPIO control (i.e., use auto-chip-select)
+        //    1 = enable as GPIO
+        this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, 0xf);
+
+        // Set the GPIO configuration:
+        //    0 = quasi-bidirectional
+        //    1 = push-pull
+        //    2 = input-only (high impedance)
+        //    3 = open-drain
+        this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
+
+        // Pull them low to manually select the optical tracking chip:
+        this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, 0);
+    }
+
+    // Manually enable chip-select:
+    void chipSelect(boolean enable) {
+        // Pull the line low to manually select the optical tracking chip:
+        this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, (enable) ? 0 : 0xf);
     }
 
     // Write the 'writePayload' data to the SPI device and read back the result for every
@@ -141,8 +162,12 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         for (int i = 0; i < writePayload.length; i++)
             writes[i + 1] = writePayload[i];
 
-        // Write the data and read back the new writePayload:
+        // Write the data:
+        chipSelect(true);
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
+        chipSelect(false);
+
+        // Read back the new writePayload:
         return this.deviceClient.read(writePayload.length);
 
 //        TimestampedData timestamp = this.deviceClient.readTimeStamped(writePayload.length); // @@@
@@ -371,7 +396,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Configure the SPI interface of the bridge:
         configureBridge();
 
-        readRegister(0x00); // @@@
+        int chipId = readRegister(0x00);
+        RobotLog.dd(MYTAG, String.format("Chip ID (should be 0x49): %x", chipId));
 
         // Initialize the optical tracking chip:
         secretSauce();
