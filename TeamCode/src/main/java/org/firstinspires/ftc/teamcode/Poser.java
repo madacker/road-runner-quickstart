@@ -502,8 +502,6 @@ class AprilTagLocalizer {
 
     private CameraState[] cameras = new CameraState[CAMERA_DESCRIPTORS.length];
     int activeCamera = -1; // Currently active camera, -1 if none is
-    private double pipelineLatency; // Pipeline latency of most recent result
-    private String poseStatus = ""; // UI status message that is persisted
 
     // Camera state:
     static class CameraState {
@@ -753,6 +751,11 @@ class AprilTagLocalizer {
             boolean enable = (i == activeCamera);
             cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, enable);
         }
+
+        Stats.poseStatus = "";
+        Stats.cameraFps = 0;
+        Stats.pipelineLatency = 0;
+
         return (activeCamera == -1) ? null : cameras[activeCamera];
     }
 
@@ -770,7 +773,7 @@ class AprilTagLocalizer {
             return null; // ====>
 
         for (AprilTagDetection detection : tagDetections) {
-            pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-6;
+            Stats.pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-9;
             if (detection.metadata != null) {
                 Location tag = getTag(detection);
                 if (tag != null) {
@@ -816,7 +819,7 @@ class AprilTagLocalizer {
                     if (interDistances[i] == min) {
                         isExcellentPose = true;
                         visionPose = visionPoses.get(i);
-                        poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
+                        Stats.poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
                     }
                 }
             }
@@ -826,17 +829,17 @@ class AprilTagLocalizer {
         if (visionPose == null)  {
             // Set a default status:
             if (poseCount == 0) {
-                poseStatus = "No vision pose found";
+                Stats.poseStatus = "No vision pose found";
             } else if (poseCount == 1) {
-                poseStatus = "One inadequate vision pose";
+                Stats.poseStatus = "One inadequate vision pose";
             } else {
-                poseStatus = String.format("%d inadequate vision poses", poseCount);
+                Stats.poseStatus = String.format("%d inadequate vision poses", poseCount);
             }
             if ((poseCount == 1) && (minResidual < FINE_EPSILON) && (visionPoses.get(0).range < RELIABLE_RANGE)) {
                 // @@@ Check its size?
                 // If only a single tag is in view, adopt its pose only if it's relatively close
                 // to our current pose estimate:
-                poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
+                Stats.poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
                 visionPose = visionPoses.get(0);
             } else if ((poseCount > 1) && (minResidual < COARSE_EPSILON)) {
                 // If multiple tags are in view, choose the closest one to our current pose
@@ -844,16 +847,11 @@ class AprilTagLocalizer {
                 for (VisionPose candidatePose : visionPoses) {
                     if ((candidatePose.residual == minResidual) && (candidatePose.range < RELIABLE_RANGE)) {
                         visionPose = candidatePose;
-                        poseStatus = String.format("Good one in %d vision pose, %.2f", visionPoses.size(), candidatePose.residual);
+                        Stats.poseStatus = String.format("Good one in %d vision pose, %.2f residual", visionPoses.size(), candidatePose.residual);
                     }
                 }
             }
         }
-
-        // Handle some telemetry and visualization logging:
-        Globals.telemetry.addLine(String.format("Vision FPS: %.2f, latency: %.1fms", camera.visionPortal.getFps(), pipelineLatency));
-        Globals.telemetry.addLine(String.format("Vision pose count: %d", visionPoses.size()));
-        Globals.telemetry.addLine(poseStatus);
 
         Pose2d resultPose = (visionPose != null) ? visionPose.pose : null;
         ArrayList<Pose2d> rejectList = new ArrayList<>();
@@ -903,6 +901,7 @@ public class Poser {
         }
     }
 
+    // Constructor:
     public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
         pose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
@@ -913,7 +912,13 @@ public class Poser {
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
         filter = new SlidingWindowFilter(initialPose != null);
 
-        originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        // Add a menu option to reset the IMU yaw:
+        Settings.addActivate("Reset IMU yaw", reset -> {
+            if (reset)
+                originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+            return String.format("%.2f°",
+                Math.toDegrees(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw));
+        });
     }
 
     // Copy a pose:
@@ -1004,6 +1009,7 @@ public class Poser {
     // Draw the history visualizations for FTC Dashboard:
     private void visualize() {
         Canvas c = Globals.canvas;
+        HistoryRecord lastDistance = null;
 
         // Draw the current distance localizer segment:
         Segment segment = distanceLocalizer.getCurrentSegment();
@@ -1046,6 +1052,7 @@ public class Poser {
                     c.setFill((record.distance.valid) ? "#00ff00" : "#d0d0d0");
                     c.fillRect(record.distance.point.x - 0.5, record.distance.point.y - 0.5,
                             1, 1);
+                    lastDistance = record;
                 }
 
                 // Draw April Tag poses, if present:
@@ -1075,6 +1082,14 @@ public class Poser {
                     break;
                 record = iterator.previous();
             }
+        }
+
+        // Draw the last distance measurement if it's new enough:
+        if ((lastDistance != null) &&
+                (Globals.time() - lastDistance.time < DistanceLocalizer.READ_INTERVAL)) {
+            c.setStroke("#a0a0a0"); // Grey
+            c.strokeLine(lastDistance.posteriorPose.position.x, lastDistance.posteriorPose.position.y,
+                         lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
         // Finally, draw our current pose:
@@ -1116,15 +1131,9 @@ public class Poser {
         // Output telemetry and visualizations:
         visualize();
         filter.telemetry();
-        double imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
-        double poseYaw = pose.heading.log();
-        double degreesCorrection = Math.toDegrees(poseYaw - imuYaw);
-        while (degreesCorrection <= -45)
-            degreesCorrection += 90;
-        while (degreesCorrection > 45)
-            degreesCorrection -= 90;
-        Globals.telemetry.addLine(String.format("Yaw correction: %.2f°, IMU yaw: %.2f°",
-                degreesCorrection, Math.toDegrees(imuYaw)));
+
+        Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
+        Stats.yawCorrection = pose.heading.log() - Stats.imuYaw;
     }
 
     // Close when done running our OpMode:

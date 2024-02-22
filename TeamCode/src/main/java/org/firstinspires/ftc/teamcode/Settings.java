@@ -6,6 +6,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Management and UI for settings.
@@ -25,7 +26,6 @@ public class Settings {
         String description;
         boolean value;
         Consumer<Boolean> callback;
-
         public ToggleOption(String description, boolean value, Consumer<Boolean> callback) {
             this.description = description; this.value = value; this.callback = callback;
         }
@@ -39,12 +39,21 @@ public class Settings {
         int index;
         String[] list;
         Consumer<Integer> callback;
-
         public ListOption(String description, int index, String[] list, Consumer<Integer> callback) {
             this.description = description; this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return description + ": <b>" + list[index] + "</b>";
+            return description + ": <b>◄" + list[index] + "►</b>";
+        }
+    }
+    private static class ActivateOption extends Option {
+        String description;
+        Function<Boolean, String> callback;
+        public ActivateOption(String description, Function<Boolean, String> callback) {
+            this.description = description; this.callback = callback;
+        }
+        public String string() {
+            return callback.apply(false); // Get current string
         }
     }
 
@@ -89,12 +98,14 @@ public class Settings {
             if (current == options.size())
                 current = options.size() - 1;
         }
+
         StringBuilder output = new StringBuilder();
         output.append("<p2><b>Settings</b></p2>");
         for (int i = 0; i < options.size(); i++) {
             output.append(i == current ? "➤" : " ").append(options.get(i).string()).append("\n");
         }
         output.append("<hr>\n\n"); // @@@ Did this work?
+        output.append(Stats.get());
         telemetry.addLine(output.toString());
 
         Option option = options.get(current);
@@ -119,8 +130,13 @@ public class Settings {
                 }
                 listOption.callback.accept(listOption.index);
             }
+        } else if (option instanceof ActivateOption) {
+            if (select()) {
+                ActivateOption activateOption = (ActivateOption) option;
+                activateOption.callback.apply(true);
+            }
         }
-        return null;
+        return null; // We own the Gamepad, the caller can't have it
     }
 
     // Add a toggleable option to the Settings menu:
@@ -132,5 +148,10 @@ public class Settings {
     public static void addList(String description, int initialIndex, String[] list, Consumer<Integer> callback) {
         callback.accept(initialIndex);
         settings.options.add(new ListOption(description, initialIndex, list, callback));
+    }
+    // Add an option that can only be activated:
+    public static void addActivate(String description, Function<Boolean, String> callback) {
+        callback.apply(true);
+        settings.options.add(new ActivateOption(description, callback));
     }
 }

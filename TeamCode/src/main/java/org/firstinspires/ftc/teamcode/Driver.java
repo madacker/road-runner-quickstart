@@ -345,8 +345,8 @@ public class Driver extends LinearOpMode {
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Poser poser = new Poser(hardwareMap, drive, null);
         Led led = new Led(hardwareMap);
-        AutoParker parker = null;
         Wall wall = new Wall(poser, drive, new Vector2d(-72, -36), new Vector2d(24, -24));
+        AutoParker parker = null;
 
         // Feed forward model: voltage = kS + kV*velocityInTicksPerSecond + kA*acceleration
         double fullAxialSpeed
@@ -363,11 +363,11 @@ public class Driver extends LinearOpMode {
 
         while (opModeIsActive()) {
             Globals.startLoop();
-
-            // Update our various components:
-            Gamepad gamepad1 = settings.update();
+            Stats.update();
             poser.update();
             led.update();
+
+            Gamepad gamepad1 = settings.update();
 
             if (poser.isConfident())
                 led.setSteadyColor(Led.Color.RED);
