@@ -18,6 +18,7 @@ import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 
+import android.annotation.SuppressLint;
 import android.util.Size;
 
 import androidx.annotation.NonNull;
@@ -707,10 +708,10 @@ class AprilTagLocalizer {
 
     // Manage the activation of the cameras
     private CameraState updateActiveCamera(Pose2d pose, boolean confident) { // Returns null if no active camera
-        activeCamera = -1; // Default to none
+        int resultIndex = -1; // Default to none
         if (!confident) {
             // Always keep the primary camera active when locking into a good pose:
-            activeCamera = 0;
+            resultIndex = 0;
         } else {
             // Determine the camera with the closest view of a tag:
             double minDistance = Double.MAX_VALUE;
@@ -733,7 +734,7 @@ class AprilTagLocalizer {
                         if ((deltaRight > 0) && (deltaLeft > 0)) {
                             double distance = Math.hypot(vectorToTag.x, vectorToTag.y);
                             if (distance < minDistance) {
-                                activeCamera = i;
+                                resultIndex = i;
                                 minDistance = distance;
                             }
                         }
@@ -743,23 +744,28 @@ class AprilTagLocalizer {
 
             // Disable if the closest tag is further than this amount:
             if (minDistance > 72) { // @@@ Constant
-                activeCamera = -1;
+                resultIndex = -1;
             }
         }
 
-        for (int i = 0; i < cameras.length; i++) {
-            boolean enable = (i == activeCamera);
-            cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, enable);
-        }
+        // Do more work if there's a change in the active camera:
+        if (activeCamera != resultIndex) {
+            for (int i = 0; i < cameras.length; i++) {
+                boolean enable = (i == resultIndex);
+                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, enable);
+            }
 
-        Stats.poseStatus = "";
-        Stats.cameraFps = 0;
-        Stats.pipelineLatency = 0;
+            Stats.poseStatus = "";
+            Stats.cameraFps = 0;
+            Stats.pipelineLatency = 0;
+            activeCamera = resultIndex;
+        }
 
         return (activeCamera == -1) ? null : cameras[activeCamera];
     }
 
     // Update loop for April Tags:
+    @SuppressLint("DefaultLocale")
     public Result update(Pose2d currentPose, boolean confident) { // Returns null if no new updates
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minResidual = Float.MAX_VALUE;

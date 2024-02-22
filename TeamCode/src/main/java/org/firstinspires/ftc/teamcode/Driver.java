@@ -2,10 +2,6 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
-import android.annotation.SuppressLint;
-
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
@@ -205,7 +201,7 @@ class AutoParker {
             angularSpeed = Math.min(Math.min(increasingAngularSpeed, maxAngularSpeed), angularApproach);
         }
 
-        // Combine ---------------------------------------------------------------------------------
+        // Combined --------------------------------------------------------------------------------
 
         // Add the component velocities to get our new velocity:
         PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), angularSpeed);
@@ -257,7 +253,7 @@ class Wall {
 
         // Direction that's normal to the wall, pointing towards the wall from the robot's
         // perspective:
-        double normalAngle = Math.atan2(wallVector.y, wallVector.x) - Math.PI/2;
+        double normalAngle = Math.atan2(wallVector.y, wallVector.x) - Math.PI/2; // Rise over run
 
         // Direction of the velocity vector:
         double velocityAngle = Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
@@ -328,18 +324,8 @@ public class Driver extends LinearOpMode {
         return shapedValue * scale;
     }
 
-    @SuppressLint("DefaultLocale")
     @Override
     public void runOpMode() throws InterruptedException {
-        double maxLinearAcceleration = 0;
-        double minLinearDeceleration = 0;
-        double maxLinearSpeed = 0;
-        double previousLinearSpeed = 0;
-        double maxAngularAcceleration = 0;
-        double minAngularDeceleration = 0;
-        double maxAngularSpeed = 0;
-        double previousAngularSpeed = 0;
-
         Globals.initialize(telemetry);
         Settings settings = new Settings(telemetry, gamepad1);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
@@ -454,28 +440,8 @@ public class Driver extends LinearOpMode {
                 }
             }
 
-            // Log interesting data:
-            double linearSpeed = Math.hypot(poser.velocity.linearVel.x, poser.velocity.linearVel.y);
-            double linearSpeedDelta = linearSpeed - previousLinearSpeed;
-            if (linearSpeedDelta > 0) {
-                maxLinearAcceleration = Math.max(linearSpeedDelta, maxLinearAcceleration);
-            } else {
-                minLinearDeceleration = Math.min(linearSpeedDelta, minLinearDeceleration);
-            }
-            previousLinearSpeed = linearSpeed;
-            maxLinearSpeed = Math.max(linearSpeed, maxLinearSpeed);
-
-            double angularSpeed = Math.abs(poser.velocity.angVel);
-            double angularSpeedDelta = angularSpeed - previousAngularSpeed;
-            if (angularSpeedDelta > 0) {
-                maxAngularAcceleration = Math.max(angularSpeedDelta, maxAngularAcceleration);
-            } else {
-                minAngularDeceleration = Math.min(angularSpeedDelta, minAngularDeceleration);
-            }
-            previousAngularSpeed = angularSpeed;
-            maxAngularSpeed = Math.max(angularSpeed, maxAngularSpeed);
-
             // Finish up:
+            Stats.updateVelocity(poser.velocity, fullAxialSpeed);
             Globals.endLoop();
         }
 
@@ -489,13 +455,6 @@ public class Driver extends LinearOpMode {
 
         // Output summary:
         TimeSplitter.reportAllResults();
-
-        TelemetryPacket packet = new TelemetryPacket();
-        packet.addLine(String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
-                maxLinearSpeed, fullAxialSpeed, maxLinearAcceleration, minLinearDeceleration));
-        packet.addLine(String.format("Angular: top-speed: %.2f, accel: %.2f, decel: %.2f",
-                maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration));
-        FtcDashboard.getInstance().sendTelemetryPacket(packet);
     }
 }
 
