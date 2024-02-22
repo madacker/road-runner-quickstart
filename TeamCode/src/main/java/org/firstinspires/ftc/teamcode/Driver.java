@@ -14,13 +14,14 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 class Led {
-    public enum Color { OFF, RED, GREEN };
+    public enum Color { OFF, RED, GREEN }
 
     private Color pulseColor = Color.OFF;
     private Color steadyColor = Color.OFF;
@@ -339,7 +340,8 @@ public class Driver extends LinearOpMode {
         double maxAngularSpeed = 0;
         double previousAngularSpeed = 0;
 
-        Globals.initialize();
+        Globals.initialize(telemetry);
+        Settings settings = new Settings(telemetry, gamepad1);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Poser poser = new Poser(hardwareMap, drive, null);
         Led led = new Led(hardwareMap);
@@ -360,9 +362,10 @@ public class Driver extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            Globals.startLoop(telemetry);
+            Globals.startLoop();
 
-            // Update the telemetry pose and update the LED loop:
+            // Update our various components:
+            Gamepad gamepad1 = settings.update();
             poser.update();
             led.update();
 
@@ -371,7 +374,9 @@ public class Driver extends LinearOpMode {
 
             // The 'A' button activates the auto-parker:
             boolean parkingActivated = false;
-            if (!gamepad1.a)
+
+            // We can't use input when the settings menu is up:
+            if ((gamepad1 == null) || (!gamepad1.a))
                 parker = null;
             else {
                 if (poser.isConfident()) {
@@ -384,11 +389,11 @@ public class Driver extends LinearOpMode {
 
             // The 'left-bumper' button activates Road Runner homing:
             boolean roadrunnerActivated = drive.doActionsWork(poser.pose, poser.velocity, Globals.packet);
-            if ((gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isConfident())) {
+            if ((gamepad1 != null) && (gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isConfident())) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(poser.velocity.linearVel.x) < 0.1) &&
-                    (Math.abs(poser.velocity.linearVel.y) < 0.1) &&
-                    (Math.abs(poser.velocity.angVel) < 0.1)) {
+                        (Math.abs(poser.velocity.linearVel.y) < 0.1) &&
+                        (Math.abs(poser.velocity.angVel) < 0.1)) {
 
                     boolean toBackdrop = poser.pose.position.x < 6.0;
                     Action action;
@@ -424,11 +429,15 @@ public class Driver extends LinearOpMode {
 
             // Manually drive:
             if ((!parkingActivated) && (!roadrunnerActivated)) {
+                double leftStickY = (gamepad1 != null) ? gamepad1.left_stick_y : 0;
+                double leftStickX = (gamepad1 != null) ? gamepad1.left_stick_x : 0;
+                double rightStickX = (gamepad1 != null) ? gamepad1.right_stick_x : 0;
+
                 if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
-                            scaleStick(-gamepad1.left_stick_y, fullAxialSpeed),
-                            scaleStick(-gamepad1.left_stick_x, fullLateralSpeed)),
-                            scaleStick(-gamepad1.right_stick_x, fullAngularSpeed));
+                            scaleStick(-leftStickY, fullAxialSpeed),
+                            scaleStick(-leftStickX, fullLateralSpeed)),
+                            scaleStick(-rightStickX, fullAngularSpeed));
 
                     PoseVelocity2d fieldVelocity = poser.pose.times(calibratedVelocity);
 
@@ -438,9 +447,9 @@ public class Driver extends LinearOpMode {
                     drive.setDrivePowers(poser.pose, poser.velocity, null, fieldVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
-                            shapeStick(-gamepad1.left_stick_y),
-                            shapeStick(-gamepad1.left_stick_x)),
-                            shapeStick(-gamepad1.right_stick_x));
+                            shapeStick(-leftStickY),
+                            shapeStick(-leftStickX)),
+                            shapeStick(-rightStickX));
                     drive.setDrivePowers(manualPower);
                 }
             }
@@ -465,13 +474,6 @@ public class Driver extends LinearOpMode {
             }
             previousAngularSpeed = angularSpeed;
             maxAngularSpeed = Math.max(angularSpeed, maxAngularSpeed);
-
-//            packet.put("Linear speed", linearSpeed);
-//            packet.put("Linear delta", linearSpeedDelta);
-//            packet.put("Linear theoretical", fullAxialSpeed);
-//            packet.put("Angular speed", angularSpeed);
-//            packet.put("Angular delta", angularSpeedDelta);
-//            packet.put("Angular theoretical", fullAngularSpeed);
 
             // Finish up:
             Globals.endLoop();

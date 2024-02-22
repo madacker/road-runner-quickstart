@@ -9,8 +9,6 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 
-import kotlin.contracts.Returns;
-
 /**
  * {@link Globals} contains all state that can be access globally anytime
  * within the sensor loop.
@@ -21,26 +19,28 @@ public class Globals {
     public static Canvas canvas;                // FTC Dashboard telemetry drawing
 
     private static TimeSplitter splitter;       // Performance timer
-    private static boolean initialized = false;
+    private static Telemetry initialTelemetry;  // Non-null if initialize() has been called
 
     // Initialize all of our static state just in case we previously crashed:
-    public static void initialize() {
+    public static void initialize(Telemetry telemetry) {
         telemetry = null;
         packet = null;
         canvas = null;
         splitter = TimeSplitter.create("> Loop");
-        initialized = true;
+        initialTelemetry = telemetry;
+
+        telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
     }
 
     // Mark the start of the sensor loop.
-    public static void startLoop(Telemetry telemetry) {
-        if (!Globals.initialized) {
+    public static void startLoop() {
+        if (Globals.initialTelemetry == null) {
             throw new IllegalArgumentException("Forgot to call Globals.initialize()");
         }
         if (Globals.packet != null) {
             throw new IllegalArgumentException("Missing Loop.end() call");
         }
-        Globals.telemetry = telemetry;
+        Globals.telemetry = initialTelemetry;
         Globals.packet = new TelemetryPacket();
         Globals.canvas = packet.fieldOverlay();
         Globals.splitter.startSplit();

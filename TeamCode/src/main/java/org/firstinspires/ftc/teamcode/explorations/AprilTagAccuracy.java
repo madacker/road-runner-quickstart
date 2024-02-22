@@ -17,12 +17,13 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        Globals.initialize(telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
         waitForStart();
 
         while (opModeIsActive()) {
-            Globals.startLoop(telemetry);
+            Globals.startLoop();
             drive.updatePoseEstimate();
             boolean doingSweep = drive.doActionsWork(drive.pose, drive.poseVelocity, Globals.packet);
             if (!doingSweep) {

@@ -371,7 +371,7 @@ class DistanceLocalizer {
         lastReadTime = time;
 
         // Create an eligibility list of all sensors that point to a wall segment. We'll choose
-        // the best of it next.
+        // the best of them afterwards.
         ArrayList<Result> eligibleSensors = new ArrayList<>();
         for (int sensorIndex = 0; sensorIndex < DISTANCE_SENSOR_DESCRIPTORS.length; sensorIndex++) {
             SensorDescriptor sensor = DISTANCE_SENSOR_DESCRIPTORS[sensorIndex];
@@ -507,9 +507,10 @@ class AprilTagLocalizer {
 
     // Camera state:
     static class CameraState {
+        boolean enabled; // Enabled by settings
+        CameraDescriptor descriptor; // Describes the associated camera
         AprilTagProcessor aprilTagProcessor;
         VisionPortal visionPortal;
-        CameraDescriptor descriptor;
 
         public CameraState(AprilTagProcessor aprilTagProcessor, VisionPortal visionPortal, CameraDescriptor descriptor) {
             this.aprilTagProcessor = aprilTagProcessor; this.visionPortal = visionPortal; this.descriptor = descriptor;
@@ -584,6 +585,9 @@ class AprilTagLocalizer {
     AprilTagLocalizer(HardwareMap hardwareMap) {
         for (int i = 0; i < CAMERA_DESCRIPTORS.length; i++) {
             cameras[i] = initializeCamera(i, hardwareMap);
+            final int lambaIndex = i;
+            Settings.addToggle(String.format("Enable %s", cameras[i].descriptor.name),
+                    true, (enable) -> cameras[lambaIndex].enabled = enable );
         }
     }
 
@@ -718,18 +722,22 @@ class AprilTagLocalizer {
                         location.y - pose.position.y);
                 double tagAngle = Math.atan2(vectorToTag.y, vectorToTag.x); // Rise over run
                 for (int i = 0; i < cameras.length; i++) {
-                    // Check to see if the tag is in the cone for this camera:
-                    CameraDescriptor camera = CAMERA_DESCRIPTORS[i];
-                    double cameraAngle = pose.heading.log() + camera.theta;
-                    double rightAngle = cameraAngle - camera.fov / 2;
-                    double leftAngle = cameraAngle + camera.fov / 2;
-                    double deltaRight = Globals.normalizeAngle(tagAngle - rightAngle);
-                    double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
-                    if ((deltaRight > 0) && (deltaLeft > 0)) {
-                        double distance = Math.hypot(vectorToTag.x, vectorToTag.y);
-                        if (distance < minDistance) {
-                            activeCamera = i;
-                            minDistance = distance;
+                    CameraState camera = cameras[i];
+                    if (camera.enabled) {
+                        // Check to see if the tag is in the cone for this camera:
+                        double cameraAngle = pose.heading.log() + camera.descriptor.theta;
+                        // Widen the FOV to account for imprecise pose estimates:
+                        double halfFov = (camera.descriptor.fov / 2) * 1.3;
+                        double rightAngle = cameraAngle - halfFov;
+                        double leftAngle = cameraAngle + halfFov;
+                        double deltaRight = Globals.normalizeAngle(tagAngle - rightAngle);
+                        double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
+                        if ((deltaRight > 0) && (deltaLeft > 0)) {
+                            double distance = Math.hypot(vectorToTag.x, vectorToTag.y);
+                            if (distance < minDistance) {
+                                activeCamera = i;
+                                minDistance = distance;
+                            }
                         }
                     }
                 }

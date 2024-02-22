@@ -17,14 +17,14 @@ public class OpticalTrackingTest extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        Globals.initialize();
+        Globals.initialize(telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
 
         waitForStart();
 
         while (opModeIsActive()) {
-            Globals.startLoop(telemetry);
+            Globals.startLoop();
 
             PoseVelocity2d powers = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
