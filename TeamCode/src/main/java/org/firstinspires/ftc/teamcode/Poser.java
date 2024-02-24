@@ -249,8 +249,8 @@ class SlidingWindowFilter {
  */
 class DistanceLocalizer {
     // Description of the distance sensor on the robot:
-    static final SensorDescriptor[] DISTANCE_SENSOR_DESCRIPTORS = {
-        new SensorDescriptor("distance", new Point(-3, -2), Math.PI)
+    public static final DistanceDescriptor[] DISTANCE_SENSOR_DESCRIPTORS = {
+        new DistanceDescriptor("distance", new Point(-3, -2), Math.PI)
     };
 
     // This is list is maintained one-to-one with SENSOR_DESCRIPTORS:
@@ -298,12 +298,12 @@ class DistanceLocalizer {
     };
 
     // Structure for describing distance sensors on the robot:
-    static class SensorDescriptor {
+    static class DistanceDescriptor {
         String name; // Device name of the sensor in the robot configuration:
         Point offset; // Offset in inches from center of rotation, robot facing forward
         double theta; // Orientation of the sensor in radians
 
-        public SensorDescriptor(String name, Point offset, double theta) {
+        public DistanceDescriptor(String name, Point offset, double theta) {
             this.name = name; this.offset = offset; this.theta = theta;
         }
     }
@@ -332,7 +332,7 @@ class DistanceLocalizer {
 
     // Create the distance sensor objects:
     DistanceLocalizer(HardwareMap hardwareMap) {
-        for (SensorDescriptor descriptor: DISTANCE_SENSOR_DESCRIPTORS) {
+        for (DistanceDescriptor descriptor: DISTANCE_SENSOR_DESCRIPTORS) {
             sensorHardware.add(hardwareMap.get(DistanceSensor.class, descriptor.name));
         }
     }
@@ -375,7 +375,7 @@ class DistanceLocalizer {
         // the best of them afterwards.
         ArrayList<Result> eligibleSensors = new ArrayList<>();
         for (int sensorIndex = 0; sensorIndex < DISTANCE_SENSOR_DESCRIPTORS.length; sensorIndex++) {
-            SensorDescriptor sensor = DISTANCE_SENSOR_DESCRIPTORS[sensorIndex];
+            DistanceDescriptor sensor = DISTANCE_SENSOR_DESCRIPTORS[sensorIndex];
 
             // Sensor offset from robot center in field coordinates:
             double sensorAngle = sensor.theta + pose.heading.log();
@@ -437,7 +437,7 @@ class DistanceLocalizer {
     static public Pose2d localize(Pose2d pose, Result distance) {
         boolean valid = false; // Assume failure, we'll convert to success later
 
-        SensorDescriptor sensor = DISTANCE_SENSOR_DESCRIPTORS[distance.sensorIndex];
+        DistanceDescriptor sensor = DISTANCE_SENSOR_DESCRIPTORS[distance.sensorIndex];
         Segment segment = WALL_SEGMENTS[distance.segmentIndex];
 
         // Sensor offset from robot center in field coordinates:
@@ -518,7 +518,7 @@ class AprilTagLocalizer {
 
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
-            new CameraDescriptor("webcam2", new Point(8.0, -5.75), Math.PI,
+            new CameraDescriptor("webcam2", new Point(6.0, -5.75), Math.PI,
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.19, Math.toRadians(75))
@@ -527,7 +527,7 @@ class AprilTagLocalizer {
     // Structure for describing cameras on the robot:
     static class CameraDescriptor {
         String name; // Device name in the robot's configuration
-        Point offset; // Offset in inches from center of rotation, relative to the camera's orientation
+        Point offset; // Offset from camera *to* the center (opposite of what you'd expect!), inches
         double theta; // Orientation of the sensor on the robot, in radians
         Size resolution; // Resolution in pixels
         double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
@@ -919,10 +919,10 @@ public class Poser {
         filter = new SlidingWindowFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
-        Settings.addActivate("Reset IMU yaw", reset -> {
+        Settings.addActivate(reset -> {
             if (reset)
                 originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-            return String.format("%.2f°",
+            return String.format("Reset IMU yaw (%.2f°)",
                 Math.toDegrees(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw));
         });
     }
@@ -959,7 +959,7 @@ public class Poser {
 
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
-    private void changeHistory(
+    private void reviseHistory(
             double time,
             AprilTagLocalizer.Result newAprilTag,
             DistanceLocalizer.Result newDistance) {
@@ -1028,13 +1028,14 @@ public class Poser {
         if (aprilTagLocalizer.activeCamera != -1) {
             // @@@ Make this a helper?
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
-            Point cameraOffset = descriptor.offset.rotate(pose.heading.log());
-            Point cameraOrigin = new Point(pose.position.x + cameraOffset.x, pose.position.y + cameraOffset.y);
             double cameraAngle = pose.heading.log() + descriptor.theta;
+            Point cameraOffset = descriptor.offset.rotate(pose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
+            Point cameraOrigin = new Point(pose.position.x + cameraOffset.x, pose.position.y + cameraOffset.y);
             double rayLength = 100;
             double halfFov = descriptor.fov / 2.0;
 
-            c.setStroke("#a0a0a0"); // Grey
+            c.setStrokeWidth(0); // This seems to be the same as width 1, oh well
+            c.setStroke("#d0d0d0"); // Almost invisible grey
             c.strokeLine(cameraOrigin.x, cameraOrigin.y,
                     cameraOrigin.x + rayLength * Math.cos(cameraAngle + halfFov),
                     cameraOrigin.y + rayLength * Math.sin(cameraAngle + halfFov));
@@ -1091,16 +1092,28 @@ public class Poser {
         }
 
         // Draw the last distance measurement if it's new enough:
-        if ((lastDistance != null) &&
+        if ((lastDistance != null) && (lastDistance.distance.valid) &&
                 (Globals.time() - lastDistance.time < DistanceLocalizer.READ_INTERVAL)) {
             c.setStroke("#a0a0a0"); // Grey
-            c.strokeLine(lastDistance.posteriorPose.position.x, lastDistance.posteriorPose.position.y,
-                         lastDistance.distance.point.x, lastDistance.distance.point.y);
+            DistanceLocalizer.DistanceDescriptor descriptor
+                    = DistanceLocalizer.DISTANCE_SENSOR_DESCRIPTORS[lastDistance.distance.sensorIndex];
+            Point offset = new Point(descriptor.offset.x, descriptor.offset.y)
+                    .rotate(lastDistance.posteriorPose.heading.log() - Math.PI / 2);
+            Point origin = new Point(
+                    lastDistance.posteriorPose.position.x + offset.x,
+                    lastDistance.posteriorPose.position.y + offset.y);
+            c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
         // Finally, draw our current pose:
+        double halfWidth = 18.5 / 2;
+        double halfLength = 17.5 / 2;
         c.setStroke("#3F51B5");
-        MecanumDrive.drawRobot(c, pose, 9);
+        c.setRotation(pose.heading.log());
+        c.setTranslation(pose.position.x, pose.position.y);
+        c.strokePolyline(new double[] { -halfWidth, halfWidth, halfWidth, -halfWidth, -halfWidth },
+                         new double[] { halfLength, halfLength, -halfLength, -halfLength, halfLength });
+        c.strokeLine(0, 0, halfWidth, 0);
     }
 
     // Update the pose estimate:
@@ -1124,14 +1137,14 @@ public class Poser {
         // Process April Tags:
         AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, filter.isConfident());
         if (aprilTag != null) {
-            changeHistory(time - aprilTag.latency, aprilTag, null);
+            reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
 
         // Process the distance sensor. Only change history if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
         DistanceLocalizer.Result distance = distanceLocalizer.update(pose);
         if ((filter.isConfident()) && (distance != null)) {
-            changeHistory(time - distance.latency, null, distance);
+            reviseHistory(time - distance.latency, null, distance);
         }
 
         // Output telemetry and visualizations:

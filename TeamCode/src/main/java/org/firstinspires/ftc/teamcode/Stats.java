@@ -41,8 +41,8 @@ public class Stats {
     // Summarize all of the statistics into a nice string:
     @SuppressLint("DefaultLocale")
     static public String get() {
-        String result = "<p1>Stats</p1>";
-        result += String.format("Loop time: %.1fms, Camera FPS: %.1f, Latency: %.1f\n",
+        String result = "<h1>Stats</h1>";
+        result += String.format("Loop: %.1fms, Camera FPS: %.1f, Latency: %.1f\n",
             loopTime * 1000.0, cameraFps, pipelineLatency * 1000.0);
         result += poseStatus + "\n";
 
@@ -51,11 +51,11 @@ public class Stats {
             degreesCorrection += 90;
         while (degreesCorrection > 45)
             degreesCorrection -= 90;
-        result += String.format("Yaw correction: %.2f°, IMU yaw: %.2f°", degreesCorrection, Math.toDegrees(imuYaw));
+        result += String.format("Yaw correction: %.2f°, IMU yaw: %.2f°\n", degreesCorrection, Math.toDegrees(imuYaw));
 
-        result += String.format("Linear: top-speed: %.1f, theoretical: %.1f, accel: %.1f, decel: %.1f",
+        result += String.format("Linear: top-speed: %.1f, theoretical: %.1f\n    accel: %.1f, decel: %.1f\n",
                 maxLinearSpeed, fullAxialSpeed, maxLinearAcceleration, minLinearDeceleration);
-        result += String.format("Angular: top-speed: %.2f, accel: %.2f, decel: %.2f",
+        result += String.format("Angular: top-speed: %.2f\n    accel: %.2f, decel: %.2f\n",
                 maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration);
 
         return result;

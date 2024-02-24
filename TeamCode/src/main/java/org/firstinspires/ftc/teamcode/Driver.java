@@ -345,15 +345,17 @@ public class Driver extends LinearOpMode {
         double fullAngularSpeed
                 = 2 * fullAxialSpeed / (MecanumDrive.PARAMS.trackWidthTicks * MecanumDrive.PARAMS.inPerTick);
 
+        Settings.addList("Max speed (inch/s)", new String[] {"20", "30", "40", "50"}, 1,
+                (i, string) -> MecanumDrive.PARAMS.maxWheelVel = Double.parseDouble(string));
+
         waitForStart();
 
         while (opModeIsActive()) {
             Globals.startLoop();
+            Gamepad gamepad1 = settings.update();
             Stats.update();
             poser.update();
             led.update();
-
-            Gamepad gamepad1 = settings.update();
 
             if (poser.isConfident())
                 led.setSteadyColor(Led.Color.RED);

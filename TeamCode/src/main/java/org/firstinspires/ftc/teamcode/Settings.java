@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.ArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -38,22 +39,21 @@ public class Settings {
         String description;
         int index;
         String[] list;
-        Consumer<Integer> callback;
-        public ListOption(String description, int index, String[] list, Consumer<Integer> callback) {
+        BiConsumer<Integer, String> callback;
+        public ListOption(String description, int index, String[] list, BiConsumer<Integer, String> callback) {
             this.description = description; this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return description + ": <b>◄" + list[index] + "►</b>";
+            return "◄" + list[index] + "► " + description;
         }
     }
     private static class ActivateOption extends Option {
-        String description;
         Function<Boolean, String> callback;
-        public ActivateOption(String description, Function<Boolean, String> callback) {
-            this.description = description; this.callback = callback;
+        public ActivateOption(Function<Boolean, String> callback) {
+            this.callback = callback;
         }
         public String string() {
-            return callback.apply(false); // Get current string
+            return callback.apply(false);
         }
     }
 
@@ -68,10 +68,10 @@ public class Settings {
     // Button press status:
     boolean select() { return buttonPress(gamepad.a, 0); }
     boolean cancel() { return buttonPress(gamepad.b, 1); }
-    boolean up() { return buttonPress(gamepad.dpad_up, 2); }
-    boolean down() { return buttonPress(gamepad.dpad_down, 3); }
-    boolean left() { return buttonPress(gamepad.dpad_left, 4); }
-    boolean right() { return buttonPress(gamepad.dpad_right, 5); }
+    boolean left() { return buttonPress(gamepad.dpad_left, 2); }
+    boolean right() { return buttonPress(gamepad.dpad_right, 3); }
+    boolean up() { return buttonPress(gamepad.dpad_up, 4); }
+    boolean down() { return buttonPress(gamepad.dpad_down, 5); }
     boolean start() { return buttonPress(gamepad.start, 6); }
 
     // Constructor:
@@ -100,9 +100,13 @@ public class Settings {
         }
 
         StringBuilder output = new StringBuilder();
-        output.append("<p2><b>Settings</b></p2>");
+        output.append("<h2>Settings</h2>");
         for (int i = 0; i < options.size(); i++) {
-            output.append(i == current ? "➤" : " ").append(options.get(i).string()).append("\n");
+            // output.append(i == current ? "➤" : " ").append(options.get(i).string()).append("\n");
+            if (i == current)
+                output.append("<b>").append(options.get(i).string()).append("</b>\n");
+            else
+                output.append(options.get(i).string()).append("\n");
         }
         output.append("<hr>\n\n"); // @@@ Did this work?
         output.append(Stats.get());
@@ -117,18 +121,20 @@ public class Settings {
             }
         } else if (option instanceof ListOption) {
             ListOption listOption = (ListOption) option;
-            if (left() || right()) {
-                if (left()) {
+            boolean left = left();
+            boolean right = right();
+            if (left || right) {
+                if (left) {
                     listOption.index--;
                     if (listOption.index < 0)
                         listOption.index = 0;
                 }
-                if (right()) {
+                if (right) {
                     listOption.index++;
                     if (listOption.index > listOption.list.length)
                         listOption.index = listOption.list.length - 1;
                 }
-                listOption.callback.accept(listOption.index);
+                listOption.callback.accept(listOption.index, listOption.list[listOption.index]);
             }
         } else if (option instanceof ActivateOption) {
             if (select()) {
@@ -145,13 +151,13 @@ public class Settings {
         settings.options.add(new ToggleOption(description, initialValue, callback));
     }
     // Add a list option to the Settings menu:
-    public static void addList(String description, int initialIndex, String[] list, Consumer<Integer> callback) {
-        callback.accept(initialIndex);
+    public static void addList(String description, String[] list, int initialIndex, BiConsumer<Integer, String> callback) {
+        callback.accept(initialIndex, list[initialIndex]);
         settings.options.add(new ListOption(description, initialIndex, list, callback));
     }
     // Add an option that can only be activated:
-    public static void addActivate(String description, Function<Boolean, String> callback) {
+    public static void addActivate(Function<Boolean, String> callback) {
         callback.apply(true);
-        settings.options.add(new ActivateOption(description, callback));
+        settings.options.add(new ActivateOption(callback));
     }
 }
