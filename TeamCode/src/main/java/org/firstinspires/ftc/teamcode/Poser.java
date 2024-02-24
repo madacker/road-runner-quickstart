@@ -35,6 +35,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -176,7 +177,6 @@ class AprilTagFilter {
 
     private double confidentAprilTagCount = 0; // Active count of trusted headings so far
     private boolean isConfident; // True if we're now confident in the results coming out
-    private double previousTime; // Time of the most recent filter() call
 
     // The residuals are maintained in newest-to-oldest order:
     private LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
@@ -196,7 +196,6 @@ class AprilTagFilter {
     // Specify true for isConfident if a starting pose was specified to Poser()
     AprilTagFilter(boolean isConfident) {
         this.isConfident = isConfident;
-        previousTime = Globals.time();
     }
 
     // Filter the prediction and measurements and return a posterior:
@@ -232,8 +231,7 @@ class AprilTagFilter {
 
         // Add April Tag and distance sensor results to the position history:
         if (aprilTagPose != null) {
-            Pose2d sampledPose = aprilTagPose;
-            Vector2d positionResidual = sampledPose.position.minus(odometryPose.position);
+            Vector2d positionResidual = aprilTagPose.position.minus(odometryPose.position);
             positionResiduals.addFirst(new Storage<>(positionResidual)); // Newest to oldest
         }
 
@@ -306,15 +304,15 @@ class DistanceLocalizer {
 
     // Active state for each one of the distance sensors. This is maintained 1-to-1 with
     // DISTANCE_SENSOR_DESCRIPTORS:
-    public DistanceState[] distanceStates = new DistanceState[DISTANCE_SENSOR_DESCRIPTORS.length];
+    public SensorState[] sensorStates = new SensorState[DISTANCE_SENSOR_DESCRIPTORS.length];
 
     // Object tracking the state for each sensor:
-    class DistanceState {
-        int sensorIndex; // Index for this entry in both 'sensors' and 'DISTANCE_SENSOR_DESCRIPTORS'
+    static class SensorState {
+        int index; // Index for this entry in both 'sensors' and 'DISTANCE_SENSOR_DESCRIPTORS'
         DistanceSensor hardware; // FTC object for the distance sensor
         DistanceFilter filter; // Filter for this sensor
         DistanceDescriptor descriptor; // Associated descriptor
-        int trackingWall; // WALL_SEGMENTS index for wall the sensor is actively tracking; -1 if none
+        Segment trackedWall; // The wall the sensor is currently tracking, null if none
     }
 
     // Average distance adder accounting for slope for backdrop intersections, in inches:
@@ -372,34 +370,35 @@ class DistanceLocalizer {
     // Structure for returning results from update():
     static class Result {
         double measurement; // Measured distance
-        int sensorIndex; // SENSOR_DESCRIPTORS index
-        int wallIndex; // Target WALL_SEGMENTS index
+        SensorState sensor; // Distance sensor
+        Segment wall; // Target wall
         double latency; // Latency, in seconds
 
         // These are for telemetry purposes:
         Point point; // Point computed from the measurement and most recent pose information
         boolean valid; // True if the sensor result was valid and used
 
-        public Result(int sensorIndex, int wallIndex, double latency, double measurement) {
-            this.sensorIndex = sensorIndex; this.wallIndex = wallIndex; this.latency = latency;
+        public Result(SensorState sensor, Segment wall, double latency, double measurement) {
+            this.sensor = sensor; this.wall = wall; this.latency = latency;
             this.measurement = measurement;
         }
     }
 
-    int currentSensorIndex; // SENSOR_DESCRIPTORS index for the current sensor
-    int currentWallIndex = -1; // WALL_SEGMENTS index for the current segment, -1 is uninitialized
-    double lastReadTime; // Time of the last read of a sensor
+    SensorState currentSensor; // Currently active sensor, null if none
+    Segment currentWall; // Current segment, null if none
+    double lastUpdateTime; // Time of the last read of a sensor
+    int tickCount; // Count of times that update() has been called
 
     // Create the distance localizer:
     DistanceLocalizer(HardwareMap hardwareMap) {
         // Initialize the sensor state:
         for (int i = 0; i < DISTANCE_SENSOR_DESCRIPTORS.length; i++) {
-            DistanceState state = distanceStates[i];
-            state.sensorIndex = i;
+            SensorState state = sensorStates[i];
+            state.index = i;
             state.descriptor = DISTANCE_SENSOR_DESCRIPTORS[i];
             state.hardware = hardwareMap.get(DistanceSensor.class, state.descriptor.name);
             state.filter = new DistanceFilter();
-            state.trackingWall = -1;
+            state.trackedWall = null;
         }
     }
 
@@ -430,51 +429,48 @@ class DistanceLocalizer {
         return null;
     }
 
-    // For every sensor, determine which wall it's pointing at, if any:
-    static class WallSearch {
-        int sensorIndex; // Index in 'sensorStates' of the associated sensor
-        int wall; // Index in WALL_SEGMENTS of wall the sensor points at, -1 if none
-        double distance; // Estimated distance to the wall
-    }
-
     // Calculate the distance from the sensor to the specified wall:
-    static public double distanceToWall(Pose2d pose, int sensorIndex, int wallIndex) {
-        DistanceDescriptor descriptor = DISTANCE_SENSOR_DESCRIPTORS[sensorIndex];
-        Segment segment = WALL_SEGMENTS[wallIndex];
-
+    static public double distanceToWall(Pose2d pose, SensorState sensor, Segment wall) {
         // Sensor offset from robot center in field coordinates:
-        double sensorAngle = descriptor.theta + pose.heading.log();
-        Point sensorOffset = descriptor.offset.rotate(sensorAngle);
+        double sensorAngle = sensor.descriptor.theta + pose.heading.log();
+        Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
 
         // Ray representing the sensor's position and orientation on the field:
         Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
         Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
         Ray sensorRay = new Ray(sensorPoint, sensorDirection);
 
-        Point hitPoint = raySegmentIntersection(sensorRay, segment);
+        Point hitPoint = raySegmentIntersection(sensorRay, wall);
         if (hitPoint != null) {
             return sensorPoint.distance(hitPoint);
         }
         return Double.MAX_VALUE;
     }
 
-    // The pose is used to determine which sensor to use:
-    Result update(Pose2d pose) { // Returns null if no readings
+    // Describes a wall we're tracking and its corresponding sensor:
+    static class WallTracker {
+        SensorState sensor; // Associated distance sensor
+        Segment wall; // Wall the sensor points at, null if none
+        double distance; // Estimated distance to the wall, Double.MAX_VALUE if infinite
+
+        public WallTracker(SensorState sensor, Segment wall, double distance) {
+            this.sensor = sensor; this.wall = wall; this.distance = distance;
+        }
+    }
+
+    // Main loop update for the distance sensors. The pose is used to determine which sensor to
+    // use next:
+    Result update(Pose2d pose, Poser.HistoryRecord record) { // Returns null if no readings
         double time = Globals.time();
-        if (time - lastReadTime < READ_INTERVAL)
+        if (time - lastUpdateTime < READ_INTERVAL)
             return null;
-        lastReadTime = time;
+        lastUpdateTime = time;
+        tickCount++;
 
-        WallSearch[] wallSearches = new WallSearch[distanceStates.length];
-        for (int sensorIndex = 0; sensorIndex < distanceStates.length; sensorIndex++) {
-            wallSearches[sensorIndex].sensorIndex = sensorIndex;
-            wallSearches[sensorIndex].wall = -1; // Assume no wall
-            wallSearches[sensorIndex].distance = Double.MAX_VALUE;
-            DistanceDescriptor descriptor = DISTANCE_SENSOR_DESCRIPTORS[sensorIndex];
-
-            // Sensor offset from robot center in field coordinates:
-            double sensorAngle = descriptor.theta + pose.heading.log();
-            Point sensorOffset = descriptor.offset.rotate(sensorAngle);
+        WallTracker[] wallTrackers = new WallTracker[sensorStates.length];
+        for (SensorState sensor: sensorStates) {
+            double sensorAngle = sensor.descriptor.theta + pose.heading.log();
+            Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
 
             // Ray representing the sensor's position and orientation on the field:
             Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
@@ -483,60 +479,64 @@ class DistanceLocalizer {
 
             // Find the first wall segment that the sensor is pointing straight at, according to
             // the current pose:
-            for (int wallIndex = 0; wallIndex < WALL_SEGMENTS.length; wallIndex++) {
-                Segment segment = WALL_SEGMENTS[wallIndex];
-
+            wallTrackers[sensor.index] = new WallTracker(sensor, null, Double.MAX_VALUE);
+            for (Segment segment: WALL_SEGMENTS) {
                 // Add this sensor and segment to the eligible list if the sensor points at it
                 // and the distance is less than MAX_DISTANCE:
                 Point hitPoint = raySegmentIntersection(sensorRay, segment);
                 if (hitPoint != null) {
-                    wallSearches[sensorIndex].wall = wallIndex;
-                    wallSearches[sensorIndex].distance = sensorPoint.distance(hitPoint);
+                    double distance = sensorPoint.distance(hitPoint);
+                    if (distance < MAX_DISTANCE) {
+                        wallTrackers[sensor.index] = new WallTracker(sensor, segment, distance);
+                    }
                 }
             }
         }
 
-        // Update the sensor tracking list:
-        for (WallSearch search: wallSearches) {
-            DistanceState state = distanceStates[search.sensorIndex];
-
-            // Clear the filter history if we're now tracking a different wall from before:
-            if (state.trackingWall != search.wall) {
-                state.filter.clear();
-                state.trackingWall = search.wall;
+        // Reset the filters whenever the associated tracking wall changes:
+        for (SensorState sensor: sensorStates) {
+            if (sensor.trackedWall != wallTrackers[sensor.index].wall) {
+                sensor.filter.clear();
+                sensor.trackedWall = wallTrackers[sensor.index].wall;
             }
         }
 
         // Sort by increasing distance:
-        Arrays.sort(wallSearches, (a, b) -> (a.distance < b.distance) ? -1 : 1);
+        Arrays.sort(wallTrackers, Comparator.comparingDouble(x -> x.distance));
+
+        // Record the walls we're tracking into the history record:
+        record.wallTrackers = wallTrackers;
+
+        // Don't waste time querying the sensor if we no walls would be tracked:
+        if (wallTrackers[0].distance == Double.MAX_VALUE) {
+            currentWall = null;
+            currentSensor = null;
+            return null; // ====>
+        }
 
         // Ping pong between the top two candidates. Always go with the largest unless we did
         // it last time and the second largest is smaller than the maximum:
-        if ((wallSearches.length > 1) &&
-                (wallSearches[1].sensorIndex != currentSensorIndex) &&
-                (wallSearches[1].distance < MAX_DISTANCE)) {
+        int selection = 0;
+        if ((wallTrackers[1].distance < Double.MAX_VALUE) && (currentSensor != wallTrackers[1].sensor))
+            selection = 1;
 
-            currentSensorIndex = wallSearches[1].sensorIndex;
-            currentWallIndex = wallSearches[1].wall;
-        } else {
-            currentSensorIndex = wallSearches[0].sensorIndex;
-            currentWallIndex = wallSearches[0].wall;
-        }
+        currentSensor = wallTrackers[selection].sensor;
+        currentWall = wallTrackers[selection].wall;
 
         // Query the hardware and return the result:
-        return new Result(currentSensorIndex, currentWallIndex, LATENCY,
-                distanceStates[currentSensorIndex].hardware.getDistance(DistanceUnit.INCH));
+        double measurement = currentSensor.hardware.getDistance(DistanceUnit.INCH);
+        return new Result(currentSensor, currentWall, LATENCY, measurement);
     }
 
     // Get the most recently used wall segment:
     public Segment getCurrentSegment() {
-        return (currentWallIndex != -1) ? WALL_SEGMENTS[currentWallIndex] : null;
+        return currentWall;
     }
 
     // Given a pose and a measured distance, calculate a corrected pose that respects that distance:
     static public Pose2d localize(
             Pose2d pose, // Current pose
-            DistanceDescriptor sensor, // Distance sensor descriptor
+            SensorState sensor, // Distance sensor descriptor
             Segment wallSegment, // Wall segment
             double measuredDistance, // Distance measured by the sensor
             Poser.HistoryRecord history) // For recording telemetry data, can be null
@@ -544,8 +544,8 @@ class DistanceLocalizer {
         boolean valid = false; // Assume failure, we'll convert to success later
 
         // Sensor offset from robot center in field coordinates:
-        double sensorFieldAngle = sensor.theta + pose.heading.log();
-        Point sensorFieldOffset = sensor.offset.rotate(sensorFieldAngle);
+        double sensorFieldAngle = sensor.descriptor.theta + pose.heading.log();
+        Point sensorFieldOffset = sensor.descriptor.offset.rotate(sensorFieldAngle);
 
         // Create the rays representing the edges of the field-of-view:
         Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorFieldOffset);
@@ -584,10 +584,12 @@ class DistanceLocalizer {
         }
 
         // Update telemetry:
-        history.distance.valid = valid;
-        history.distance.point = new Point(
-                pose.position.x + sensorFieldOffset.x + measuredDistance * Math.cos(sensorFieldAngle),
-                pose.position.y + sensorFieldOffset.y + measuredDistance * Math.sin(sensorFieldAngle));
+        if (history != null) {
+            history.distance.valid = valid;
+            history.distance.point = new Point(
+                    pose.position.x + sensorFieldOffset.x + measuredDistance * Math.cos(sensorFieldAngle),
+                    pose.position.y + sensorFieldOffset.y + measuredDistance * Math.sin(sensorFieldAngle));
+        }
 
         return pose;
     }
@@ -601,8 +603,11 @@ class AprilTagLocalizer {
     final double FINE_EPSILON = 5.0;
     final double COARSE_EPSILON = 24.0;
 
-    // Arbitrary reliable range:
+    // Arbitrary reliable range for an April Tag pose:
     final double RELIABLE_RANGE = 60.0;
+
+    // Activate a camera only if it's within this many inches of a tag:
+    final double MIN_ACTIVATION_DISTANCE = 72;
 
     private CameraState[] cameras = new CameraState[CAMERA_DESCRIPTORS.length];
     int activeCamera = -1; // Currently active camera, -1 if none is
@@ -846,7 +851,7 @@ class AprilTagLocalizer {
             }
 
             // Disable if the closest tag is further than this amount:
-            if (minDistance > 72) { // @@@ Constant
+            if (minDistance > MIN_ACTIVATION_DISTANCE) {
                 resultIndex = -1;
             }
         }
@@ -945,7 +950,7 @@ class AprilTagLocalizer {
                 Stats.poseStatus = String.format("%d inadequate vision poses", poseCount);
             }
             if ((poseCount == 1) && (minResidual < FINE_EPSILON) && (visionPoses.get(0).range < RELIABLE_RANGE)) {
-                // @@@ Check its size?
+                // TODO: Check the returned size?
                 // If only a single tag is in view, adopt its pose only if it's relatively close
                 // to our current pose estimate:
                 Stats.poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
@@ -999,15 +1004,12 @@ public class Poser {
 
     // Record structure for the history:
     static class HistoryRecord {
-        final int DISTANCE_SENSOR_COUNT = DistanceLocalizer.DISTANCE_SENSOR_DESCRIPTORS.length; // @@@ Needed?
-
         double time; // Time, in seconds, of the record
         Pose2d posteriorPose; // Result of the *previous* step
         Twist2d twist; // Odometry twist
         DistanceLocalizer.Result distance; // Distance sensor distance, if any
+        DistanceLocalizer.WallTracker[] wallTrackers; // Distance sensor tracking walls
         AprilTagLocalizer.Result aprilTag; // April tag result, if any
-        DistanceFilter[] distanceFilters; // @@@ Initialize
-        int[] trackingWalls; // Distance sensor tracking walls @@@ Gotta initialize @@@ Should just point directly?
 
         public HistoryRecord(double time, Pose2d posteriorPose, Twist2d twist) {
             this.time = time; this.posteriorPose = posteriorPose; this.twist = twist;
@@ -1046,21 +1048,21 @@ public class Poser {
         Pose2d pose = record.posteriorPose.plus(record.twist);
 
         if (record.distance != null) {
-            double estimatedDistance = DistanceLocalizer.distanceToWall(pose, record.distance.sensorIndex, record.distance.wallIndex);
+            double estimatedDistance = DistanceLocalizer.distanceToWall(pose, record.distance.sensor, record.distance.wall);
             if (estimatedDistance < Double.MAX_VALUE) {
-                double filteredDistance = record.distanceFilters[record.distance.sensorIndex].filter(record.time, record.distance.measurement, estimatedDistance);
-                pose = DistanceLocalizer.localize(pose, record.distance.sensorIndex,record.distance.wallIndex,record.distance.measurement, record);
+                double filteredDistance = record.distance.sensor.filter.filter(record.time, record.distance.measurement, estimatedDistance);
+                pose = DistanceLocalizer.localize(pose, record.distance.sensor, record.distance.wall, filteredDistance, record);
             }
         }
 
         if (record.aprilTag != null) {
             Pose2d aprilTagPose = record.aprilTag.pose;
-            for (int sensorIndex = 0; sensorIndex < record.DISTANCE_SENSOR_COUNT; sensorIndex++) {
-                if (record.trackingWalls[sensorIndex] != -1) {
-                    double currentDistance = DistanceLocalizer.distanceToWall(pose, sensorIndex, record.trackingWalls[sensorIndex]); // @@@ Is trackingWalls updated?
-                    if (currentDistance < Double.MAX_VALUE) {
-                        aprilTagPose = DistanceLocalizer.localize(aprilTagPose, sensorIndex, record.trackingWalls[sensorIndex], currentDistance, null);
-                    }
+            for (DistanceLocalizer.WallTracker tracker: record.wallTrackers) {
+                // Only use this tracking wall data if there already was a hit so the
+                // residual buffer is non-empty:
+                if ((tracker.wall != null) && (tracker.sensor.filter.residuals.size() != 0)) {
+                    double currentDistance = DistanceLocalizer.distanceToWall(pose, tracker.sensor, tracker.wall);
+                    aprilTagPose = DistanceLocalizer.localize(aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
                 }
             }
             pose = aprilTagFilter.filter(record.time, pose, aprilTagPose, record.aprilTag.isConfident);
@@ -1137,7 +1139,6 @@ public class Poser {
 
         // Draw the active camera's field of view:
         if (aprilTagLocalizer.activeCamera != -1) {
-            // @@@ Make this a helper?
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
             double cameraAngle = pose.heading.log() + descriptor.theta;
             Point cameraOffset = descriptor.offset.rotate(pose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
@@ -1207,7 +1208,7 @@ public class Poser {
                 (Globals.time() - lastDistance.time < DistanceLocalizer.READ_INTERVAL)) {
             c.setStroke("#a0a0a0"); // Grey
             DistanceLocalizer.DistanceDescriptor descriptor
-                    = DistanceLocalizer.DISTANCE_SENSOR_DESCRIPTORS[lastDistance.distance.sensorIndex];
+                    = lastDistance.distance.sensor.descriptor;
             Point offset = new Point(descriptor.offset.x, descriptor.offset.y)
                     .rotate(lastDistance.posteriorPose.heading.log() - Math.PI / 2);
             Point origin = new Point(
@@ -1251,9 +1252,9 @@ public class Poser {
             reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
 
-        // Process the distance sensor. Only change history if the current pose estimate is
+        // Process the distance sensor. Only act on it if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
-        DistanceLocalizer.Result distance = distanceLocalizer.update(pose);
+        DistanceLocalizer.Result distance = distanceLocalizer.update(pose, record);
         if ((aprilTagFilter.isConfident()) && (distance != null)) {
             reviseHistory(time - distance.latency, null, distance);
         }
