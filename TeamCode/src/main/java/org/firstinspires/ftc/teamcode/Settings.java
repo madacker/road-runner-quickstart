@@ -32,7 +32,8 @@ public class Settings {
         }
         public String string() {
             // From https://www.alt-codes.net/circle-symbols // "✅" : "❌";
-            return (value ? "●" : "○") + " " + description;
+            // return (value ? "●" : "○") + " " + description;
+            return (value ? "☒" : "☐") + " " + description;
         }
     }
     private static class ListOption extends Option {
@@ -47,13 +48,13 @@ public class Settings {
             return "◄" + list[index] + "► " + description;
         }
     }
-    private static class ActivateOption extends Option {
+    private static class ActivationOption extends Option {
         Function<Boolean, String> callback;
-        public ActivateOption(Function<Boolean, String> callback) {
+        public ActivationOption(Function<Boolean, String> callback) {
             this.callback = callback;
         }
         public String string() {
-            return callback.apply(false);
+            return "○ " + callback.apply(false);
         }
     }
 
@@ -131,33 +132,33 @@ public class Settings {
                 }
                 if (right) {
                     listOption.index++;
-                    if (listOption.index > listOption.list.length)
+                    if (listOption.index >= listOption.list.length)
                         listOption.index = listOption.list.length - 1;
                 }
                 listOption.callback.accept(listOption.index, listOption.list[listOption.index]);
             }
-        } else if (option instanceof ActivateOption) {
+        } else if (option instanceof ActivationOption) {
             if (select()) {
-                ActivateOption activateOption = (ActivateOption) option;
-                activateOption.callback.apply(true);
+                ActivationOption activationOption = (ActivationOption) option;
+                activationOption.callback.apply(true);
             }
         }
         return null; // We own the Gamepad, the caller can't have it
     }
 
     // Add a toggleable option to the Settings menu:
-    public static void addToggle(String description, boolean initialValue, Consumer<Boolean> callback) {
+    public static void registerToggleOption(String description, boolean initialValue, Consumer<Boolean> callback) {
         callback.accept(initialValue);
         settings.options.add(new ToggleOption(description, initialValue, callback));
     }
     // Add a list option to the Settings menu:
-    public static void addList(String description, String[] list, int initialIndex, BiConsumer<Integer, String> callback) {
+    public static void registerListOption(String description, String[] list, int initialIndex, BiConsumer<Integer, String> callback) {
         callback.accept(initialIndex, list[initialIndex]);
         settings.options.add(new ListOption(description, initialIndex, list, callback));
     }
     // Add an option that can only be activated:
-    public static void addActivate(Function<Boolean, String> callback) {
+    public static void registerActivationOption(Function<Boolean, String> callback) {
         callback.apply(true);
-        settings.options.add(new ActivateOption(callback));
+        settings.options.add(new ActivationOption(callback));
     }
 }

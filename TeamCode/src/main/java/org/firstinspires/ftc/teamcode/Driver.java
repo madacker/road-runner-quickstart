@@ -345,7 +345,7 @@ public class Driver extends LinearOpMode {
         double fullAngularSpeed
                 = 2 * fullAxialSpeed / (MecanumDrive.PARAMS.trackWidthTicks * MecanumDrive.PARAMS.inPerTick);
 
-        Settings.addList("Max speed (inch/s)", new String[] {"20", "30", "40", "50"}, 1,
+        Settings.registerListOption("Max speed (inch/s)", new String[] {"20", "30", "40", "50", "60"}, 1,
                 (i, string) -> MecanumDrive.PARAMS.maxWheelVel = Double.parseDouble(string));
 
         waitForStart();
@@ -417,15 +417,11 @@ public class Driver extends LinearOpMode {
 
             // Manually drive:
             if ((!parkingActivated) && (!roadrunnerActivated)) {
-                double leftStickY = (gamepad1 != null) ? gamepad1.left_stick_y : 0;
-                double leftStickX = (gamepad1 != null) ? gamepad1.left_stick_x : 0;
-                double rightStickX = (gamepad1 != null) ? gamepad1.right_stick_x : 0;
-
                 if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
-                            scaleStick(-leftStickY, fullAxialSpeed),
-                            scaleStick(-leftStickX, fullLateralSpeed)),
-                            scaleStick(-rightStickX, fullAngularSpeed));
+                            scaleStick(-this.gamepad1.left_stick_y, fullAxialSpeed),
+                            scaleStick(-this.gamepad1.left_stick_x, fullLateralSpeed)),
+                            scaleStick(-this.gamepad1.right_stick_x, fullAngularSpeed));
 
                     PoseVelocity2d fieldVelocity = poser.pose.times(calibratedVelocity);
 
@@ -435,9 +431,9 @@ public class Driver extends LinearOpMode {
                     drive.setDrivePowers(poser.pose, poser.velocity, null, fieldVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
-                            shapeStick(-leftStickY),
-                            shapeStick(-leftStickX)),
-                            shapeStick(-rightStickX));
+                            shapeStick(-this.gamepad1.left_stick_y),
+                            shapeStick(-this.gamepad1.left_stick_x)),
+                            shapeStick(-this.gamepad1.right_stick_x));
                     drive.setDrivePowers(manualPower);
                 }
             }

@@ -310,9 +310,16 @@ class DistanceLocalizer {
     static class SensorState {
         int index; // Index for this entry in both 'sensors' and 'DISTANCE_SENSOR_DESCRIPTORS'
         DistanceSensor hardware; // FTC object for the distance sensor
-        DistanceFilter filter; // Filter for this sensor
         DistanceDescriptor descriptor; // Associated descriptor
         Segment trackedWall; // The wall the sensor is currently tracking, null if none
+        DistanceFilter filter = new DistanceFilter(); // Filter for this sensor
+        boolean enabled; // True if enabled in settings
+
+        public SensorState(int index, DistanceSensor hardware, DistanceDescriptor descriptor) {
+            this.index = index;
+            this.hardware = hardware;
+            this.descriptor = descriptor;
+        }
     }
 
     // Average distance adder accounting for slope for backdrop intersections, in inches:
@@ -387,18 +394,16 @@ class DistanceLocalizer {
     SensorState currentSensor; // Currently active sensor, null if none
     Segment currentWall; // Current segment, null if none
     double lastUpdateTime; // Time of the last read of a sensor
-    int tickCount; // Count of times that update() has been called
 
     // Create the distance localizer:
     DistanceLocalizer(HardwareMap hardwareMap) {
         // Initialize the sensor state:
         for (int i = 0; i < DISTANCE_SENSOR_DESCRIPTORS.length; i++) {
-            SensorState state = sensorStates[i];
-            state.index = i;
-            state.descriptor = DISTANCE_SENSOR_DESCRIPTORS[i];
-            state.hardware = hardwareMap.get(DistanceSensor.class, state.descriptor.name);
-            state.filter = new DistanceFilter();
-            state.trackedWall = null;
+            DistanceDescriptor descriptor = DISTANCE_SENSOR_DESCRIPTORS[i];
+            SensorState state = new SensorState(i, hardwareMap.get(DistanceSensor.class, descriptor.name), descriptor);
+            sensorStates[i] = state;
+            Settings.registerToggleOption(String.format("Enable %s", descriptor.name),
+                    true, enable -> state.enabled = enable );
         }
     }
 
@@ -465,29 +470,31 @@ class DistanceLocalizer {
         if (time - lastUpdateTime < READ_INTERVAL)
             return null;
         lastUpdateTime = time;
-        tickCount++;
 
         WallTracker[] wallTrackers = new WallTracker[sensorStates.length];
         for (SensorState sensor: sensorStates) {
-            double sensorAngle = sensor.descriptor.theta + pose.heading.log();
-            Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
-
-            // Ray representing the sensor's position and orientation on the field:
-            Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
-            Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
-            Ray sensorRay = new Ray(sensorPoint, sensorDirection);
-
-            // Find the first wall segment that the sensor is pointing straight at, according to
-            // the current pose:
+            // Set an entry even if the sensor is disabled:
             wallTrackers[sensor.index] = new WallTracker(sensor, null, Double.MAX_VALUE);
-            for (Segment segment: WALL_SEGMENTS) {
-                // Add this sensor and segment to the eligible list if the sensor points at it
-                // and the distance is less than MAX_DISTANCE:
-                Point hitPoint = raySegmentIntersection(sensorRay, segment);
-                if (hitPoint != null) {
-                    double distance = sensorPoint.distance(hitPoint);
-                    if (distance < MAX_DISTANCE) {
-                        wallTrackers[sensor.index] = new WallTracker(sensor, segment, distance);
+            if (sensor.enabled) {
+                double sensorAngle = sensor.descriptor.theta + pose.heading.log();
+                Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
+
+                // Ray representing the sensor's position and orientation on the field:
+                Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
+                Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
+                Ray sensorRay = new Ray(sensorPoint, sensorDirection);
+
+                // Find the first wall segment that the sensor is pointing straight at, according to
+                // the current pose:
+                for (Segment segment : WALL_SEGMENTS) {
+                    // Add this sensor and segment to the eligible list if the sensor points at it
+                    // and the distance is less than MAX_DISTANCE:
+                    Point hitPoint = raySegmentIntersection(sensorRay, segment);
+                    if (hitPoint != null) {
+                        double distance = sensorPoint.distance(hitPoint);
+                        if (distance < Math.min(wallTrackers[sensor.index].distance, MAX_DISTANCE)) {
+                            wallTrackers[sensor.index] = new WallTracker(sensor, segment, distance);
+                        }
                     }
                 }
             }
@@ -495,9 +502,11 @@ class DistanceLocalizer {
 
         // Reset the filters whenever the associated tracking wall changes:
         for (SensorState sensor: sensorStates) {
-            if (sensor.trackedWall != wallTrackers[sensor.index].wall) {
-                sensor.filter.clear();
-                sensor.trackedWall = wallTrackers[sensor.index].wall;
+            if (wallTrackers[sensor.index].wall != null) {
+                if (sensor.trackedWall != wallTrackers[sensor.index].wall) {
+                    sensor.trackedWall = wallTrackers[sensor.index].wall;
+                    sensor.filter.clear();
+                }
             }
         }
 
@@ -507,7 +516,7 @@ class DistanceLocalizer {
         // Record the walls we're tracking into the history record:
         record.wallTrackers = wallTrackers;
 
-        // Don't waste time querying the sensor if we no walls would be tracked:
+        // Don't waste time querying the sensor if no walls would be tracked:
         if (wallTrackers[0].distance == Double.MAX_VALUE) {
             currentWall = null;
             currentSensor = null;
@@ -517,8 +526,10 @@ class DistanceLocalizer {
         // Ping pong between the top two candidates. Always go with the largest unless we did
         // it last time and the second largest is smaller than the maximum:
         int selection = 0;
-        if ((wallTrackers[1].distance < Double.MAX_VALUE) && (currentSensor != wallTrackers[1].sensor))
-            selection = 1;
+        if ((wallTrackers.length > 1) &&
+            (wallTrackers[1].distance < Double.MAX_VALUE) &&
+            (currentSensor != wallTrackers[1].sensor))
+                selection = 1;
 
         currentSensor = wallTrackers[selection].sensor;
         currentWall = wallTrackers[selection].wall;
@@ -688,14 +699,26 @@ class AprilTagLocalizer {
         }
     }
 
+    // Enable or disable the live view for "scrcpy" for all cameras:
+    void enableLiveView(boolean enable) {
+        for (CameraState camera: cameras) {
+            if (enable)
+                camera.visionPortal.resumeLiveView();
+            else
+                camera.visionPortal.stopLiveView();
+        }
+    }
+
     // Constructor:
     AprilTagLocalizer(HardwareMap hardwareMap) {
         for (int i = 0; i < CAMERA_DESCRIPTORS.length; i++) {
             cameras[i] = initializeCamera(i, hardwareMap);
             final int lambaIndex = i;
-            Settings.addToggle(String.format("Enable %s", cameras[i].descriptor.name),
-                    true, (enable) -> cameras[lambaIndex].enabled = enable );
+            Settings.registerToggleOption(String.format("Enable %s", cameras[i].descriptor.name),
+                    true, enable -> cameras[lambaIndex].enabled = enable );
         }
+        Settings.registerToggleOption("Enable screen preview", false,
+                enable -> enableLiveView(enable));
     }
 
     // Create the AprilTagProcessor and VisionPortal objects for the specified camera:
@@ -751,7 +774,7 @@ class AprilTagLocalizer {
         // Choose whether or not LiveView stops if no processors are enabled.
         // If set "true", monitor shows solid orange screen if no processors enabled.
         // If set "false", monitor shows camera view without annotations.
-        // builder.setAutoStopLiveView(false);
+        builder.setAutoStopLiveView(false); // We have a setting to override live-view
 
         // Set and enable the processor.
         builder.addProcessor(aprilTagProcessor);
@@ -814,7 +837,7 @@ class AprilTagLocalizer {
         return Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
     }
 
-    // Manage the activation of the cameras
+    // Manage the activation of the cameras:
     private CameraState updateActiveCamera(Pose2d pose, boolean confident) { // Returns null if no active camera
         int resultIndex = -1; // Default to none
         if (!confident) {
@@ -886,6 +909,7 @@ class AprilTagLocalizer {
         if (tagDetections == null)
             return null; // ====>
 
+        Stats.cameraFps = camera.visionPortal.getFps();
         for (AprilTagDetection detection : tagDetections) {
             Stats.pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-9;
             if (detection.metadata != null) {
@@ -1028,7 +1052,7 @@ public class Poser {
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
-        Settings.addActivate(reset -> {
+        Settings.registerActivationOption(reset -> {
             if (reset)
                 originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
             return String.format("Reset IMU yaw (%.2f°)",
@@ -1048,21 +1072,28 @@ public class Poser {
         Pose2d pose = record.posteriorPose.plus(record.twist);
 
         if (record.distance != null) {
-            double estimatedDistance = DistanceLocalizer.distanceToWall(pose, record.distance.sensor, record.distance.wall);
+            double estimatedDistance = DistanceLocalizer.distanceToWall(
+                    pose, record.distance.sensor, record.distance.wall);
             if (estimatedDistance < Double.MAX_VALUE) {
-                double filteredDistance = record.distance.sensor.filter.filter(record.time, record.distance.measurement, estimatedDistance);
-                pose = DistanceLocalizer.localize(pose, record.distance.sensor, record.distance.wall, filteredDistance, record);
+                double filteredDistance = record.distance.sensor.filter.filter(
+                        record.time, record.distance.measurement, estimatedDistance);
+                pose = DistanceLocalizer.localize(
+                        pose, record.distance.sensor, record.distance.wall, filteredDistance, record);
             }
         }
 
         if (record.aprilTag != null) {
             Pose2d aprilTagPose = record.aprilTag.pose;
-            for (DistanceLocalizer.WallTracker tracker: record.wallTrackers) {
-                // Only use this tracking wall data if there already was a hit so the
-                // residual buffer is non-empty:
-                if ((tracker.wall != null) && (tracker.sensor.filter.residuals.size() != 0)) {
-                    double currentDistance = DistanceLocalizer.distanceToWall(pose, tracker.sensor, tracker.wall);
-                    aprilTagPose = DistanceLocalizer.localize(aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
+            if (record.wallTrackers != null) {
+                for (DistanceLocalizer.WallTracker tracker : record.wallTrackers) {
+                    // Only use this tracking wall data if there already was a hit so the
+                    // residual buffer is non-empty:
+                    if ((tracker.wall != null) && (tracker.sensor.filter.residuals.size() != 0)) {
+                        double currentDistance = DistanceLocalizer.distanceToWall(
+                                pose, tracker.sensor, tracker.wall);
+                        aprilTagPose = DistanceLocalizer.localize(
+                                aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
+                    }
                 }
             }
             pose = aprilTagFilter.filter(record.time, pose, aprilTagPose, record.aprilTag.isConfident);
@@ -1134,7 +1165,9 @@ public class Poser {
         Segment segment = distanceLocalizer.getCurrentSegment();
         if (segment != null) {
             c.setStroke("#800080"); // Purple
+            c.setAlpha(0.5);
             c.strokeLine(segment.p1.x, segment.p1.y, segment.p2.x, segment.p2.y);
+            c.setAlpha(1.0);
         }
 
         // Draw the active camera's field of view:
@@ -1147,6 +1180,7 @@ public class Poser {
             double halfFov = descriptor.fov / 2.0;
 
             c.setStrokeWidth(0); // This seems to be the same as width 1, oh well
+            c.setAlpha(0.5);
             c.setStroke("#d0d0d0"); // Almost invisible grey
             c.strokeLine(cameraOrigin.x, cameraOrigin.y,
                     cameraOrigin.x + rayLength * Math.cos(cameraAngle + halfFov),
@@ -1154,6 +1188,7 @@ public class Poser {
             c.strokeLine(cameraOrigin.x, cameraOrigin.y,
                     cameraOrigin.x + rayLength * Math.cos(cameraAngle - halfFov),
                     cameraOrigin.y + rayLength * Math.sin(cameraAngle - halfFov));
+            c.setAlpha(1.0);
         }
 
         if (history.size() != 0) {
