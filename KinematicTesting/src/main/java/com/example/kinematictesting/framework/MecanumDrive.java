@@ -60,7 +60,7 @@ public final class MecanumDrive {
 
     public static class Params {
         // path profile parameters (in inches)
-        public double maxWheelVel = 50 / 2.5;
+        public double maxWheelVel = 50;
         public double minProfileAccel = -30;
         public double maxProfileAccel = 50;
 
@@ -78,12 +78,16 @@ public final class MecanumDrive {
     public final Localizer localizer;
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
+    Simulation simulation;
 
     public MecanumDrive(Simulation simulation) {
+        simulation.setKinematics(PARAMS);
+
         this.pose = new Pose2d(
                 simulation.pose.position.x,
                 simulation.pose.position.y,
                 simulation.pose.heading.log());
+        this.simulation = simulation;
         this.localizer = new Localizer(simulation);
     }
 
@@ -178,6 +182,20 @@ public final class MecanumDrive {
             // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
             PoseVelocity2d assistVelocity)
     {
-        // @@@ Implement
+        PoseVelocity2d fieldVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        if (stickVelocity != null) {
+            fieldVelocity = new PoseVelocity2d(new Vector2d(
+                    stickVelocity.linearVel.x * MecanumDrive.PARAMS.maxWheelVel,
+                    stickVelocity.linearVel.y * MecanumDrive.PARAMS.maxWheelVel),
+                    stickVelocity.angVel * MecanumDrive.PARAMS.maxAngVel);
+            fieldVelocity = pose.times(fieldVelocity); // Make it field-relative
+        }
+        if (assistVelocity != null) {
+            fieldVelocity = new PoseVelocity2d(new Vector2d(
+                    fieldVelocity.linearVel.x + assistVelocity.linearVel.x,
+                    fieldVelocity.linearVel.y + assistVelocity.linearVel.y),
+                    fieldVelocity.angVel + assistVelocity.angVel);
+        }
+        simulation.requestVelocity(fieldVelocity);
     }
 }

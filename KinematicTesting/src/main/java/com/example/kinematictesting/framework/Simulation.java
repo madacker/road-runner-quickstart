@@ -143,12 +143,14 @@ class Field {
 
 public class Simulation {
     public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
-    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(200, 100), Math.toRadians(90)); // Robot's true pose velocity
+    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(40, 40), Math.toRadians(400)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(24, 18); // Size in inches of user's robot
     public MainCanvas canvas; // Canvas for the entire window frame
 
     private WindowFrame windowFrame;
     private Field field;
+    private MecanumDrive.Params kinematics; // Kinematic parameters for the simulation
+    private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
 
     public Simulation() {
         windowFrame = new WindowFrame("UI", 1280, 720);
@@ -157,16 +159,84 @@ public class Simulation {
         field = new Field(this);
     }
 
-    public void advance() {
-        double deltaT = 0.020; // Seconds
-        pose = new Pose2d(
-                pose.position.x + deltaT * poseVelocity.linearVel.x * deltaT,
-                pose.position.y + deltaT * poseVelocity.linearVel.y * deltaT,
-                pose.heading.log() + deltaT * poseVelocity.angVel);
+    // Set the kinematics for the simulation to use:
+    public void setKinematics(MecanumDrive.Params kinematics) {
+        this.kinematics = kinematics;
     }
 
-    public void update() {
-        advance();
+    // Update the simulation's velocity to accommodate the request:
+    public void requestVelocity(PoseVelocity2d velocity) { // Field relative, inch/s and radian/s
+        this.requestedVelocity = velocity;
+    }
+
+    // Move the robot in the requested direction via kinematics:
+    public void advance(double dt) {
+        // Maintain the current velocity if no-one has called requestVelocity yet:
+        if (requestedVelocity == null)
+            requestedVelocity = poseVelocity;
+
+        // Handle the rotational velocity:
+        double currentAngular = poseVelocity.angVel;
+        double requestedAngular = requestedVelocity.angVel;
+        double deltaAngular = requestedAngular - currentAngular;
+        if (deltaAngular >= 0) {
+            // Increase the angular velocity:
+            currentAngular += kinematics.maxAngAccel * dt;
+            currentAngular = Math.min(currentAngular, kinematics.maxAngVel);
+            currentAngular = Math.min(currentAngular, requestedAngular);
+        } else {
+            // Decrease the angular velocity:
+            currentAngular -= kinematics.maxAngAccel * dt; // maxAngAccel is positive
+            currentAngular = Math.max(currentAngular, -kinematics.maxAngVel);
+            currentAngular = Math.max(currentAngular, requestedAngular);
+        }
+
+        // Handle the linear velocity:
+        double currentLinearX = poseVelocity.linearVel.x;
+        double currentLinearY = poseVelocity.linearVel.y;
+        double requestedLinearX = requestedVelocity.linearVel.x;
+        double requestedLinearY = requestedVelocity.linearVel.y;
+
+        double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
+        double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
+        double theta = requestedAngle - currentAngle; // Angle from current to requested
+        double currentVelocity = Math.hypot(currentLinearX, currentLinearY);
+        double requestedVelocity = Math.hypot(requestedLinearX, requestedLinearY);
+        double currentRadialVelocity = Math.cos(theta) * currentVelocity;
+        double currentTangentVelocity = Math.sin(theta) * currentVelocity;
+        double deltaRadial = requestedVelocity - currentRadialVelocity;
+        if (deltaRadial >= 0) { // Increase radial velocity
+            currentRadialVelocity += kinematics.maxProfileAccel * dt;
+            currentRadialVelocity = Math.min(currentRadialVelocity, kinematics.maxWheelVel);
+            currentRadialVelocity = Math.min(currentRadialVelocity, requestedVelocity);
+        } else { // Decrease radial velocity
+            currentRadialVelocity += kinematics.minProfileAccel * dt; // minProfileAccel is negative
+            currentRadialVelocity = Math.max(currentRadialVelocity, -kinematics.maxWheelVel);
+            currentRadialVelocity = Math.max(currentRadialVelocity, requestedVelocity);
+        }
+        // Drive the tangential velocity to zero:
+        if (currentTangentVelocity >= 0) {
+            currentTangentVelocity += kinematics.minProfileAccel * dt; // minProfileAccel is negative
+            currentTangentVelocity = Math.max(currentTangentVelocity, 0);
+        } else {
+            currentTangentVelocity += kinematics.maxProfileAccel * dt;
+            currentTangentVelocity = Math.min(currentTangentVelocity, 0);
+        }
+        currentLinearX = Math.cos(currentAngle) * currentRadialVelocity
+                       + Math.cos(currentAngle + Math.PI / 2) * currentTangentVelocity;
+        currentLinearY = Math.sin(currentAngle) * currentRadialVelocity
+                       + Math.sin(currentAngle + Math.PI / 2) * currentTangentVelocity;
+
+        // Update our official pose and velocity:
+        pose = new Pose2d(
+                pose.position.x + dt * currentLinearX,
+                pose.position.y + dt * currentLinearY,
+                pose.heading.log() + dt * currentAngular);
+        poseVelocity = new PoseVelocity2d(new Vector2d(currentLinearX, currentLinearY), currentAngular);
+    }
+
+    public void update(double deltaT) {
+        advance(deltaT);
 
         // All Graphics objects can be cast to Graphics2D:
         Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
@@ -176,11 +246,5 @@ public class Simulation {
 
         g.dispose();
         canvas.getBufferStrategy().show();
-
-        try {
-            sleep(20);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 }
