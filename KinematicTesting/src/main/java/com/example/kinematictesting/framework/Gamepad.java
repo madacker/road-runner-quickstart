@@ -63,6 +63,13 @@ public class Gamepad {
         ps = guide;
     }
 
+    private float deadZone(float value) {
+        final double EPSILON = 0.05f;
+        if (Math.abs(value) <= EPSILON)
+            value = 0;
+        return value;
+    }
+
     // Poll the attached game controller to update the button and axis states
     public void update() {
         int count = controllerManager.getControllers().size;
@@ -91,12 +98,12 @@ public class Gamepad {
             left_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK);
             right_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK);
 
-            left_stick_x = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX);
-            left_stick_y = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTY);
-            right_stick_x = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTX);
-            right_stick_y = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTY);
-            left_trigger = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-            right_trigger = controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+            left_stick_x = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX));
+            left_stick_y = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTY));
+            right_stick_x = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTX));
+            right_stick_y = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTY));
+            left_trigger = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT));
+            right_trigger = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
         }
     }
 }

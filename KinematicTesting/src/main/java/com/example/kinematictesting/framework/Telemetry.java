@@ -31,6 +31,9 @@ public class Telemetry {
     final int WIDTH_IN_FONT_UNITS = 239;
     final int HEIGHT_IN_LINES = 18;
 
+    // Global state:
+    public static Telemetry telemetry;
+
     // Class state:
     TelemetryWindow telemetryWindow;
     Canvas canvas;
@@ -63,6 +66,8 @@ public class Telemetry {
 
     // PC constructor for a Telemetry object:
     public Telemetry() {
+        telemetry = this;
+
         telemetryWindow = new TelemetryWindow("Telemetry", 400);
         telemetryWindow.setVisible(true);
 

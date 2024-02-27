@@ -63,6 +63,9 @@ class Navigation {
         telemetry.addData("x", drive.pose.position.x);
         telemetry.addData("y", drive.pose.position.y);
         telemetry.addData("heading", drive.pose.heading);
+        telemetry.addData("left_stick_x", gamepad1.left_stick_x);
+        telemetry.addData("left_stick_y", gamepad1.left_stick_y);
+        telemetry.addData("right_stick_x", gamepad1.right_stick_x);
         telemetry.update();
 
         // Code added to draw the pose:

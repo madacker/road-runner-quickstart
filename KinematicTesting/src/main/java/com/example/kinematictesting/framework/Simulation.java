@@ -141,8 +141,8 @@ class Field {
 
 public class Simulation {
     public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
-    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(40, 40), Math.toRadians(400)); // Robot's true pose velocity
-    public Dimension robotSize = new Dimension(24, 18); // Size in inches of user's robot
+    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(0, 60), Math.toRadians(0)); // Robot's true pose velocity
+    public Dimension robotSize = new Dimension(16, 18); // Size in inches of user's robot
     public DashboardCanvas canvas; // Canvas for the entire window frame
 
     private Field field;
@@ -194,11 +194,18 @@ public class Simulation {
         double requestedLinearX = requestedVelocity.linearVel.x;
         double requestedLinearY = requestedVelocity.linearVel.y;
 
-        double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
-        double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
-        double theta = requestedAngle - currentAngle; // Angle from current to requested
         double currentVelocity = Math.hypot(currentLinearX, currentLinearY);
         double requestedVelocity = Math.hypot(requestedLinearX, requestedLinearY);
+        double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
+        double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
+
+        Telemetry.telemetry.addData("requestedVelocity", requestedVelocity); // @@@
+
+        // If the requested velocity is close to zero then its angle is rather undetermined.
+        // Use the current angle in that case:
+        if (Math.abs(requestedVelocity) < 1)
+            requestedAngle = currentAngle;
+        double theta = requestedAngle - currentAngle; // Angle from current to requested
 
         // Clamp to the maximum allowable velocities:
         currentVelocity = Math.min(currentVelocity, kinematics.maxWheelVel);
@@ -233,7 +240,7 @@ public class Simulation {
             parallelVelocity = Math.min(parallelVelocity, requestedVelocity);
         } else { // Decrease the parallel velocity:
             parallelVelocity -= kinematics.maxProfileAccel * dt; // maxProfileAccel is positive
-            parallelVelocity = Math.max(parallelVelocity, maxParallelVelocity);
+            parallelVelocity = Math.max(parallelVelocity, -maxParallelVelocity);
             parallelVelocity = Math.max(parallelVelocity, requestedVelocity);
         }
         currentLinearX = Math.cos(requestedAngle) * parallelVelocity
