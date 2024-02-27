@@ -13,22 +13,40 @@ import java.util.function.Function;
  * Management and UI for settings.
  */
 public class Settings {
+    static private final String DESCRIPTOR_SEPARATOR = "::";
     private static Settings settings; // Points to our own  singleton object
     Telemetry telemetry; // Telemetry object used for output
     Gamepad gamepad; // Gamepad to use for settings control
     boolean menuEnabled = false; // True if the setting menu is currently up
-    ArrayList<Option> options = new ArrayList<>(); // List of options in the settings menu
-    int current; // Option with the UI focus
+    ArrayList<MenuOption> menuStack = new ArrayList<>(); // Stack of menus, the last is the current
 
     abstract private static class Option {
+        String description;
+        Option(String descriptor) {
+            // The description comes after the last separator:
+            int lastIndex = descriptor.lastIndexOf(DESCRIPTOR_SEPARATOR);
+            if (lastIndex != -1) {
+                descriptor = descriptor.substring(lastIndex + DESCRIPTOR_SEPARATOR.length());
+            }
+            description = descriptor;
+        }
         abstract public String string();
     }
+    private static class MenuOption extends Option {
+        ArrayList<Option> options = new ArrayList<>(); // List of options in this menu
+        int current; // Index of Option in options that has the UI focus
+        public MenuOption(String descriptor) {
+            super(descriptor);
+        }
+        public String string() {
+            return description + "...";
+        }
+    }
     private static class ToggleOption extends Option {
-        String description;
         boolean value;
         Consumer<Boolean> callback;
-        public ToggleOption(String description, boolean value, Consumer<Boolean> callback) {
-            this.description = description; this.value = value; this.callback = callback;
+        public ToggleOption(String descriptor, boolean value, Consumer<Boolean> callback) {
+            super(descriptor); this.value = value; this.callback = callback;
         }
         public String string() {
             // From https://www.alt-codes.net/circle-symbols // "✅" : "❌";
@@ -37,25 +55,24 @@ public class Settings {
         }
     }
     private static class ListOption extends Option {
-        String description;
         int index;
         String[] list;
         BiConsumer<Integer, String> callback;
-        public ListOption(String description, int index, String[] list, BiConsumer<Integer, String> callback) {
-            this.description = description; this.index = index; this.list = list; this.callback = callback;
+        public ListOption(String descriptor, int index, String[] list, BiConsumer<Integer, String> callback) {
+            super(descriptor); this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return "◄" + list[index] + "► " + description;
+            return "↔ " + description + ": " + list[index];
         }
     }
     private static class ActivationOption extends Option {
         Function<Boolean, String> callback;
-        public ActivationOption(Function<Boolean, String> callback) {
-            this.callback = callback;
+        public ActivationOption(String descriptor, Function<Boolean, String> callback) {
+            super(descriptor); this.callback = callback;
         }
         public String string() {
-            return "○ " + callback.apply(false);
-        }
+            return "\uD83D\uDDF2 " + callback.apply(false);
+        } // Lightning
     }
 
     // Button press state:
@@ -77,9 +94,13 @@ public class Settings {
 
     // Constructor:
     Settings(Telemetry telemetry, Gamepad gamepad) {
-        settings = this;
+        Settings.settings = this;
+
         this.telemetry = telemetry;
         this.gamepad = gamepad;
+
+        // Create the root settings menu:
+        menuStack.add(new MenuOption("Settings"));
     }
 
     // Update loop for Settings. If true is returned, the caller should not use gamepad input
@@ -89,32 +110,49 @@ public class Settings {
         if (!menuEnabled)
             return gamepad; // ====>
 
+        // The current menu is always at the bottom:
+        MenuOption menu = menuStack.get(menuStack.size() - 1);
         if (up()) {
-            current--;
-            if (current < 0)
-                current = 0;
+            menu.current--;
+            if (menu.current < 0)
+                menu.current = 0;
         }
         if (down()) {
-            current++;
-            if (current == options.size())
-                current = options.size() - 1;
+            menu.current++;
+            if (menu.current == menu.options.size())
+                menu.current = menu.options.size() - 1;
         }
 
         StringBuilder output = new StringBuilder();
-        output.append("<h2>Settings</h2>");
-        for (int i = 0; i < options.size(); i++) {
-            // output.append(i == current ? "➤" : " ").append(options.get(i).string()).append("\n");
-            if (i == current)
-                output.append("<b>").append(options.get(i).string()).append("</b>\n");
-            else
-                output.append(options.get(i).string()).append("\n");
+
+        // Output a header with the submenu names:
+        output.append("<h2>");
+        for (int i = 0; i < menuStack.size(); i++) {
+            if (i > 0)
+                output.append("·");
+            output.append(menuStack.get(i).description);
         }
-        output.append("<hr>\n\n"); // @@@ Did this work?
+        output.append("</h2>");
+
+        // Now output the options:
+        for (int i = 0; i < menu.options.size(); i++) {
+            // output.append(i == menu.current ? "➤" : " ").append(menu.options.get(i).string()).append("\n");
+            if (i == menu.current)
+                output.append("<b><font color='#bfdbfe'>").append(menu.options.get(i).string()).append("</font></b>\n");
+            else
+                output.append(menu.options.get(i).string()).append("\n");
+        }
         output.append(Stats.get());
         telemetry.addLine(output.toString());
 
-        Option option = options.get(current);
-        if (option instanceof ToggleOption) {
+        Option option = menu.options.get(menu.current);
+        if (cancel()) {
+            if (menuStack.size() > 1) {
+                // Pop up the menu stack:
+                menuStack.remove(menuStack.size() - 1);
+            }
+        }
+        else if (option instanceof ToggleOption) {
             ToggleOption toggleOption = (ToggleOption) option;
             if (select()) {
                 toggleOption.value = !toggleOption.value;
@@ -142,23 +180,59 @@ public class Settings {
                 ActivationOption activationOption = (ActivationOption) option;
                 activationOption.callback.apply(true);
             }
+        } else if (option instanceof MenuOption) {
+            if (select()) {
+                menuStack.add((MenuOption) option);
+            }
         }
         return null; // We own the Gamepad, the caller can't have it
     }
 
+    // Add a new option to the appropriate spot in the menu hierarchy:
+    private void register(String descriptor, Option newOption) {
+        MenuOption menu = menuStack.get(0); // Root menu
+
+        // Peel off the hierarchy which is in the form "Vision::Configuration::Setting":
+        while (true) {
+            int index = descriptor.indexOf(DESCRIPTOR_SEPARATOR);
+            if (index == -1)
+                break; // ====>
+
+            // Peel off the first menu name from the descriptor:
+            String submenuName = descriptor.substring(0, index);
+            descriptor = descriptor.substring(index + DESCRIPTOR_SEPARATOR.length());
+
+            // Find or create the submenu:
+            MenuOption submenu = null;
+            for (Option option: menu.options) {
+                if ((option instanceof MenuOption) && (option.description.equals(submenuName))) {
+                    submenu = (MenuOption) option;
+                    break;
+                }
+            }
+            if (submenu == null) {
+                submenu = new MenuOption(submenuName);
+                menu.options.add(submenu);
+            }
+            // Descend into that submenu:
+            menu = submenu;
+        }
+        menu.options.add(newOption);
+    }
+
     // Add a toggleable option to the Settings menu:
-    public static void registerToggleOption(String description, boolean initialValue, Consumer<Boolean> callback) {
+    public static void registerToggleOption(String descriptor, boolean initialValue, Consumer<Boolean> callback) {
         callback.accept(initialValue);
-        settings.options.add(new ToggleOption(description, initialValue, callback));
+        settings.register(descriptor, new ToggleOption(descriptor, initialValue, callback));
     }
     // Add a list option to the Settings menu:
-    public static void registerListOption(String description, String[] list, int initialIndex, BiConsumer<Integer, String> callback) {
+    public static void registerListOption(String descriptor, String[] list, int initialIndex, BiConsumer<Integer, String> callback) {
         callback.accept(initialIndex, list[initialIndex]);
-        settings.options.add(new ListOption(description, initialIndex, list, callback));
+        settings.register(descriptor, new ListOption(descriptor, initialIndex, list, callback));
     }
     // Add an option that can only be activated:
-    public static void registerActivationOption(Function<Boolean, String> callback) {
+    public static void registerActivationOption(String descriptor, Function<Boolean, String> callback) {
         callback.apply(true);
-        settings.options.add(new ActivationOption(callback));
+        settings.register(descriptor, new ActivationOption(descriptor, callback));
     }
 }

@@ -1052,7 +1052,7 @@ public class Poser {
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
-        Settings.registerActivationOption(reset -> {
+        Settings.registerActivationOption("", reset -> {
             if (reset)
                 originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
             return String.format("Reset IMU yaw (%.2f°)",
