@@ -39,7 +39,7 @@ public class Settings {
             super(descriptor);
         }
         public String string() {
-            return description + "...";
+            return "\uD83D\uDCC1 " + description + "..."; // Folder symbol
         }
     }
     private static class ToggleOption extends Option {
@@ -62,7 +62,7 @@ public class Settings {
             super(descriptor); this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return "↔ " + description + ": " + list[index];
+            return "↔️ " + description + ": " + list[index]; // "↔⬌ "
         }
     }
     private static class ActivationOption extends Option {
@@ -71,7 +71,7 @@ public class Settings {
             super(descriptor); this.callback = callback;
         }
         public String string() {
-            return "\uD83D\uDDF2 " + callback.apply(false);
+            return "⚡ " + callback.apply(false);
         } // Lightning
     }
 
@@ -138,7 +138,7 @@ public class Settings {
         for (int i = 0; i < menu.options.size(); i++) {
             // output.append(i == menu.current ? "➤" : " ").append(menu.options.get(i).string()).append("\n");
             if (i == menu.current)
-                output.append("<b><font color='#bfdbfe'>").append(menu.options.get(i).string()).append("</font></b>\n");
+                output.append("<font color='#bfdbfe'>").append(menu.options.get(i).string()).append(" ☚</font>\n"); // ◀
             else
                 output.append(menu.options.get(i).string()).append("\n");
         }
