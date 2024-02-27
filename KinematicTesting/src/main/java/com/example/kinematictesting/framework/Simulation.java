@@ -16,6 +16,7 @@ import java.awt.Transparency;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
@@ -41,14 +42,16 @@ class Field {
         this.simulation = simulation;
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 
-        try {
-            backgroundImage = ImageIO
-                    .read(classLoader.getResourceAsStream("background/season-2023-centerstage/field-2023-juice-dark.png"))
-                    .getScaledInstance(FIELD_SURFACE_DIMENSION, FIELD_SURFACE_DIMENSION, Image.SCALE_SMOOTH);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        InputStream stream = classLoader.getResourceAsStream("background/season-2023-centerstage/field-2023-juice-dark.png");
+        if (stream != null) {
+            try {
+                backgroundImage = ImageIO
+                        .read(stream)
+                        .getScaledInstance(FIELD_SURFACE_DIMENSION, FIELD_SURFACE_DIMENSION, Image.SCALE_SMOOTH);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
-
         initializeRobotImage();
     }
 
@@ -203,7 +206,7 @@ public class Simulation {
 
         // If the requested velocity is close to zero then its angle is rather undetermined.
         // Use the current angle in that case:
-        if (Math.abs(requestedVelocity) < 1)
+        if (Math.abs(requestedVelocity) == 0)
             requestedAngle = currentAngle;
         double theta = requestedAngle - currentAngle; // Angle from current to requested
 
@@ -244,9 +247,9 @@ public class Simulation {
             parallelVelocity = Math.max(parallelVelocity, requestedVelocity);
         }
         currentLinearX = Math.cos(requestedAngle) * parallelVelocity
-                       + Math.cos(requestedAngle + Math.PI / 2) * perpVelocity;
+                       + Math.cos(requestedAngle - Math.PI / 2) * perpVelocity;
         currentLinearY = Math.sin(requestedAngle) * parallelVelocity
-                       + Math.sin(requestedAngle + Math.PI / 2) * perpVelocity;
+                       + Math.sin(requestedAngle - Math.PI / 2) * perpVelocity;
 
         double x = pose.position.x + dt * currentLinearX;
         double y = pose.position.y + dt * currentLinearY;
