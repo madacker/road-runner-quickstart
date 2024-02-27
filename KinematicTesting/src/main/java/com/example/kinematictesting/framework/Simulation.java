@@ -199,36 +199,63 @@ public class Simulation {
         double theta = requestedAngle - currentAngle; // Angle from current to requested
         double currentVelocity = Math.hypot(currentLinearX, currentLinearY);
         double requestedVelocity = Math.hypot(requestedLinearX, requestedLinearY);
-        double currentRadialVelocity = Math.cos(theta) * currentVelocity;
-        double currentTangentVelocity = Math.sin(theta) * currentVelocity;
-        double deltaRadial = requestedVelocity - currentRadialVelocity;
-        if (deltaRadial >= 0) { // Increase radial velocity
-            currentRadialVelocity += kinematics.maxProfileAccel * dt;
-            currentRadialVelocity = Math.min(currentRadialVelocity, kinematics.maxWheelVel);
-            currentRadialVelocity = Math.min(currentRadialVelocity, requestedVelocity);
-        } else { // Decrease radial velocity
-            currentRadialVelocity += kinematics.minProfileAccel * dt; // minProfileAccel is negative
-            currentRadialVelocity = Math.max(currentRadialVelocity, -kinematics.maxWheelVel);
-            currentRadialVelocity = Math.max(currentRadialVelocity, requestedVelocity);
-        }
-        // Drive the tangential velocity to zero:
-        if (currentTangentVelocity >= 0) {
-            currentTangentVelocity += kinematics.minProfileAccel * dt; // minProfileAccel is negative
-            currentTangentVelocity = Math.max(currentTangentVelocity, 0);
+
+        // Clamp to the maximum allowable velocities:
+        currentVelocity = Math.min(currentVelocity, kinematics.maxWheelVel);
+        requestedVelocity = Math.min(requestedVelocity, kinematics.maxWheelVel);
+
+        // Perpendicular velocity is the current velocity component away from
+        // the requested velocity. We reduce this by the deceleration:
+        double perpVelocity = Math.sin(theta) * currentVelocity;
+        if (perpVelocity >= 0) {
+            perpVelocity += kinematics.minProfileAccel * dt; // minProfileAccel is negative
+            perpVelocity = Math.max(perpVelocity, 0);
         } else {
-            currentTangentVelocity += kinematics.maxProfileAccel * dt;
-            currentTangentVelocity = Math.min(currentTangentVelocity, 0);
+            perpVelocity -= kinematics.minProfileAccel * dt;
+            perpVelocity = Math.min(perpVelocity, 0);
         }
-        currentLinearX = Math.cos(currentAngle) * currentRadialVelocity
-                       + Math.cos(currentAngle + Math.PI / 2) * currentTangentVelocity;
-        currentLinearY = Math.sin(currentAngle) * currentRadialVelocity
-                       + Math.sin(currentAngle + Math.PI / 2) * currentTangentVelocity;
+
+        // Parallel velocity is the current velocity component in the same direction
+        // as the requested velocity. Accelerate or decelerate to match our parallel
+        // velocity with the request:
+        double parallelVelocity = Math.cos(theta) * currentVelocity;
+        double parallelDelta = requestedVelocity - parallelVelocity;
+
+        // We now know our perpendicular velocity and we know the maximum allowable
+        // velocity so our maximum parallel velocity is remainder. Note that we're
+        // guaranteed that won't try to do the square root of a negative:
+        double maxParallelVelocity =
+                Math.sqrt(Math.pow(kinematics.maxWheelVel, 2) - Math.pow(perpVelocity, 2));
+
+        if (parallelDelta >= 0) { // Increase the parallel velocity
+            parallelVelocity += kinematics.maxProfileAccel * dt;
+            parallelVelocity = Math.min(parallelVelocity, maxParallelVelocity);
+            parallelVelocity = Math.min(parallelVelocity, requestedVelocity);
+        } else { // Decrease the parallel velocity:
+            parallelVelocity -= kinematics.maxProfileAccel * dt; // maxProfileAccel is positive
+            parallelVelocity = Math.max(parallelVelocity, maxParallelVelocity);
+            parallelVelocity = Math.max(parallelVelocity, requestedVelocity);
+        }
+        currentLinearX = Math.cos(requestedAngle) * parallelVelocity
+                       + Math.cos(requestedAngle + Math.PI / 2) * perpVelocity;
+        currentLinearY = Math.sin(requestedAngle) * parallelVelocity
+                       + Math.sin(requestedAngle + Math.PI / 2) * perpVelocity;
+
+        double x = pose.position.x + dt * currentLinearX;
+        double y = pose.position.y + dt * currentLinearY;
+
+        // Wrap the coordinates for now:
+        if (x > 72.0)
+            x -= 144.0;
+        if (x <= -72.0)
+            x += 144.0;
+        if (y > 72.0)
+            y -= 144.0;
+        if (y <= -72.0)
+            y += 144.0;
 
         // Update our official pose and velocity:
-        pose = new Pose2d(
-                pose.position.x + dt * currentLinearX,
-                pose.position.y + dt * currentLinearY,
-                pose.heading.log() + dt * currentAngular);
+        pose = new Pose2d(x, y, pose.heading.log() + dt * currentAngular);
         poseVelocity = new PoseVelocity2d(new Vector2d(currentLinearX, currentLinearY), currentAngular);
     }
 
