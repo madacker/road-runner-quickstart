@@ -1,7 +1,5 @@
 package com.example.kinematictesting.framework;
 
-import static java.lang.Thread.sleep;
-
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
@@ -145,17 +143,16 @@ public class Simulation {
     public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
     public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(40, 40), Math.toRadians(400)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(24, 18); // Size in inches of user's robot
-    public MainCanvas canvas; // Canvas for the entire window frame
+    public DashboardCanvas canvas; // Canvas for the entire window frame
 
-    private WindowFrame windowFrame;
     private Field field;
     private MecanumDrive.Params kinematics; // Kinematic parameters for the simulation
     private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
 
     public Simulation() {
-        windowFrame = new WindowFrame("UI", 1280, 720);
-        windowFrame.setVisible(true);
-        canvas = windowFrame.getCanvas();
+        DashboardWindow dashboardWindow = new DashboardWindow("FTC Dashboard", 1280, 720);
+        dashboardWindow.setVisible(true);
+        canvas = dashboardWindow.getCanvas();
         field = new Field(this);
     }
 

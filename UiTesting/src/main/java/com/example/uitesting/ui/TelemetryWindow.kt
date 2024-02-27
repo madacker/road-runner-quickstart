@@ -1,18 +1,21 @@
-package com.example.kinematictesting.framework
+package com.example.uitesting.ui
 
+import java.awt.Canvas
+import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.awt.image.BufferStrategy
 import javax.swing.BoxLayout
 import javax.swing.JFrame
 import javax.swing.JPanel
 import kotlin.system.exitProcess
 
 /**
- * Wrapper for the window frame.
+ * Wrapper for the Telemetry window frame.
  */
-class WindowFrame(title: String, windowWidth: Int, windowHeight: Int) : JFrame() {
-    var internalWidth = windowWidth
-    var internalHeight = windowHeight
+class TelemetryWindow(title: String, windowSize: Int) : JFrame() {
+    var internalWidth = windowSize
+    var internalHeight = windowSize
 
     val canvas = MainCanvas(internalWidth, internalHeight)
     val canvasPanel = JPanel()
@@ -26,7 +29,7 @@ class WindowFrame(title: String, windowWidth: Int, windowHeight: Int) : JFrame()
                 super.windowClosing(we)
 
                 dispose()
-                exitProcess(0);
+                exitProcess(0)
             }
         })
 
@@ -44,5 +47,29 @@ class WindowFrame(title: String, windowWidth: Int, windowHeight: Int) : JFrame()
         pack()
 
         canvas.start()
+    }
+}
+
+/**
+ * Wrapper for the Telemetry drawing canvas.
+ */
+class MainCanvas(private var internalWidth: Int, private var internalHeight: Int): Canvas() {
+    lateinit var bufferStrat: BufferStrategy
+
+    init {
+        setBounds(0, 0, internalWidth, internalHeight)
+        preferredSize = Dimension(internalWidth, internalHeight)
+        ignoreRepaint = true
+    }
+
+    fun start() {
+        createBufferStrategy(2)
+        bufferStrat = bufferStrategy
+
+        requestFocus()
+    }
+
+    override fun getPreferredSize(): Dimension {
+        return Dimension(internalWidth, internalHeight)
     }
 }

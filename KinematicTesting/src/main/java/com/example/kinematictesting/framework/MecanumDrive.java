@@ -48,8 +48,8 @@ class Localizer {
 
         return new Twist2dDual<>(
                 new Vector2dDual<>(
-                        new DualNum<Time>(new double[] { deltaLinear.x, deltaLinearVel.x }),
-                        new DualNum<Time>(new double[] { deltaLinear.y, deltaLinearVel.y })
+                        new DualNum<>(new double[] { deltaLinear.x, deltaLinearVel.x }),
+                        new DualNum<>(new double[] { deltaLinear.y, deltaLinearVel.y })
                 ),
                 new DualNum<>(new double[] { deltaAng, deltaAngVel })
         );
@@ -65,16 +65,11 @@ public final class MecanumDrive {
         public double maxProfileAccel = 50;
 
         // turn profile parameters (in radians)
-        public double maxAngVel = Math.PI / 2.5; // shared with path
+        public double maxAngVel = Math.PI; // shared with path
         public double maxAngAccel = Math.PI;
     }
 
     public static Params PARAMS = new Params();
-    public final TurnConstraints defaultTurnConstraints = new TurnConstraints(
-            PARAMS.maxAngVel, -PARAMS.maxAngAccel, PARAMS.maxAngAccel);
-    public final AccelConstraint defaultAccelConstraint =
-            new ProfileAccelConstraint(PARAMS.minProfileAccel, PARAMS.maxProfileAccel);
-
     public final Localizer localizer;
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
@@ -96,8 +91,8 @@ public final class MecanumDrive {
     public PoseVelocity2d updatePoseEstimate() {
         Twist2dDual<Time> twist = localizer.update();
 
-        final boolean POSE_EXPONTENTIAL = false;
-        if (POSE_EXPONTENTIAL) {
+        final boolean USE_POSE_EXPONTENTIAL = false;
+        if (USE_POSE_EXPONTENTIAL) {
             // Use pose exponential refinement and conversion to field-relative:
             pose = pose.plus(twist.value());
         } else {
@@ -157,10 +152,6 @@ public final class MecanumDrive {
     public void setDrivePowers(PoseVelocity2d powers) {
         setDrivePowers(powers, null);
     }
-
-    // Used by setDrivePowers to calculate acceleration:
-    PoseVelocity2d previousAssistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
-    double previousAssistSeconds = 0; // Previous call's nanoTime() in seconds
 
     /**
      * Power the motors according to the specified velocities. 'stickVelocity' is for controller

@@ -23,7 +23,7 @@ abstract class CanvasOp {
         FILL,
         STROKE_WIDTH,
         TEXT,
-        IMAGE;
+        IMAGE
     }
 
     private Type type;
@@ -510,7 +510,7 @@ public class Canvas {
                 g.drawPolyline(xPoints, yPoints, xPoints.length);
             } else if (op instanceof Image) {
                 Image image = (Image) op;
-                // @@@
+                // TODO: Implement FTC Dashboard Image
             } else if (op instanceof Text) {
                 AffineTransform originalTransform = g.getTransform();
                 Text text = (Text) op;
@@ -526,7 +526,7 @@ public class Canvas {
                 g.setTransform(originalTransform);
             } else if (op instanceof Grid) {
                 Grid grid = (Grid) op;
-                // @@@
+                // TODO: Implement FTC Dashboard Grid
             } else if (op instanceof Alpha) {
                 Alpha alpha = (Alpha) op; // Ranges from 0.0 to 1.0
                 g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) alpha.alpha));

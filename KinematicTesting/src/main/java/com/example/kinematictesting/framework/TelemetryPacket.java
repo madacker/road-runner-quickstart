@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 
+/**
+ * Thunk for FTC Dashboard's TelemetryPacket class.
+ */
 public class TelemetryPacket {
     public TreeMap<String, String> data;
     public ArrayList<String> log;

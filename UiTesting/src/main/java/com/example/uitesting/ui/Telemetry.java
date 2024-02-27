@@ -32,7 +32,7 @@ public class Telemetry {
     final int HEIGHT_IN_LINES = 18;
 
     // Class state:
-    WindowFrame windowFrame;
+    TelemetryWindow telemetryWindow;
     Canvas canvas;
     FontMetrics metrics;
     ArrayList<String> lineList = new ArrayList<>();
@@ -63,10 +63,10 @@ public class Telemetry {
 
     // PC constructor for a Telemetry object:
     public Telemetry() {
-        windowFrame = new WindowFrame("UI", 400);
-        windowFrame.setVisible(true);
+        telemetryWindow = new TelemetryWindow("UI", 400);
+        telemetryWindow.setVisible(true);
 
-        canvas = windowFrame.getCanvas();
+        canvas = telemetryWindow.getCanvas();
         metrics = canvas.getBufferStrategy().getDrawGraphics().getFontMetrics(SIZING_FONT);
     }
 
@@ -139,7 +139,7 @@ public class Telemetry {
                 y += DISPLAY_FONT_SIZE;
                 lineCount++;
                 line = line.substring(lineBreak);
-                if (line == "")
+                if (line.equals(""))
                     break; // ====>
             }
         }
