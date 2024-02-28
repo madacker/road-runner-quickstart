@@ -39,9 +39,6 @@ public class OpticalTrackingTest extends LinearOpMode {
             OpticalTrackingPaa5100.Motion motion = optical.getMotion();
             opticalTimer.endSplit();
 
-            // Output the results:
-            Globals.telemetry.addLine(String.format("Motion: %d, %d", motion.x, motion.y));
-            Globals.telemetry.addLine("Read: " + opticalTimer.getResult());
 
             // Update and draw the optical motion pose estimate:
             double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
@@ -51,6 +48,11 @@ public class OpticalTrackingTest extends LinearOpMode {
             opticalPose = new Pose2d(opticalPose.position.plus(fieldTranslation), yaw);
             Globals.canvas.setStroke("#00ff00");
             MecanumDrive.drawRobot(Globals.canvas, opticalPose);
+
+            // Output the results:
+            Globals.telemetry.addLine(String.format("Motion: %d, %d", motion.x, motion.y));
+            Globals.telemetry.addLine(String.format("Accumulated: %.1f, %.1f", opticalPose.position.x, opticalPose.position.y));
+            Globals.telemetry.addLine("Time: " + opticalTimer.getResult());
 
             // Draw the Mecanum robot pose:
             drive.updatePoseEstimate();

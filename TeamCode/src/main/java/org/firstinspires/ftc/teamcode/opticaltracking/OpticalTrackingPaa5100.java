@@ -41,7 +41,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     }
 
     // Enable manual chip-select:
-    final boolean MANUAL_CHIP_SELECT = true;
+    final boolean MANUAL_CHIP_SELECT = false;
 
     // Special opcode for bulkWrite() encodings:
     private final int WAIT = -1;
@@ -107,7 +107,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //             1 = 461 kHz
         //             2 = 115 kHz
         //             3 = 58 kHz
-        int clockRate = 2;
+        int clockRate = 0;
 
         // Mode: 0 = SPICLK low when idle, data clocked on leading edge
         //       1 = SPICLK low when idle, data clocked on trailing edge
@@ -122,22 +122,17 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
 
-        if (MANUAL_CHIP_SELECT) {
-            // Manually enable the chip select pins:
-            //    0 = disable GPIO control (i.e., use auto-chip-select)
-            //    1 = enable as GPIO
-            this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, 0xf);
+        // Manually enable the chip select pins:
+        //    0 = disable GPIO control (i.e., use auto-chip-select)
+        //    1 = enable as GPIO
+        this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, MANUAL_CHIP_SELECT ? 0xf : 0);
 
-            // Set the GPIO configuration:
-            //    0 = quasi-bidirectional
-            //    1 = push-pull
-            //    2 = input-only (high impedance)
-            //    3 = open-drain
-            this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
-
-            // Pull them low to manually select the optical tracking chip:
-            this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, 0);
-        }
+        // Set the GPIO configuration:
+        //    0 = quasi-bidirectional
+        //    1 = push-pull
+        //    2 = input-only (high impedance)
+        //    3 = open-drain
+        this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
     }
 
     // Manually enable chip-select:
@@ -455,7 +450,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
-        final boolean fast = false;
+        final boolean fast = true;
         if (!fast) {
             // Use individual register reads:
             int deltaX_low = readRegister(0x03);
@@ -491,10 +486,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
             int dr = TypeConversion.unsignedByteToInt(result[1]);
             int quality = TypeConversion.unsignedByteToInt(result[7]);
-            int deltaX = (TypeConversion.unsignedByteToInt(result[4]))
-                       | (TypeConversion.unsignedByteToInt(result[3]) << 8);
-            int deltaY = (TypeConversion.unsignedByteToInt(result[6]))
-                       | (TypeConversion.unsignedByteToInt(result[5]) << 8);
+            int deltaX = (TypeConversion.unsignedByteToInt(result[3]))
+                       | (TypeConversion.unsignedByteToInt(result[4]) << 8);
+            int deltaY = (TypeConversion.unsignedByteToInt(result[5]))
+                       | (TypeConversion.unsignedByteToInt(result[6]) << 8);
 
             if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
                 return new Motion(deltaX, deltaY);
