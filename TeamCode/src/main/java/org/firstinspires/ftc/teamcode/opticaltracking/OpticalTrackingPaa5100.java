@@ -119,20 +119,23 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
 
-        // Manually enable the chip select pins:
-        //    0 = disable GPIO control (i.e., use auto-chip-select)
-        //    1 = enable as GPIO
-        this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, 0xf);
+        final boolean MANUAL_CHIP_SELECT = false;
+        if (MANUAL_CHIP_SELECT) {
+            // Manually enable the chip select pins:
+            //    0 = disable GPIO control (i.e., use auto-chip-select)
+            //    1 = enable as GPIO
+            this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, 0xf);
 
-        // Set the GPIO configuration:
-        //    0 = quasi-bidirectional
-        //    1 = push-pull
-        //    2 = input-only (high impedance)
-        //    3 = open-drain
-        this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
+            // Set the GPIO configuration:
+            //    0 = quasi-bidirectional
+            //    1 = push-pull
+            //    2 = input-only (high impedance)
+            //    3 = open-drain
+            this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
 
-        // Pull them low to manually select the optical tracking chip:
-        this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, 0);
+            // Pull them low to manually select the optical tracking chip:
+            this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, 0);
+        }
     }
 
     // Manually enable chip-select:
