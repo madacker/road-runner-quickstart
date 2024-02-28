@@ -40,6 +40,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         }
     }
 
+    // Enable manual chip-select:
+    final boolean MANUAL_CHIP_SELECT = true;
+
     // Special opcode for bulkWrite() encodings:
     private final int WAIT = -1;
 
@@ -119,7 +122,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
 
-        final boolean MANUAL_CHIP_SELECT = false;
         if (MANUAL_CHIP_SELECT) {
             // Manually enable the chip select pins:
             //    0 = disable GPIO control (i.e., use auto-chip-select)
@@ -140,8 +142,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Manually enable chip-select:
     void chipSelect(boolean enable) {
-        // Pull the line low to manually select the optical tracking chip:
-        this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, (enable) ? 0 : 0xf);
+        if (MANUAL_CHIP_SELECT) {
+            // Pull the line low to manually select the optical tracking chip:
+            this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, (enable) ? 0 : 0xf);
+        }
     }
 
     // Write the 'writePayload' data to the SPI device and read back the result for every
@@ -168,14 +172,14 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
         chipSelect(false);
 
-        // Read back the new writePayload:
+        // Read back the new payload from the bridge chip:
         return this.deviceClient.read(writePayload.length);
     }
 
     // This function takes an 8-bit address and returns an 8-bit value:
     int readRegister(int addr) {
         byte[] reads = bridgeTransfer(new byte[] { (byte) addr, (byte) 0xff });
-        RobotLog.dd(MYTAG, String.format("ReadRegister address: 0x%x, length: %d, result: 0x%x", addr, reads.length, reads[1]));
+        RobotLog.dd(MYTAG, String.format("ReadRegister address: 0x%x, length: %d, result: 0x%x, 0x%x", addr, reads.length, reads[0], reads[1]));
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
 
