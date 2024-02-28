@@ -3,12 +3,10 @@ package org.firstinspires.ftc.teamcode.opticaltracking;
 import static java.lang.Thread.sleep;
 
 import com.qualcomm.robotcore.hardware.ControlSystem;
-import com.qualcomm.robotcore.hardware.HardwareDeviceHealth;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
 import com.qualcomm.robotcore.hardware.I2cWaitControl;
-import com.qualcomm.robotcore.hardware.TimestampedData;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.RobotLog;
@@ -34,8 +32,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Structure for returning the motion:
     static public class Motion {
-        int x;
-        int y;
+        public int x;
+        public int y;
         Motion(int x, int y) {
             this.x = x;
             this.y = y;
@@ -150,11 +148,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //      I2C_ADDRESS
         //      SLAVE_SELECT_MASK
         //      <spiAddr>
-        //      0x00 (filler)
+        //      <write-data>
         // Then read from the bus:
         //      I2C_ADDRESS
-        //      <spiAddr>
-        //      <result>
+        //      <zero> (corresponds to the spiAddr write)
+        //      <read-data>
 
         // Create an array that prepends the chip-select:
         byte[] writes = new byte[writePayload.length + 1];
@@ -169,14 +167,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
         // Read back the new writePayload:
         return this.deviceClient.read(writePayload.length);
-
-//        TimestampedData timestamp = this.deviceClient.readTimeStamped(writePayload.length); // @@@
-//        return timestamp.data;
     }
 
     // This function takes an 8-bit address and returns an 8-bit value:
     int readRegister(int addr) {
-        byte[] reads = bridgeTransfer(new byte[] { (byte) addr, 0 });
+        byte[] reads = bridgeTransfer(new byte[] { (byte) addr, (byte) 0xff });
         RobotLog.dd(MYTAG, String.format("ReadRegister address: 0x%x, length: %d, result: 0x%x", addr, reads.length, reads[1]));
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
@@ -184,7 +179,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     // This function takes an 8-bit address and 8-bit datum. Writes the given datum to the given
     // address.
     void writeRegister(int addr, int datum) {
-        bridgeTransfer(new byte[] { (byte) addr, (byte) datum });
+        // Set the MSB to indicate a write operation:
+        bridgeTransfer(new byte[] { (byte) (addr | 0x80), (byte) datum });
     }
 
     // Register write pairs of (address, datum):
@@ -202,10 +198,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         }
     }
 
+    // Aliases:
     void write(int addr, int datum) {
         writeRegister(addr, datum);
     }
-
     int read(int addr) {
         return readRegister(addr);
     }
@@ -406,8 +402,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         setLedState(true);
 
         // Check chip ID:
-        if (readRegister(0x00) != 0x49)
-            return false;
+        chipId = readRegister(0x00);
+        if (chipId != 0x49) {
+            RobotLog.dd(MYTAG, String.format("Bad chip ID: %x", chipId));
+            return true; // @@@ Should be false
+        }
 
 //        // Do a quick check to see if chip startup succeeded:
 //        if (!startupCheck())
@@ -449,28 +448,52 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
-        // This uses individual register reads. Another option is to use burst mode which
-        // is composed of 13 bytes:
-        //      0 - unused
-        //      1 - dr (unsigned char)
-        //      2 - obs (unsigned char)
-        //      3 - x (short, little endian)
-        //      5 - y (short, little endian)
-        //      7 - quality (unsigned char)
-        //      8 - raw_sum (unsigned char)
-        //      9 - raw_max (unsigned char)
-        //      10 - raw_min (unsigned char)
-        //      11 - shutter_upper (unsigned char)
-        //      12 - shutter_lower (unsigned char)
+        final boolean fast = false;
+        if (!fast) {
+            // Use individual register reads:
+            int deltaX_low = readRegister(0x03);
+            int deltaX_high = (readRegister(0x04) << 8) & 0xFF00;
+            int deltaY_low = readRegister(0x05);
+            int deltaY_high = (readRegister(0x06) << 8) & 0xFF00;
 
-        int deltaX_low = readRegister(0x03);
-        int deltaX_high = (readRegister(0x04)<<8) & 0xFF00;
-        int deltaY_low = readRegister(0x05);
-        int deltaY_high = (readRegister(0x06)<<8) & 0xFF00;
+            int deltaX = deltaX_high | deltaX_low;
+            int deltaY = deltaY_high | deltaY_low;
 
-        int deltaX = deltaX_high | deltaX_low;
-        int deltaY = deltaY_high | deltaY_low;
+            return new Motion(deltaX, deltaY);
+        } else {
+            // Magic minimum quality constant:
+            final int MOV_MIN_QUALITY = 0x10;
 
-        return new Motion(deltaX, deltaY);
+            // Use burst mode which is composed of 13 bytes:
+            //      0 - unused
+            //      1 - dr (unsigned char)
+            //      2 - obs (unsigned char)
+            //      3 - x (short, little endian)
+            //      5 - y (short, little endian)
+            //      7 - quality (unsigned char)
+            //      8 - raw_sum (unsigned char)
+            //      9 - raw_max (unsigned char)
+            //      10 - raw_min (unsigned char)
+            //      11 - shutter_upper (unsigned char)
+            //      12 - shutter_lower (unsigned char)
+            byte[] command = new byte[13]; // Zero initialized by default
+            command[0] = (byte) Register.SPI_MOTION_BURST.bVal;
+            for (int i = 1; i < command.length; i++)
+                command[i] = (byte) 0xff; // Filler
+            byte[] result = bridgeTransfer(command);
+
+            int dr = TypeConversion.unsignedByteToInt(result[1]);
+            int quality = TypeConversion.unsignedByteToInt(result[7]);
+            int deltaX = (TypeConversion.unsignedByteToInt(result[4]))
+                       | (TypeConversion.unsignedByteToInt(result[3]) << 8);
+            int deltaY = (TypeConversion.unsignedByteToInt(result[6]))
+                       | (TypeConversion.unsignedByteToInt(result[5]) << 8);
+
+            if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
+                return new Motion(deltaX, deltaY);
+            } else {
+                return new Motion(0, 0);
+            }
+        }
     }
 }

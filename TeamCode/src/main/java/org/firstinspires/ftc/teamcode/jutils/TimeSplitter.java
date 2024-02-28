@@ -55,8 +55,8 @@ public class TimeSplitter {
     int startGcCount;
     int totalGcCount;
     long startThreadNanos;
-    double maxOutlierTime;
-    double minOutlierTime;
+    double maxOutlierNanos;
+    double minOutlierNanos;
     double minOutlier = MAX_VALUE;
     double maxOutlier = -1;
     long runtimeStartNanos = nanoTime();
@@ -105,11 +105,11 @@ public class TimeSplitter {
         this.clockStats.add(clockMillis);
         if (clockMillis < minOutlier) {
             minOutlier = clockMillis;
-            minOutlierTime = nanosToMillis(clockNanos - runtimeStartNanos);
+            minOutlierNanos = clockNanos - runtimeStartNanos;
         }
         if (clockMillis > maxOutlier) {
             maxOutlier = clockMillis;
-            maxOutlierTime = nanosToMillis(clockNanos - runtimeStartNanos);
+            maxOutlierNanos = clockNanos - runtimeStartNanos;
         }
         long threadNanos = Debug.threadCpuTimeNanos();
         double threadMillis = nanosToMillis(threadNanos - startThreadNanos);
@@ -120,8 +120,11 @@ public class TimeSplitter {
     @SuppressLint("DefaultLocale")
     public String getResult() {
         if (minOutlier <= maxOutlier) {
-            return String.format("x%d: Clock mean %.2fms (SD %.2f), Thread mean %.2fms (SD %.2f), Longest %.2fms (at %.0f), Shortest %.2fms (at %.0f), %d GCs",
-                    n, clockStats.mean(), clockStats.sd(), threadStats.mean(), threadStats.sd(), maxOutlier, maxOutlierTime, minOutlier, minOutlierTime, totalGcCount);
+            double durationNanos = nanoTime() - runtimeStartNanos;
+            double minPercent = (minOutlierNanos / durationNanos) * 100.0;
+            double maxPercent = (maxOutlierNanos / durationNanos) * 100.0;
+            return String.format("x%d: Clock/Thread %.2fms/%.2fms (SD %.2f/%.2f), Min/Max: %.2fms/%.2fms (at %.0f%%, %.0f%%), %d GCs",
+                    n, clockStats.mean(), threadStats.mean(), clockStats.sd(), threadStats.sd(), minOutlier, maxOutlier, minPercent, maxPercent, totalGcCount);
         } else {
             return String.format("- Not used");
         }

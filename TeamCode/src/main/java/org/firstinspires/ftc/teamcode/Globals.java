@@ -10,7 +10,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 
 /**
- * {@link Globals} contains all state that can be access globally anytime
+ * {@link Globals} contains all state that can be accessed globally any time
  * within the sensor loop.
  */
 public class Globals {
