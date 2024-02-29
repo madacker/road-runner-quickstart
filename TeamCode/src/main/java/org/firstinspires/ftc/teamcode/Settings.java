@@ -71,8 +71,8 @@ public class Settings {
             super(descriptor); this.callback = callback;
         }
         public String string() {
-            return "⚡ " + callback.apply(false);
-        } // Lightning
+            return "❗ " + callback.apply(false); // ⚡
+        }
     }
 
     // Button press state:

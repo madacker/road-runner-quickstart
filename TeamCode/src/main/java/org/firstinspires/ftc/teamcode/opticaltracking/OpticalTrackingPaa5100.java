@@ -174,7 +174,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     // This function takes an 8-bit address and returns an 8-bit value:
     int readRegister(int addr) {
         byte[] reads = bridgeTransfer(new byte[] { (byte) addr, (byte) 0xff });
-        RobotLog.dd(MYTAG, String.format("ReadRegister address: 0x%x, length: %d, result: 0x%x, 0x%x", addr, reads.length, reads[0], reads[1]));
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
 
@@ -210,7 +209,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     //----------------------------------------------------------------------------------------------
     // Do the secret-sauce initialization for the PAA5100:
-    private void secretSauce() {
+    private void secretSauceInitialization() {
         // The following portion is from __init__()
         // Here we're seeing 0x50 0x0f 0x3x 0x5a
         writeRegister(Register.SPI_POWER_UP_RESET.bVal, 0x5a);
@@ -394,21 +393,19 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Configure the SPI interface of the bridge:
         configureBridge();
 
-        int chipId = readRegister(0x00);
-        RobotLog.dd(MYTAG, String.format("Chip ID (should be 0x49): %x", chipId));
+        // The first thing we should do is check the chip ID because we don't want to
+        // send register writes to any random I2C devices:
+        int chipId = readRegister(Register.SPI_ID.bVal);
+        if (chipId != 0x49) {
+            RobotLog.dd(MYTAG, String.format("Bad chip ID (should be 0x49): %x", chipId));
+            return false;
+        }
 
         // Initialize the optical tracking chip:
-        secretSauce();
+        secretSauceInitialization();
 
         // Enable the LEDs:
         setLedState(true);
-
-        // Check chip ID:
-        chipId = readRegister(0x00);
-        if (chipId != 0x49) {
-            RobotLog.dd(MYTAG, String.format("Bad chip ID: %x", chipId));
-            return true; // @@@ Should be false
-        }
 
 //        // Do a quick check to see if chip startup succeeded:
 //        if (!startupCheck())
@@ -487,9 +484,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             int dr = TypeConversion.unsignedByteToInt(result[1]);
             int quality = TypeConversion.unsignedByteToInt(result[7]);
             int deltaX = (TypeConversion.unsignedByteToInt(result[3]))
-                       | (TypeConversion.unsignedByteToInt(result[4]) << 8);
+                       | (result[4] << 8); // Signed conversion
             int deltaY = (TypeConversion.unsignedByteToInt(result[5]))
-                       | (TypeConversion.unsignedByteToInt(result[6]) << 8);
+                       | (result[6] << 8); // Signed conversion
+
+RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
 
             if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
                 return new Motion(deltaX, deltaY);
