@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.explorations;
+package org.firstinspires.ftc.teamcode.opticaltracking;
 
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -9,7 +9,6 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
-import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 @TeleOp(name="*OpticalTrackingTest",group="Explore")

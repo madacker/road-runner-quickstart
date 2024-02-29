@@ -27,6 +27,7 @@ import androidx.annotation.Nullable;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -59,6 +60,8 @@ class Point {
         return new Point(Math.cos(theta) * x - Math.sin(theta) * y,
                 Math.sin(theta) * x + Math.cos(theta) * y);
     }
+    public Point negate() { return new Point(-x, -y); }
+    public Point times(double scalar) { return new Point(x * scalar, y * scalar); }
     public double dot(Point other) {
         return this.x * other.x + this.y * other.y;
     }
@@ -1004,6 +1007,66 @@ class AprilTagLocalizer {
 }
 
 /**
+ * Localizer for the Optical Tracking sensor.
+ */
+class OpticalLocalizer {
+    final double INCHES_PER_TICK = 1.0;
+    final double SENSOR_ANGLE_RADIANS = Math.toRadians(0);
+    final Point SENSOR_OFFSET = new Point(3, 3); // @@@ Fix
+
+    OpticalTrackingPaa5100 device;
+    IMU imu;
+    double previousYaw;
+    Pose2d sensorPose;
+
+    OpticalLocalizer(HardwareMap hardwareMap, IMU imu) {
+        this.imu = imu;
+
+        device = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
+        device.getMotion(); // Zero the movement
+        previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        sensorPose = new Pose2d(SENSOR_OFFSET.x, SENSOR_OFFSET.y, 0);
+    }
+
+    Pose2d update() {
+        // Calculate the field-relative angle and its delta:
+        double theta = sensorPose.heading.log();
+        double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        double deltaTheta = currentYaw - previousYaw;
+        previousYaw = currentYaw;
+
+        // Calculate the change in position via Forward Euler integration courtesy of Theorem 10.2.1
+        // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
+        OpticalTrackingPaa5100.Motion motion = device.getMotion();
+        Point motionVector
+                = new Point(motion.x, motion.y).times(INCHES_PER_TICK).rotate(-SENSOR_ANGLE_RADIANS);
+        double deltaX = motionVector.x;
+        double deltaY = motionVector.y;
+
+        double cosTheta = Math.cos(theta);
+        double sinTheta = Math.sin(theta);
+        double sinDeltaThetaOverDeltaTheta = 1 - Math.pow(deltaTheta, 2) / 6;
+        double cosDeltaThetaMinusOneOverDeltaTheta = -deltaTheta / 2;
+        double oneMinusCosDeltaThetaOverDeltaTheta = deltaTheta / 2;
+        double deltaXPrime
+        = (cosTheta * sinDeltaThetaOverDeltaTheta - sinTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+        + (cosTheta * cosDeltaThetaMinusOneOverDeltaTheta - sinTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        double deltaYPrime
+        = (sinTheta * sinDeltaThetaOverDeltaTheta + cosTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+        + (sinTheta * cosDeltaThetaMinusOneOverDeltaTheta + cosTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+
+        // Update the pose for the sensor and the robot center, respectively:
+        double xPrime = sensorPose.position.x + deltaXPrime;
+        double yPrime = sensorPose.position.y + deltaYPrime;
+        double thetaPrime = theta + deltaTheta;
+        Point centerOffset = SENSOR_OFFSET.negate().rotate(thetaPrime);
+
+        sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
+        return new Pose2d(xPrime + centerOffset.x, yPrime + centerOffset.y, thetaPrime);
+    }
+}
+
+/**
  * Master localizer for doing pose estimates. Incorporates odometry, April Tags and distance
  * sensors.
  */
@@ -1024,6 +1087,7 @@ public class Poser {
     private Localizer odometryLocalizer;
     private DistanceLocalizer distanceLocalizer;
     private AprilTagLocalizer aprilTagLocalizer;
+    private OpticalLocalizer opticalLocalizer;
     private AprilTagFilter aprilTagFilter;
 
     // Record structure for the history:
@@ -1049,6 +1113,8 @@ public class Poser {
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
+        opticalLocalizer = new OpticalLocalizer(hardwareMap, imu);
+
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
@@ -1157,7 +1223,7 @@ public class Poser {
     }
 
     // Draw the history visualizations for FTC Dashboard:
-    private void visualize() {
+    private void visualize(Pose2d opticalPose) {
         Canvas c = Globals.canvas;
         HistoryRecord lastDistance = null;
 
@@ -1252,7 +1318,11 @@ public class Poser {
             c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
-        // Finally, draw our current pose:
+        // Draw the optical pose:
+        c.setStroke("#E9967A"); // Olive
+        MecanumDrive.drawRobot(Globals.canvas, opticalPose);
+
+        // Finally, draw our current pose, drawing a rectangle instead of using drawRobot():
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
         c.setStroke("#3F51B5");
@@ -1294,6 +1364,9 @@ public class Poser {
             reviseHistory(time - distance.latency, null, distance);
         }
 
+        // Update the optical localizer:
+        Pose2d opticalPose = opticalLocalizer.update();
+
         // @@@ Think about clamping rate change
 
 //        // Track the current time and the delta-t from the previous filter operation:
@@ -1313,7 +1386,7 @@ public class Poser {
 //        }
 
         // Output telemetry and visualizations:
-        visualize();
+        visualize(opticalPose);
         aprilTagFilter.telemetry();
 
         Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
