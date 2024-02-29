@@ -106,8 +106,8 @@ public class Settings {
     // Animate the cursor:
     private String cursor() {
         // Spinner taken from https://stackoverflow.com/questions/2685435/cooler-ascii-spinners:
-        final String spinner = "◇◈◆";
-        final double CYCLE_TIME = 1.0; // Seconds
+        final String spinner = "◇◈◆◈";
+        final double CYCLE_TIME = 1.5; // Seconds
 
         double fraction = (Globals.time() % CYCLE_TIME) / CYCLE_TIME;
         int index = (int) (fraction * spinner.length());
@@ -148,9 +148,9 @@ public class Settings {
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
             if (i == menu.current)
-                output.append("<font color='#bfdbfe'>").append(menu.options.get(i).string()).append(cursor() + "\n");
+                output.append("<font color='#bfdbfe'>" + cursor() + "</font><b>" + menu.options.get(i).string() + "</b>\n");
             else
-                output.append(menu.options.get(i).string()).append("\n");
+                output.append("&nbsp;&nbsp;&nbsp;" + menu.options.get(i).string() + "\n");
         }
         output.append(Stats.get());
         telemetry.addLine(output.toString());
