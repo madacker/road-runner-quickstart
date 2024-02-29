@@ -103,6 +103,17 @@ public class Settings {
         menuStack.add(new MenuOption("Settings"));
     }
 
+    // Animate the cursor:
+    private String cursor() {
+        // Spinner taken from https://stackoverflow.com/questions/2685435/cooler-ascii-spinners:
+        final String spinner = "◇◈◆";
+        final double CYCLE_TIME = 1.0; // Seconds
+
+        double fraction = (Globals.time() % CYCLE_TIME) / CYCLE_TIME;
+        int index = (int) (fraction * spinner.length());
+        return " " + spinner.substring(index, index + 1);
+    }
+
     // Update loop for Settings. If true is returned, the caller should not use gamepad input
     // because the Settings UI is active:
     Gamepad update() {
@@ -136,9 +147,8 @@ public class Settings {
 
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
-            // output.append(i == menu.current ? "➤" : " ").append(menu.options.get(i).string()).append("\n");
             if (i == menu.current)
-                output.append("<font color='#bfdbfe'>").append(menu.options.get(i).string()).append(" ☚</font>\n"); // ◀
+                output.append("<font color='#bfdbfe'>").append(menu.options.get(i).string()).append(cursor() + "\n");
             else
                 output.append(menu.options.get(i).string()).append("\n");
         }
