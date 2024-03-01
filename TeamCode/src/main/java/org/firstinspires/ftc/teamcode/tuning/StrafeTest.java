@@ -34,7 +34,6 @@ public final class StrafeTest extends LinearOpMode {
 
         waitForStart();
 
-        drive.leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         int initPos = drive.leftFront.getCurrentPosition();
 
         Actions.runBlocking(

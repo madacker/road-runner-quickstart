@@ -62,7 +62,7 @@ public class Settings {
             super(descriptor); this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return "↔️ " + description + ": " + list[index]; // "↔⬌ "
+            return "↔️ <b>" + list[index] + "</b>: " + description; // "↔⬌ "
         }
     }
     private static class ActivationOption extends Option {
@@ -107,7 +107,7 @@ public class Settings {
     private String cursor() {
         // Spinner taken from https://stackoverflow.com/questions/2685435/cooler-ascii-spinners:
         final String spinner = "◇◈◆◈";
-        final double CYCLE_TIME = 3.0; // Seconds
+        final double CYCLE_TIME = 1.5; // Seconds
 
         double fraction = (Globals.time() % CYCLE_TIME) / CYCLE_TIME;
         int index = (int) (fraction * spinner.length());
@@ -147,10 +147,12 @@ public class Settings {
 
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
-            if (i == menu.current)
-                output.append("<font color='#bfdbfe'>" + cursor() + "</font><b>" + menu.options.get(i).string() + "</b>\n");
+            if (i == menu.current) {
+                String option = menu.options.get(i).string();
+                output.append(option.substring(0, 2) + "<font color='#bfdbfe'>" + cursor() + "</font></i>" + option.substring(2) + "</i>\n");
+            }
             else
-                output.append("&nbsp;&nbsp;&nbsp;" + menu.options.get(i).string() + "\n");
+                output.append(menu.options.get(i).string() + "\n");
         }
         output.append(Stats.get());
         telemetry.addLine(output.toString());

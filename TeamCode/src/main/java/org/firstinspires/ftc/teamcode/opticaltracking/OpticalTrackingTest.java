@@ -11,7 +11,7 @@ import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
-@TeleOp(name="*OpticalTrackingTest",group="Explore")
+@TeleOp(name="OpticalTrackingTest",group="Explore")
 public class OpticalTrackingTest extends LinearOpMode {
 
     @Override
