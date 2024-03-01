@@ -107,11 +107,11 @@ public class Settings {
     private String cursor() {
         // Spinner taken from https://stackoverflow.com/questions/2685435/cooler-ascii-spinners:
         final String spinner = "◇◈◆◈";
-        final double CYCLE_TIME = 1.5; // Seconds
+        final double CYCLE_TIME = 3.0; // Seconds
 
         double fraction = (Globals.time() % CYCLE_TIME) / CYCLE_TIME;
         int index = (int) (fraction * spinner.length());
-        return " " + spinner.substring(index, index + 1);
+        return " " + spinner.charAt(index);
     }
 
     // Update loop for Settings. If true is returned, the caller should not use gamepad input

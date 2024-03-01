@@ -42,41 +42,6 @@ import java.util.List;
 import java.util.ListIterator;
 
 /**
- * Math helper for points and vectors:
- */
-class Point {
-    public double x, y;
-    Point(double x, double y) {
-        this.x = x;
-        this.y = y;
-    }
-    public Point add(Point other) {
-        return new Point(this.x + other.x, this.y + other.y);
-    }
-    public Point subtract(Point other) {
-        return new Point(this.x - other.x, this.y - other.y);
-    }
-    public Point rotate(double theta) {
-        return new Point(Math.cos(theta) * x - Math.sin(theta) * y,
-                Math.sin(theta) * x + Math.cos(theta) * y);
-    }
-    public Point negate() { return new Point(-x, -y); }
-    public Point times(double scalar) { return new Point(x * scalar, y * scalar); }
-    public double dot(Point other) {
-        return this.x * other.x + this.y * other.y;
-    }
-    public double cross(Point other) {
-        return this.x * other.y - this.y * other.x;
-    }
-    public double distance(Point other) {
-        return Math.hypot(other.x - this.x, other.y - this.y);
-    }
-    public double length() {
-        return Math.hypot(x, y);
-    }
-}
-
-/**
  * Math helper for line segments:
  */
 class Segment {
@@ -1039,7 +1004,7 @@ class OpticalLocalizer {
         // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Point motionVector
-                = new Point(motion.x, motion.y).times(INCHES_PER_TICK).rotate(-SENSOR_ANGLE_RADIANS);
+                = new Point(motion.x, motion.y).scale(INCHES_PER_TICK).rotate(-SENSOR_ANGLE_RADIANS);
         double deltaX = motionVector.x;
         double deltaY = motionVector.y;
 
