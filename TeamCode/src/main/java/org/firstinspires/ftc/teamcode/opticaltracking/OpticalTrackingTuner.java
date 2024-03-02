@@ -57,7 +57,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
     }
 
     Calibration measureCalibration(OpticalTrackingPaa5100 optical, MecanumDrive drive) {
-        while (true) {
+        while (opModeIsActive()) {
             drive.leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
             drive.leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
             drive.rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
@@ -98,6 +98,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
                     return result; // ====>
             }
         }
+        return null;
     }
 
     static class CenterOfRotation {
@@ -108,7 +109,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
     }
 
     CenterOfRotation measureCenterOfRotation(OpticalTrackingPaa5100 optical, MecanumDrive drive, Calibration calibration) {
-        while (true) {
+        while (opModeIsActive()) {
             telemetry.addLine("Now ready for the center-of-rotation test.");
             telemetry.addLine("The robot will need room to spin.\n");
             telemetry.addLine("Press A to start, B to skip");
@@ -194,6 +195,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
                     return result; // ====>
             }
         }
+        return null;
     }
 
     @Override
@@ -205,6 +207,8 @@ public class OpticalTrackingTuner extends LinearOpMode {
         waitForStart();
 
         Calibration calibration = measureCalibration(optical, drive);
+        if (calibration == null)
+            return;
         CenterOfRotation centerOfRotation = measureCenterOfRotation(optical, drive, calibration);
 
         telemetry.addLine("<< Completed all tuning tests! >>\n");

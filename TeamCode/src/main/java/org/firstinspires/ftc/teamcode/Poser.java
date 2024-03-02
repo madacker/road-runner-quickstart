@@ -809,8 +809,11 @@ class AprilTagLocalizer {
     private CameraState updateActiveCamera(Pose2d pose, boolean confident) { // Returns null if no active camera
         int resultIndex = -1; // Default to none
         if (!confident) {
-            // Always keep the primary camera active when locking into a good pose:
+            // Always keep the primary camera active when locking into a good pose, assuming that
+            // it's active:
             resultIndex = 0;
+            if (!cameras[resultIndex].enabled)
+                resultIndex = -1;
         } else {
             // Determine the camera with the closest view of a tag:
             double minDistance = Double.MAX_VALUE;
@@ -990,7 +993,7 @@ class OpticalLocalizer {
         device = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
         device.getMotion(); // Zero the movement
         previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        sensorPose = new Pose2d(SENSOR_OFFSET.x, SENSOR_OFFSET.y, 0);
+        sensorPose = new Pose2d(-SENSOR_OFFSET.x, -SENSOR_OFFSET.y, 0);
     }
 
     Pose2d update() {
@@ -1004,7 +1007,7 @@ class OpticalLocalizer {
         // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Point motionVector
-                = new Point(motion.x, motion.y).scale(INCHES_PER_TICK).rotate(-SENSOR_ANGLE_RADIANS);
+                = new Point(motion.x, motion.y).scale(INCHES_PER_TICK).rotate(SENSOR_ANGLE_RADIANS);
         double deltaX = motionVector.x;
         double deltaY = motionVector.y;
 
@@ -1027,7 +1030,7 @@ class OpticalLocalizer {
         Point centerOffset = SENSOR_OFFSET.negate().rotate(thetaPrime);
 
         sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
-        return new Pose2d(xPrime + centerOffset.x, yPrime + centerOffset.y, thetaPrime);
+        return new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
     }
 }
 
