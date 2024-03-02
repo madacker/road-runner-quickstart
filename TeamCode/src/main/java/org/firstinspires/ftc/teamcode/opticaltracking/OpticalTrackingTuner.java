@@ -129,6 +129,10 @@ public class OpticalTrackingTuner extends LinearOpMode {
         return new Point(deltaXPrime, deltaYPrime);
     }
 
+    static Point inferiorDeltaFieldPosition(double theta, double deltaX, double deltaY, double deltaTheta) {
+        return new Point(deltaX, deltaY).rotate(theta + deltaTheta);
+    }
+
     static class CenterOfRotation {
         double x;
         double y;
@@ -207,7 +211,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
             while (opModeIsActive() && (rotationTotal < rotationTarget)) {
                 // Track the amount of rotation we've done:
                 double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-                double deltaYaw = yaw - lastYaw;
+                double deltaYaw = Globals.normalizeAngle(yaw - lastYaw);
                 lastYaw = yaw;
 
                 rotationTotal += Globals.normalizeAngle(deltaYaw);
@@ -251,17 +255,18 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
 
             CenterOfRotation circleFit = fitCircle(points, farthestPoint.x / 2, farthestPoint.y / 2);
 
-            double resultX = -farthestPoint.x / 2;
-            double resultY = -farthestPoint.y / 2;
+            double inchesPerTick = calibration.inchesPerTick;
+            double resultX = farthestPoint.x / 2;
+            double resultY = farthestPoint.y / 2;
             double farthestPointRadius = farthestDistance / 2;
-            double traveledRadius = tickDistance * calibration.inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI);
+            double traveledRadius = tickDistance * inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI);
 
-            telemetry.addLine(String.format("InchesPerTick: %f, tickDistance: %f, farthestPoint.x: %f, farthestPoint.y: %f, traveledRadius: %f\n", calibration.inchesPerTick, tickDistance, farthestPoint.x, farthestPoint.y, tickDistance * calibration.inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI)));
+            telemetry.addLine(String.format("InchesPerTick: %f, tickDistance: %f, farthestPoint.x: %f, farthestPoint.y: %f, traveledRadius: %f\n", inchesPerTick, tickDistance, farthestPoint.x, farthestPoint.y, tickDistance * inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI)));
             telemetry.addLine(String.format("Test result...\nOffset from center of rotation (inches): (%.2f, %.2f), samples: %d",
                     resultX, resultY, points.size()));
             telemetry.addLine(String.format("Farthest point radius: %.2f, Traveled radius: %.2f", farthestPointRadius, traveledRadius));
             telemetry.addLine(String.format("Error (inches): (%.2f, %.2f)\n", currentPoint.x, currentPoint.y));
-            telemetry.addLine(String.format("Circle-fit position: (%.2f, %.2f), radius: %.2f\n", -circleFit.x, -circleFit.y, circleFit.leastSquaresRadius));
+            telemetry.addLine(String.format("Circle-fit position: (%.2f, %.2f), radius: %.2f\n", circleFit.x, circleFit.y, circleFit.leastSquaresRadius));
 
             telemetry.addLine("Press A to continue, B to repeat this test");
             telemetry.update();

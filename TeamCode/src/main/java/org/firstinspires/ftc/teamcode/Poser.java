@@ -980,7 +980,7 @@ class AprilTagLocalizer {
 class OpticalLocalizer {
     final double INCHES_PER_TICK = 0.001035;
     final double SENSOR_ANGLE_RADIANS = Math.toRadians(90.78);
-    final Point SENSOR_OFFSET = new Point(-4.62, 3.30);
+    final Point SENSOR_OFFSET = new Point(-4.47, 2.6);
 
     OpticalTrackingPaa5100 device;
     IMU imu;
@@ -1018,7 +1018,7 @@ class OpticalLocalizer {
         // Calculate the field-relative angle and its delta:
         double theta = sensorPose.heading.log();
         double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        double deltaTheta = currentYaw - previousYaw;
+        double deltaTheta = Globals.normalizeAngle(currentYaw - previousYaw);
         previousYaw = currentYaw;
 
         OpticalTrackingPaa5100.Motion motion = device.getMotion();

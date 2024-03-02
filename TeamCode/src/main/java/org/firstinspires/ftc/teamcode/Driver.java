@@ -345,8 +345,9 @@ public class Driver extends LinearOpMode {
         double fullAngularSpeed
                 = 2 * fullAxialSpeed / (MecanumDrive.PARAMS.trackWidthTicks * MecanumDrive.PARAMS.inPerTick);
 
-        Settings.registerListOption("Max speed (inch/s)", new String[] {"20", "30", "40", "50", "60"}, 1,
-                (i, string) -> MecanumDrive.PARAMS.maxWheelVel = Double.parseDouble(string));
+        // TODO: Should integrate theoretical here:
+        Settings.registerListOption("Max speed factor", new String[] {"0.25", "0.50", "0.75", "1.0"}, 1,
+                (i, string) -> { double factor = Double.parseDouble(string); MecanumDrive.PARAMS.maxWheelVel = 60 * factor; MecanumDrive.PARAMS.maxAngVel = Math.PI * factor; });
 
         waitForStart();
 
@@ -419,9 +420,9 @@ public class Driver extends LinearOpMode {
             if ((!parkingActivated) && (!roadrunnerActivated)) {
                 if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
-                            scaleStick(-this.gamepad1.left_stick_y, fullAxialSpeed),
-                            scaleStick(-this.gamepad1.left_stick_x, fullLateralSpeed)),
-                            scaleStick(-this.gamepad1.right_stick_x, fullAngularSpeed));
+                            scaleStick(-this.gamepad1.left_stick_y, MecanumDrive.PARAMS.maxWheelVel), // fullAxialSpeed),
+                            scaleStick(-this.gamepad1.left_stick_x, MecanumDrive.PARAMS.maxWheelVel)), // fullLateralSpeed)),
+                            scaleStick(-this.gamepad1.right_stick_x, MecanumDrive.PARAMS.maxAngVel)); // , fullAngularSpeed));
 
                     PoseVelocity2d fieldVelocity = poser.pose.times(calibratedVelocity);
 

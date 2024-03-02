@@ -149,7 +149,7 @@ public class Settings {
         for (int i = 0; i < menu.options.size(); i++) {
             if (i == menu.current) {
                 String option = menu.options.get(i).string();
-                output.append(option.substring(0, 2) + "<font color='#bfdbfe'>" + cursor() + "</font><i>" + option.substring(2) + "</i>\n");
+                output.append(option.substring(0, 2) + "<font color='#bfdbfe'>" + cursor() + "</font><b>" + option.substring(2) + "</b>\n");
             }
             else
                 output.append(menu.options.get(i).string() + "\n");
