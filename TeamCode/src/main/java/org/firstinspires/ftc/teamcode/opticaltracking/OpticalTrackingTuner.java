@@ -185,7 +185,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
                     return null;
             }
 
-            telemetry.addLine(String.format("Rotating %d times...", REVOLUTION_COUNT));
+            telemetry.addLine(String.format("Rotating %.1f times...", REVOLUTION_COUNT));
             telemetry.update();
 
             ArrayList<Point> points = new ArrayList<>();
