@@ -490,7 +490,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             int deltaX = (TypeConversion.unsignedByteToInt(result[5]))
                        | (result[6] << 8); // Signed conversion
 
-RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
+// RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
 
             if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
                 return new Motion(deltaX, deltaY);

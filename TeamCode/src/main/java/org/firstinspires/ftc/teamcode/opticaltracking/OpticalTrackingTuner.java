@@ -14,16 +14,18 @@ import org.firstinspires.ftc.teamcode.Point;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @TeleOp(name="*OpticalTrackingTuner",group="Explore")
 public class OpticalTrackingTuner extends LinearOpMode {
-    final int REVOLUTION_COUNT = 1;
-    final double RAMP_TIME = 2; // Seconds
-    final double SPIN_SPEED = 0.3;
+    final double REVOLUTION_COUNT = 1.0;
+    final double RAMP_TIME = 0.5; // Seconds
+    final double SPIN_SPEED = 0.2;
     final double PUSH_INCHES = 96; // 4 tiles
 
     boolean aPressed = false;
     boolean bPressed = false;
+    double tickDistance = 0; // @@@ Bug?
 
     boolean buttonA() {
         boolean result = (aPressed) && (!gamepad1.a);
@@ -54,6 +56,11 @@ public class OpticalTrackingTuner extends LinearOpMode {
     static class Calibration {
         double inchesPerTick;
         double correctionAngle; // Radians
+
+        public Calibration(double inchesPerTick, double correctionAngle) {
+            this.inchesPerTick = inchesPerTick;
+            this.correctionAngle = correctionAngle;
+        }
     }
 
     Calibration measureCalibration(OpticalTrackingPaa5100 optical, MecanumDrive drive) {
@@ -64,14 +71,17 @@ public class OpticalTrackingTuner extends LinearOpMode {
             drive.rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
             telemetry.addLine(String.format("Ready for calibration. Push the robot forward in a straight line for %.1f inches.\n", PUSH_INCHES));
-            telemetry.addLine("Press A to start");
+            telemetry.addLine("Press A to start, B to skip");
             telemetry.update();
-            while (opModeIsActive() && !buttonA())
-                ;
+            while (opModeIsActive() && !buttonA()) {
+                if (buttonB()) {
+                    return new Calibration(0.001035, Math.toRadians(90.78));
+                }
+            }
 
             long xTotal = 0;
             long yTotal = 0;
-            Calibration result = new Calibration();
+            Calibration result = new Calibration(0, 0);
             optical.getMotion(); // Reset the sensor
 
             while (opModeIsActive() && !buttonA()) {
@@ -101,15 +111,71 @@ public class OpticalTrackingTuner extends LinearOpMode {
         return null;
     }
 
+    // Convert the robot-relative change-in-pose to field-relative change-in-position.
+    // Apply the conversion via Forward Euler integration courtesy of Theorem 10.2.1
+    // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
+    static Point deltaFieldPosition(double theta, double deltaX, double deltaY, double deltaTheta) {
+        double cosTheta = Math.cos(theta);
+        double sinTheta = Math.sin(theta);
+        double sinDeltaThetaOverDeltaTheta = 1 - Math.pow(deltaTheta, 2) / 6;
+        double cosDeltaThetaMinusOneOverDeltaTheta = -deltaTheta / 2;
+        double oneMinusCosDeltaThetaOverDeltaTheta = deltaTheta / 2;
+        double deltaXPrime
+                = (cosTheta * sinDeltaThetaOverDeltaTheta - sinTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+                + (cosTheta * cosDeltaThetaMinusOneOverDeltaTheta - sinTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        double deltaYPrime
+                = (sinTheta * sinDeltaThetaOverDeltaTheta + cosTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+                + (sinTheta * cosDeltaThetaMinusOneOverDeltaTheta + cosTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        return new Point(deltaXPrime, deltaYPrime);
+    }
+
     static class CenterOfRotation {
         double x;
         double y;
         double farthestPointRadius;
         double traveledRadius;
+        double leastSquaresRadius;
+
+        public CenterOfRotation(double x, double y, double farthestPointRadius, double traveledRadius, double leastSquaresRadius) {
+            this.x = x;
+            this.y = y;
+            this.farthestPointRadius = farthestPointRadius;
+            this.traveledRadius = traveledRadius;
+            this.leastSquaresRadius = leastSquaresRadius;
+        }
+    }
+
+    // Perform a least-squares fit of an array of points to a circle without using matrices,
+    // courtesy of Copilot:
+    static CenterOfRotation fitCircle(List<Point> points, double centerX, double centerY) {
+        double radius = 0.0;
+
+        // Iteratively refine the center and radius
+        for (int iter = 0; iter < 100; iter++) {
+            double sumX = 0.0;
+            double sumY = 0.0;
+            double sumR = 0.0;
+
+            for (Point p : points) {
+                double dx = p.x - centerX;
+                double dy = p.y - centerY;
+                double dist = Math.sqrt(dx * dx + dy * dy);
+                sumX += dx / dist;
+                sumY += dy / dist;
+                sumR += dist;
+            }
+
+            centerX += sumX / points.size();
+            centerY += sumY / points.size();
+            radius = sumR / points.size();
+        }
+
+        return new CenterOfRotation(centerX, centerY,0, 0, radius);
     }
 
     CenterOfRotation measureCenterOfRotation(OpticalTrackingPaa5100 optical, MecanumDrive drive, Calibration calibration) {
         while (opModeIsActive()) {
+            telemetry.addLine(String.format("InchesPerTick: %f\n", calibration.inchesPerTick));
             telemetry.addLine("Now ready for the center-of-rotation test.");
             telemetry.addLine("The robot will need room to spin.\n");
             telemetry.addLine("Press A to start, B to skip");
@@ -131,7 +197,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
             double farthestDistance = 0;
             Point farthestPoint = new Point(0, 0);
-            double tickDistance = 0;
+            tickDistance = 0;
 
             // Reset the two sensors:
             drive.imu.resetYaw();
@@ -141,13 +207,19 @@ public class OpticalTrackingTuner extends LinearOpMode {
             while (opModeIsActive() && (rotationTotal < rotationTarget)) {
                 // Track the amount of rotation we've done:
                 double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-                rotationTotal += Globals.normalizeAngle(yaw - lastYaw);
+                double deltaYaw = yaw - lastYaw;
                 lastYaw = yaw;
 
+                rotationTotal += Globals.normalizeAngle(deltaYaw);
                 OpticalTrackingPaa5100.Motion motion = optical.getMotion();
                 tickDistance += Math.hypot(motion.x, motion.y);
 
-                currentPoint = currentPoint.add(new Point(motion.x, motion.y).rotate(calibration.correctionAngle + yaw).scale(calibration.inchesPerTick));
+System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotationTotal, tickDistance));
+
+                Point motionVector
+                        = new Point(motion.x, motion.y).scale(calibration.inchesPerTick).rotate(calibration.correctionAngle);
+                Point deltaPosition = deltaFieldPosition(yaw, motionVector.x, motionVector.y, deltaYaw);
+                currentPoint = currentPoint.add(deltaPosition);
                 points.add(currentPoint);
 
                 double currentDistance = Math.hypot(currentPoint.x, currentPoint.y);
@@ -177,22 +249,26 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
             rampMotors(drive, false);
 
-            CenterOfRotation result = new CenterOfRotation();
-            result.x = -farthestPoint.x / 2;
-            result.y = -farthestPoint.y / 2;
-            result.farthestPointRadius = farthestDistance / 2;
-            result.traveledRadius = tickDistance * calibration.inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI);
+            CenterOfRotation circleFit = fitCircle(points, farthestPoint.x / 2, farthestPoint.y / 2);
 
-            telemetry.addLine(String.format("Test result: Offset from center of rotation (inches): (%.2f, %.2f), samples: %d",
-                    result.x, result.y, points.size()));
-            telemetry.addLine(String.format("Farthest point radius: %.2f, Traveled radius: %.2f", result.farthestPointRadius, result.traveledRadius));
-            telemetry.addLine(String.format("End point (inches): (%.2f, %.2f)\n", currentPoint.x, currentPoint.y));
+            double resultX = -farthestPoint.x / 2;
+            double resultY = -farthestPoint.y / 2;
+            double farthestPointRadius = farthestDistance / 2;
+            double traveledRadius = tickDistance * calibration.inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI);
+
+            telemetry.addLine(String.format("InchesPerTick: %f, tickDistance: %f, farthestPoint.x: %f, farthestPoint.y: %f, traveledRadius: %f\n", calibration.inchesPerTick, tickDistance, farthestPoint.x, farthestPoint.y, tickDistance * calibration.inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI)));
+            telemetry.addLine(String.format("Test result...\nOffset from center of rotation (inches): (%.2f, %.2f), samples: %d",
+                    resultX, resultY, points.size()));
+            telemetry.addLine(String.format("Farthest point radius: %.2f, Traveled radius: %.2f", farthestPointRadius, traveledRadius));
+            telemetry.addLine(String.format("Error (inches): (%.2f, %.2f)\n", currentPoint.x, currentPoint.y));
+            telemetry.addLine(String.format("Circle-fit position: (%.2f, %.2f), radius: %.2f\n", -circleFit.x, -circleFit.y, circleFit.leastSquaresRadius));
 
             telemetry.addLine("Press A to continue, B to repeat this test");
             telemetry.update();
             while (opModeIsActive() && !buttonB()) {
-                if (buttonA())
-                    return result; // ====>
+                if (buttonA()) {
+                    return new CenterOfRotation(resultX, resultY, farthestPointRadius, traveledRadius, 0); // @@@
+                }
             }
         }
         return null;
@@ -207,8 +283,6 @@ public class OpticalTrackingTuner extends LinearOpMode {
         waitForStart();
 
         Calibration calibration = measureCalibration(optical, drive);
-        if (calibration == null)
-            return;
         CenterOfRotation centerOfRotation = measureCenterOfRotation(optical, drive, calibration);
 
         telemetry.addLine("<< Completed all tuning tests! >>\n");

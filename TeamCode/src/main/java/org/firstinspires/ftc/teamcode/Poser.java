@@ -980,7 +980,7 @@ class AprilTagLocalizer {
 class OpticalLocalizer {
     final double INCHES_PER_TICK = 0.001035;
     final double SENSOR_ANGLE_RADIANS = Math.toRadians(90.78);
-    final Point SENSOR_OFFSET = new Point(-4.862, -1.624);
+    final Point SENSOR_OFFSET = new Point(-4.62, 3.30);
 
     OpticalTrackingPaa5100 device;
     IMU imu;
@@ -996,6 +996,24 @@ class OpticalLocalizer {
         sensorPose = new Pose2d(-SENSOR_OFFSET.x, -SENSOR_OFFSET.y, 0);
     }
 
+    // Convert the robot-relative change-in-pose to field-relative change-in-position.
+    // Apply the conversion via Forward Euler integration courtesy of Theorem 10.2.1
+    // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
+    static Point deltaFieldPosition(double theta, double deltaX, double deltaY, double deltaTheta) {
+        double cosTheta = Math.cos(theta);
+        double sinTheta = Math.sin(theta);
+        double sinDeltaThetaOverDeltaTheta = 1 - Math.pow(deltaTheta, 2) / 6;
+        double cosDeltaThetaMinusOneOverDeltaTheta = -deltaTheta / 2;
+        double oneMinusCosDeltaThetaOverDeltaTheta = deltaTheta / 2;
+        double deltaXPrime
+                = (cosTheta * sinDeltaThetaOverDeltaTheta - sinTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+                + (cosTheta * cosDeltaThetaMinusOneOverDeltaTheta - sinTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        double deltaYPrime
+                = (sinTheta * sinDeltaThetaOverDeltaTheta + cosTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
+                + (sinTheta * cosDeltaThetaMinusOneOverDeltaTheta + cosTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        return new Point(deltaXPrime, deltaYPrime);
+    }
+
     Pose2d update() {
         // Calculate the field-relative angle and its delta:
         double theta = sensorPose.heading.log();
@@ -1003,29 +1021,14 @@ class OpticalLocalizer {
         double deltaTheta = currentYaw - previousYaw;
         previousYaw = currentYaw;
 
-        // Calculate the change in position via Forward Euler integration courtesy of Theorem 10.2.1
-        // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Point motionVector
                 = new Point(motion.x, motion.y).scale(INCHES_PER_TICK).rotate(SENSOR_ANGLE_RADIANS);
-        double deltaX = motionVector.x;
-        double deltaY = motionVector.y;
-
-        double cosTheta = Math.cos(theta);
-        double sinTheta = Math.sin(theta);
-        double sinDeltaThetaOverDeltaTheta = 1 - Math.pow(deltaTheta, 2) / 6;
-        double cosDeltaThetaMinusOneOverDeltaTheta = -deltaTheta / 2;
-        double oneMinusCosDeltaThetaOverDeltaTheta = deltaTheta / 2;
-        double deltaXPrime
-        = (cosTheta * sinDeltaThetaOverDeltaTheta - sinTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
-        + (cosTheta * cosDeltaThetaMinusOneOverDeltaTheta - sinTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
-        double deltaYPrime
-        = (sinTheta * sinDeltaThetaOverDeltaTheta + cosTheta * oneMinusCosDeltaThetaOverDeltaTheta) * deltaX
-        + (sinTheta * cosDeltaThetaMinusOneOverDeltaTheta + cosTheta * sinDeltaThetaOverDeltaTheta) * deltaY;
+        Point deltaPosition = deltaFieldPosition(theta, motionVector.x, motionVector.y, deltaTheta);
 
         // Update the pose for the sensor and the robot center, respectively:
-        double xPrime = sensorPose.position.x + deltaXPrime;
-        double yPrime = sensorPose.position.y + deltaYPrime;
+        double xPrime = sensorPose.position.x + deltaPosition.x;
+        double yPrime = sensorPose.position.y + deltaPosition.y;
         double thetaPrime = theta + deltaTheta;
         Point centerOffset = SENSOR_OFFSET.negate().rotate(thetaPrime);
 
