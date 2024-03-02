@@ -211,7 +211,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
         telemetry.addLine(String.format("Inches per tick: %f", calibration.inchesPerTick));
         telemetry.addLine(String.format("Correction angle (degrees): %.2f", Math.toDegrees(calibration.correctionAngle)));
         if (centerOfRotation != null) {
-            telemetry.addLine(String.format("Offset to center-of-rotation (inches): (%.2f, %.2f)", centerOfRotation.x, centerOfRotation.y));
+            telemetry.addLine(String.format("Offset to center-of-rotation (inches): (%.3f, %.3f)", centerOfRotation.x, centerOfRotation.y));
             telemetry.addLine(String.format("\nFarthest-point to distance-traveled radius: %.2f", centerOfRotation.farthestPointRadius / centerOfRotation.traveledRadius));
         }
         telemetry.update();

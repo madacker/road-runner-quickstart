@@ -975,9 +975,9 @@ class AprilTagLocalizer {
  * Localizer for the Optical Tracking sensor.
  */
 class OpticalLocalizer {
-    final double INCHES_PER_TICK = 1.0;
-    final double SENSOR_ANGLE_RADIANS = Math.toRadians(0);
-    final Point SENSOR_OFFSET = new Point(3, 3); // @@@ Fix
+    final double INCHES_PER_TICK = 0.001035;
+    final double SENSOR_ANGLE_RADIANS = Math.toRadians(90.78);
+    final Point SENSOR_OFFSET = new Point(-4.862, -1.624);
 
     OpticalTrackingPaa5100 device;
     IMU imu;

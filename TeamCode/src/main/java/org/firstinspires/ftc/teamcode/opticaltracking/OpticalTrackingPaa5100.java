@@ -483,9 +483,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
             int dr = TypeConversion.unsignedByteToInt(result[1]);
             int quality = TypeConversion.unsignedByteToInt(result[7]);
-            int deltaX = (TypeConversion.unsignedByteToInt(result[3]))
+
+            // Note that we switch X and Y to preserve a clockwise coordinate system:
+            int deltaY = (TypeConversion.unsignedByteToInt(result[3]))
                        | (result[4] << 8); // Signed conversion
-            int deltaY = (TypeConversion.unsignedByteToInt(result[5]))
+            int deltaX = (TypeConversion.unsignedByteToInt(result[5]))
                        | (result[6] << 8); // Signed conversion
 
 RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
