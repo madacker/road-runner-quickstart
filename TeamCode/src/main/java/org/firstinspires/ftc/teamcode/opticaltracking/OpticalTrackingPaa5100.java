@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.hardware.ControlSystem;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
-import com.qualcomm.robotcore.hardware.I2cWaitControl;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.RobotLog;
@@ -436,63 +435,50 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
-        final boolean fast = true;
-        if (!fast) {
-            // Use individual register reads:
-            int deltaX_low = readRegister(0x03);
-            int deltaX_high = (readRegister(0x04) << 8) & 0xFF00;
-            int deltaY_low = readRegister(0x05);
-            int deltaY_high = (readRegister(0x06) << 8) & 0xFF00;
+        // Magic minimum quality constant:
+        final int MOV_MIN_QUALITY = 0x10;
 
-            int deltaX = deltaX_high | deltaX_low;
-            int deltaY = deltaY_high | deltaY_low;
+        // Use burst mode which has a result composed of 13 bytes:
+        //      0 - unused
+        //      1 - dr (unsigned char)
+        //      2 - obs (unsigned char)
+        //      3 - x (short, little endian)
+        //      5 - y (short, little endian)
+        //      7 - quality (unsigned char)
+        //      8 - raw_sum (unsigned char)
+        //      9 - raw_max (unsigned char)
+        //      10 - raw_min (unsigned char)
+        //      11 - shutter_upper (unsigned char)
+        //      12 - shutter_lower (unsigned char)
 
-            return new Motion(deltaX, deltaY);
-        } else {
-            // Magic minimum quality constant:
-            final int MOV_MIN_QUALITY = 0x10;
+        byte[] command = new byte[14]; // Zero initialized by default
+        command[0] = SLAVE_SELECT_MASK;
+        command[1] = (byte) Register.SPI_MOTION_BURST.bVal;
+        for (int i = 2; i < command.length; i++)
+            command[i] = (byte) 0xff; // Filler
 
-            // Use burst mode which has a result composed of 13 bytes:
-            //      0 - unused
-            //      1 - dr (unsigned char)
-            //      2 - obs (unsigned char)
-            //      3 - x (short, little endian)
-            //      5 - y (short, little endian)
-            //      7 - quality (unsigned char)
-            //      8 - raw_sum (unsigned char)
-            //      9 - raw_max (unsigned char)
-            //      10 - raw_min (unsigned char)
-            //      11 - shutter_upper (unsigned char)
-            //      12 - shutter_lower (unsigned char)
+        this.deviceClient.write(command);
 
-            byte[] command = new byte[14]; // Zero initialized by default
-            command[0] = SLAVE_SELECT_MASK;
-            command[1] = (byte) Register.SPI_MOTION_BURST.bVal;
-            for (int i = 2; i < command.length; i++)
-                command[i] = (byte) 0xff; // Filler
+        // As an optimization, read only as many bytes from the burst as we look at (i.e.,
+        // skip the raw max/min and shutter):
+        byte[] result = this.deviceClient.read(8);
 
-            this.deviceClient.write(command);
+        // Parse the data:
+        int dr = TypeConversion.unsignedByteToInt(result[1]);
+        int quality = TypeConversion.unsignedByteToInt(result[7]);
 
-            // -1 because no slave-select mask on read:
-            byte[] result = this.deviceClient.read(command.length - 1);
-
-            // Parse the data:
-            int dr = TypeConversion.unsignedByteToInt(result[1]);
-            int quality = TypeConversion.unsignedByteToInt(result[7]);
-
-            // Note that we switch X and Y to preserve a clockwise coordinate system:
-            int deltaY = (TypeConversion.unsignedByteToInt(result[3]))
-                       | (result[4] << 8); // Signed conversion
-            int deltaX = (TypeConversion.unsignedByteToInt(result[5]))
-                       | (result[6] << 8); // Signed conversion
+        // Note that we switch X and Y to preserve a clockwise coordinate system:
+        int deltaY = (TypeConversion.unsignedByteToInt(result[3]))
+                   | (result[4] << 8); // Signed conversion
+        int deltaX = (TypeConversion.unsignedByteToInt(result[5]))
+                   | (result[6] << 8); // Signed conversion
 
 // RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
 
-            if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
-                return new Motion(deltaX, deltaY);
-            } else {
-                return new Motion(0, 0);
-            }
+        if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
+            return new Motion(deltaX, deltaY);
+        } else {
+            return new Motion(0, 0);
         }
     }
 }
