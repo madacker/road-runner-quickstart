@@ -11,6 +11,9 @@ import com.qualcomm.robotcore.hardware.configuration.annotations.DevicePropertie
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.RobotLog;
 import com.qualcomm.robotcore.util.TypeConversion;
+
+import java.util.ArrayList;
+
 /**
  * <hr>
  * {@link OpticalTrackingPaa5100} is a driver for the FTC environment for a
@@ -39,9 +42,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             this.y = y;
         }
     }
-
-    // Enable manual chip-select:
-    final boolean MANUAL_CHIP_SELECT = false;
 
     // Special opcode for bulkWrite() encodings:
     private final int WAIT = -1;
@@ -121,59 +121,23 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         int configuration = (order << 5) | (mode << 2) | (clockRate << 0);
         RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
-
-        // Manually enable the chip select pins:
-        //    0 = disable GPIO control (i.e., use auto-chip-select)
-        //    1 = enable as GPIO
-        this.deviceClient.write8(Register.I2C_GPIO_ENABLE.bVal, MANUAL_CHIP_SELECT ? 0xf : 0);
-
-        // Set the GPIO configuration:
-        //    0 = quasi-bidirectional
-        //    1 = push-pull
-        //    2 = input-only (high impedance)
-        //    3 = open-drain
-        this.deviceClient.write8(Register.I2C_GPIO_CONFIGURATION.bVal, 0);
     }
 
-    // Manually enable chip-select:
-    void chipSelect(boolean enable) {
-        if (MANUAL_CHIP_SELECT) {
-            // Pull the line low to manually select the optical tracking chip:
-            this.deviceClient.write8(Register.I2C_GPIO_WRITE.bVal, (enable) ? 0 : 0xf);
-        }
-    }
-
-    // Write the 'writePayload' data to the SPI device and read back the result for every
-    // effective byte written (since the SPI interface is bidirectional):
-    byte[] bridgeTransfer(byte[] writePayload) {
+    // This function takes an 8-bit address and returns an 8-bit value:
+    int readRegister(int addr) {
         // Write over the bus:
         //      I2C_ADDRESS
         //      SLAVE_SELECT_MASK
         //      <spiAddr>
-        //      <write-data>
+        //      <0xff> (placeholder)
         // Then read from the bus:
         //      I2C_ADDRESS
         //      <zero> (corresponds to the spiAddr write)
         //      <read-data>
 
-        // Create an array that prepends the chip-select:
-        byte[] writes = new byte[writePayload.length + 1];
-        writes[0] = SLAVE_SELECT_MASK;
-        for (int i = 0; i < writePayload.length; i++)
-            writes[i + 1] = writePayload[i];
-
-        // Write the data:
-        chipSelect(true);
-        this.deviceClient.write(writes, I2cWaitControl.WRITTEN);
-        chipSelect(false);
-
-        // Read back the new payload from the bridge chip:
-        return this.deviceClient.read(writePayload.length);
-    }
-
-    // This function takes an 8-bit address and returns an 8-bit value:
-    int readRegister(int addr) {
-        byte[] reads = bridgeTransfer(new byte[] { (byte) addr, (byte) 0xff });
+        // Use 0xff as the data placeholder on the write operation:
+        this.deviceClient.write(new byte[] { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff });
+        byte[] reads = this.deviceClient.read(2); // address placeholder, datum
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
 
@@ -181,7 +145,40 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
     // address.
     void writeRegister(int addr, int datum) {
         // Set the MSB to indicate a write operation:
-        bridgeTransfer(new byte[] { (byte) (addr | 0x80), (byte) datum });
+        this.deviceClient.write(new byte[] { SLAVE_SELECT_MASK, (byte) (addr | 0x80), (byte) datum });
+    }
+
+    // Bulk write of SPI register pairs of (address, datum):
+    void badBulkWrite(int[] data) {
+        ArrayList<Byte> payload = new ArrayList<>();
+        for (int dataIndex = 0; ; dataIndex += 2) {
+            if ((dataIndex < data.length) && (data[dataIndex] != WAIT)) {
+                // Add this pair to the payload, remembering to add a header before the first:
+                if (payload.size() == 0) {
+                    payload.add((byte) SLAVE_SELECT_MASK);
+                }
+                payload.add((byte) (data[dataIndex + 0] | 0x80)); // MSB indicates an SPI write
+                payload.add((byte) (data[dataIndex + 1]));
+            } else {
+                // Write all accumulated payload in one blast:
+                if (payload.size() != 0) {
+                    byte[] writeArray = new byte[payload.size()];
+                    for (int i = 0; i < payload.size(); i++)
+                        writeArray[i] = payload.get(i);
+                    this.deviceClient.write(writeArray);
+                }
+                if (dataIndex == data.length)
+                    return; // ====>
+                if (data[dataIndex] == WAIT) {
+                    try {
+                        sleep(data[dataIndex + 1]);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                payload.clear();
+            }
+        }
     }
 
     // Register write pairs of (address, datum):
@@ -197,14 +194,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
                 writeRegister(data[i], data[i + 1]);
             }
         }
-    }
-
-    // Aliases:
-    void write(int addr, int datum) {
-        writeRegister(addr, datum);
-    }
-    int read(int addr) {
-        return readRegister(addr);
     }
 
     //----------------------------------------------------------------------------------------------
@@ -234,10 +223,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             0x7f, 0x0e,
             0x43, 0x10
         });
-        if ((read(0x67) & 0b10000000) != 0) {
-            write(0x48, 0x04);
+        if ((readRegister(0x67) & 0b10000000) != 0) {
+            writeRegister(0x48, 0x04);
         } else {
-            write(0x48, 0x02);
+            writeRegister(0x48, 0x02);
         }
         bulkWrite(new int[]{
             0x7f, 0x00,
@@ -246,9 +235,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             0x55, 0x00,
             0x7f, 0x0e
         });
-        if (read(0x73) == 0x00) {
-            int c1 = read(0x70);
-            int c2 = read(0x71);
+        if (readRegister(0x73) == 0x00) {
+            int c1 = readRegister(0x70);
+            int c2 = readRegister(0x71);
             if (c1 <= 28) {
                 c1 += 14;
             }
@@ -263,8 +252,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
                 0x51, 0x70,
                 0x7f, 0x0e
             });
-            write(0x70, c1);
-            write(0x71, c2);
+            writeRegister(0x70, c1);
+            writeRegister(0x71, c2);
         }
         bulkWrite(new int[]{
             0x7f, 0x00,
@@ -463,7 +452,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             // Magic minimum quality constant:
             final int MOV_MIN_QUALITY = 0x10;
 
-            // Use burst mode which is composed of 13 bytes:
+            // Use burst mode which has a result composed of 13 bytes:
             //      0 - unused
             //      1 - dr (unsigned char)
             //      2 - obs (unsigned char)
@@ -475,12 +464,19 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             //      10 - raw_min (unsigned char)
             //      11 - shutter_upper (unsigned char)
             //      12 - shutter_lower (unsigned char)
-            byte[] command = new byte[13]; // Zero initialized by default
-            command[0] = (byte) Register.SPI_MOTION_BURST.bVal;
-            for (int i = 1; i < command.length; i++)
-                command[i] = (byte) 0xff; // Filler
-            byte[] result = bridgeTransfer(command);
 
+            byte[] command = new byte[14]; // Zero initialized by default
+            command[0] = SLAVE_SELECT_MASK;
+            command[1] = (byte) Register.SPI_MOTION_BURST.bVal;
+            for (int i = 2; i < command.length; i++)
+                command[i] = (byte) 0xff; // Filler
+
+            this.deviceClient.write(command);
+
+            // -1 because no slave-select mask on read:
+            byte[] result = this.deviceClient.read(command.length - 1);
+
+            // Parse the data:
             int dr = TypeConversion.unsignedByteToInt(result[1]);
             int quality = TypeConversion.unsignedByteToInt(result[7]);
 

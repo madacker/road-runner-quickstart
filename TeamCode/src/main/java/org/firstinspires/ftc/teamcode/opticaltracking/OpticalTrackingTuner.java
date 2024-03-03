@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Point;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 import java.util.ArrayList;
@@ -26,6 +27,8 @@ public class OpticalTrackingTuner extends LinearOpMode {
     boolean aPressed = false;
     boolean bPressed = false;
     double tickDistance = 0; // @@@ Bug?
+
+    TimeSplitter readTime = TimeSplitter.create("getMotion");
 
     boolean buttonA() {
         boolean result = (aPressed) && (!gamepad1.a);
@@ -215,7 +218,11 @@ public class OpticalTrackingTuner extends LinearOpMode {
                 lastYaw = yaw;
 
                 rotationTotal += Globals.normalizeAngle(deltaYaw);
+
+                readTime.startSplit();
                 OpticalTrackingPaa5100.Motion motion = optical.getMotion();
+                readTime.endSplit();
+
                 tickDistance += Math.hypot(motion.x, motion.y);
 
 System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotationTotal, tickDistance));
@@ -282,8 +289,12 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
     @Override
     public void runOpMode() {
         Globals.initialize(telemetry);
-        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        TimeSplitter opticalInitialize = TimeSplitter.create("Optical Initialization");
+
+        opticalInitialize.startSplit();
+        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
+        opticalInitialize.endSplit();
 
         waitForStart();
 
@@ -300,5 +311,7 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
         telemetry.update();
         while (opModeIsActive())
             ;
+
+        TimeSplitter.reportAllResults();
     }
 }
