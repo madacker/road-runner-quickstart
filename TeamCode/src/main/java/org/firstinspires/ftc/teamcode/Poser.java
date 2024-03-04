@@ -978,9 +978,22 @@ class AprilTagLocalizer {
  * Localizer for the Optical Tracking sensor.
  */
 class OpticalLocalizer {
-    final double INCHES_PER_TICK = 0.001035;
-    final double SENSOR_ANGLE_RADIANS = Math.toRadians(90.78);
-    final Point SENSOR_OFFSET = new Point(-4.47, 2.6);
+    OpticalDescriptor[] OPTICAL_DESCRIPTORS = {
+        new OpticalDescriptor("optical1", 0.003569, Math.toRadians(90.42), new Point(-3.34, -0.59)),
+        new OpticalDescriptor("optical2", 0.001035, Math.toRadians(90.78), new Point(-4.47, 2.6)),
+    };
+
+    // Structure for describing cameras on the robot:
+    static class OpticalDescriptor {
+        String name; // Device name in the robot's configuration
+        double inchesPerTick;
+        double headingAdjustment;
+        Point offset;
+
+        public OpticalDescriptor(String name, double inchesPerTick, double headingAdjustment, Point offset) {
+            this.name = name; this.inchesPerTick = inchesPerTick; this.headingAdjustment = headingAdjustment; this.offset = offset;
+        }
+    }
 
     OpticalTrackingPaa5100 device;
     IMU imu;
@@ -990,10 +1003,12 @@ class OpticalLocalizer {
     OpticalLocalizer(HardwareMap hardwareMap, IMU imu) {
         this.imu = imu;
 
-        device = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
+        OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
+
+        device = hardwareMap.get(OpticalTrackingPaa5100.class, descriptor.name);
         device.getMotion(); // Zero the movement
         previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        sensorPose = new Pose2d(-SENSOR_OFFSET.x, -SENSOR_OFFSET.y, 0);
+        sensorPose = new Pose2d(-descriptor.offset.x, -descriptor.offset.y, 0);
     }
 
     // Convert the robot-relative change-in-pose to field-relative change-in-position.
@@ -1021,16 +1036,18 @@ class OpticalLocalizer {
         double deltaTheta = Globals.normalizeAngle(currentYaw - previousYaw);
         previousYaw = currentYaw;
 
+        OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
+
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Point motionVector
-                = new Point(motion.x, motion.y).scale(INCHES_PER_TICK).rotate(SENSOR_ANGLE_RADIANS);
+                = new Point(motion.x, motion.y).scale(descriptor.inchesPerTick).rotate(descriptor.headingAdjustment);
         Point deltaPosition = deltaFieldPosition(theta, motionVector.x, motionVector.y, deltaTheta);
 
         // Update the pose for the sensor and the robot center, respectively:
         double xPrime = sensorPose.position.x + deltaPosition.x;
         double yPrime = sensorPose.position.y + deltaPosition.y;
         double thetaPrime = theta + deltaTheta;
-        Point centerOffset = SENSOR_OFFSET.negate().rotate(thetaPrime);
+        Point centerOffset = descriptor.offset.negate().rotate(thetaPrime);
 
         sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
         return new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);

@@ -293,7 +293,7 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
         TimeSplitter opticalInitialize = TimeSplitter.create("Optical Initialization");
 
         opticalInitialize.startSplit();
-        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
+        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical1");
         opticalInitialize.endSplit();
 
         waitForStart();
