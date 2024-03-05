@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Management and UI for settings.
@@ -19,6 +20,8 @@ public class Settings {
     Gamepad gamepad; // Gamepad to use for settings control
     boolean menuEnabled = false; // True if the setting menu is currently up
     ArrayList<MenuOption> menuStack = new ArrayList<>(); // Stack of menus, the last is the current
+    Supplier<String> statsCallback; // If non-null, we're showing stats and this is the callback
+        // to obtain them; if null, we're just showing the menu
 
     abstract private static class Option {
         String description;
@@ -74,6 +77,13 @@ public class Settings {
             return "❗ " + callback.apply(false); // ⚡
         }
     }
+    private static class StatsOption extends Option {
+        Supplier<String> callback;
+        public StatsOption(String descriptor, Supplier<String> callback) {
+            super(descriptor); this.callback = callback;
+        }
+        public String string() { return "\uD83D\uDCCA " + description + "..."; }
+    }
 
     // Button press state:
     private boolean[] buttonPressed = new boolean[7];
@@ -103,23 +113,29 @@ public class Settings {
         menuStack.add(new MenuOption("Settings"));
     }
 
-    // Animate the cursor:
-    private String cursor() {
-        // Spinner taken from https://stackoverflow.com/questions/2685435/cooler-ascii-spinners:
-        final String spinner = "◇◈◆◈";
-        final double CYCLE_TIME = 1.5; // Seconds
-
-        double fraction = (Globals.time() % CYCLE_TIME) / CYCLE_TIME;
-        int index = (int) (fraction * spinner.length());
-        return " " + spinner.charAt(index);
-    }
-
     // Update loop for Settings. If true is returned, the caller should not use gamepad input
     // because the Settings UI is active:
     Gamepad update() {
         menuEnabled = (menuEnabled && !start()) || (!menuEnabled && start());
-        if (!menuEnabled)
+        if (!menuEnabled) {
+            telemetry.addLine(Stats.getHeader());
             return gamepad; // ====>
+        }
+
+        // TODO: Make this more orthogonal
+        // Show the stats if that's our current mode:
+        if (statsCallback != null) {
+            if (cancel()) {
+                statsCallback = null; // Return to the menu
+            } else {
+                StringBuilder output = new StringBuilder();
+                output.append(statsCallback.get());
+                output.append("\n\nPress <b>B</b> to exit.");
+                output.append("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+                telemetry.addLine(output.toString());
+                return null; // We own the gamepad
+            }
+        }
 
         // The current menu is always at the bottom:
         MenuOption menu = menuStack.get(menuStack.size() - 1);
@@ -136,7 +152,10 @@ public class Settings {
 
         StringBuilder output = new StringBuilder();
 
-        // Output a header with the submenu names:
+        // Draw the mandatory header:
+        output.append(Stats.getHeader());
+
+        // Add a header with submenu names:
         output.append("<h2>");
         for (int i = 0; i < menuStack.size(); i++) {
             if (i > 0)
@@ -147,14 +166,12 @@ public class Settings {
 
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
-            if (i == menu.current) {
-                String option = menu.options.get(i).string();
-                output.append(option.substring(0, 2) + "<font color='#bfdbfe'>" + cursor() + "</font><b>" + option.substring(2) + "</b>\n");
-            }
+            if (i == menu.current)
+                output.append("<span style='background: #78184a'>" + menu.options.get(i).string() + "</span>\n"); // 575757 4682b4
             else
                 output.append(menu.options.get(i).string() + "\n");
         }
-        output.append(Stats.get());
+        output.append("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         telemetry.addLine(output.toString());
 
         Option option = menu.options.get(menu.current);
@@ -191,6 +208,11 @@ public class Settings {
             if (select()) {
                 ActivationOption activationOption = (ActivationOption) option;
                 activationOption.callback.apply(true);
+            }
+        } else if (option instanceof StatsOption) {
+            if (select()) {
+                StatsOption statsOption = (StatsOption) option;
+                statsCallback = statsOption.callback;
             }
         } else if (option instanceof MenuOption) {
             if (select()) {
@@ -246,5 +268,9 @@ public class Settings {
     public static void registerActivationOption(String descriptor, Function<Boolean, String> callback) {
         callback.apply(true);
         settings.register(descriptor, new ActivationOption(descriptor, callback));
+    }
+
+    public static void registerStats(String descriptor, Supplier<String> callback) {
+        settings.register(descriptor, new StatsOption(descriptor, callback));
     }
 }

@@ -27,6 +27,7 @@ import androidx.annotation.Nullable;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -503,7 +504,10 @@ class DistanceLocalizer {
         currentWall = wallTrackers[selection].wall;
 
         // Query the hardware and return the result:
+        Poser.getDistanceTime.startSplit();
         double measurement = currentSensor.hardware.getDistance(DistanceUnit.INCH);
+        Poser.getDistanceTime.endSplit();
+
         return new Result(currentSensor, currentWall, LATENCY, measurement);
     }
 
@@ -876,7 +880,10 @@ class AprilTagLocalizer {
         if (camera == null)
             return null; // ====>
 
+        Poser.getCamera.startSplit();
         List<AprilTagDetection> tagDetections = camera.aprilTagProcessor.getFreshDetections();
+        Poser.getCamera.endSplit();
+
         if (tagDetections == null)
             return null; // ====>
 
@@ -1030,15 +1037,21 @@ class OpticalLocalizer {
     }
 
     Pose2d update() {
-        // Calculate the field-relative angle and its delta:
-        double theta = sensorPose.heading.log();
+        // Do our I/O:
+        Poser.getMotion.startSplit();
+        OpticalTrackingPaa5100.Motion motion = device.getMotion();
+        Poser.getMotion.endSplit();
+
+        Poser.getImuTime.startSplit();
         double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        Poser.getImuTime.endSplit();
+
+        // Calculate the angles:
         double deltaTheta = Globals.normalizeAngle(currentYaw - previousYaw);
         previousYaw = currentYaw;
+        double theta = sensorPose.heading.log();
 
         OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
-
-        OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Point motionVector
                 = new Point(motion.x, motion.y).scale(descriptor.inchesPerTick).rotate(descriptor.headingAdjustment);
         Point deltaPosition = deltaFieldPosition(theta, motionVector.x, motionVector.y, deltaTheta);
@@ -1078,6 +1091,12 @@ public class Poser {
     private OpticalLocalizer opticalLocalizer;
     private AprilTagFilter aprilTagFilter;
 
+    // Performance trackers:
+    public static TimeSplitter getImuTime = TimeSplitter.create("getImu (localizer)");
+    public static TimeSplitter getDistanceTime = TimeSplitter.create("getDistanceSensor");
+    public static TimeSplitter getCamera = TimeSplitter.create("getCamera");
+    public static TimeSplitter getMotion = TimeSplitter.create("getMotion");
+
     // Record structure for the history:
     static class HistoryRecord {
         double time; // Time, in seconds, of the record
@@ -1104,6 +1123,12 @@ public class Poser {
         opticalLocalizer = new OpticalLocalizer(hardwareMap, imu);
 
         aprilTagFilter = new AprilTagFilter(initialPose != null);
+
+        // Register our I/O performance:
+        Stats.ioTimes.add(getImuTime);
+        Stats.ioTimes.add(getDistanceTime);
+        Stats.ioTimes.add(getCamera);
+        Stats.ioTimes.add(getMotion);
 
         // Add a menu option to reset the IMU yaw:
         Settings.registerActivationOption("", reset -> {

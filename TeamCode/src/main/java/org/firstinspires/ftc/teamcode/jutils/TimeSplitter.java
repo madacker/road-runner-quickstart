@@ -61,8 +61,8 @@ public class TimeSplitter {
     double maxOutlier = -1;
     long runtimeStartNanos = nanoTime();
     long startClockNanos = 0;
-    RunningStats clockStats = new RunningStats();
-    RunningStats threadStats = new RunningStats();
+    RunningStats clockStats = new RunningStats(); // ms
+    RunningStats threadStats = new RunningStats(); // ms
     static ArrayList<TimeSplitter> list = new ArrayList<TimeSplitter>();
     /**
      * Constructor.
@@ -118,7 +118,7 @@ public class TimeSplitter {
     }
     // Get the results as a string:
     @SuppressLint("DefaultLocale")
-    public String getResult() {
+    public String getSummary() {
         if (minOutlier <= maxOutlier) {
             double durationNanos = nanoTime() - runtimeStartNanos;
             double minPercent = (minOutlierNanos / durationNanos) * 100.0;
@@ -129,11 +129,17 @@ public class TimeSplitter {
             return String.format("- Not used");
         }
     }
+    public String getDescription() {
+        return description;
+    }
+    public double getMs() {
+        return clockStats.mean();
+    }
     // Log the results:
     private void logResult(TelemetryPacket packet) {
         if (log) {
-            Log.d("TimeSplitter", this.description + " " + getResult());
-            packet.put(this.description, getResult());
+            Log.d("TimeSplitter", this.description + " " + getSummary());
+            packet.put(this.description, getSummary());
         }
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////

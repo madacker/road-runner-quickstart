@@ -51,7 +51,7 @@ public class OpticalTrackingTest extends LinearOpMode {
             // Output the results:
             Globals.telemetry.addLine(String.format("Motion: %d, %d", motion.x, motion.y));
             Globals.telemetry.addLine(String.format("Accumulated: %.1f, %.1f", opticalPose.position.x, opticalPose.position.y));
-            Globals.telemetry.addLine("Time: " + opticalTimer.getResult());
+            Globals.telemetry.addLine("Time: " + opticalTimer.getSummary());
 
             // Draw the Mecanum robot pose:
             drive.updatePoseEstimate();

@@ -328,6 +328,7 @@ public class Driver extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         Globals.initialize(telemetry);
         Settings settings = new Settings(telemetry, gamepad1);
+        Stats stats = new Stats();
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         Poser poser = new Poser(hardwareMap, drive, null);
         Led led = new Led(hardwareMap);
