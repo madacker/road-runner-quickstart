@@ -19,9 +19,7 @@ public class Settings {
     Telemetry telemetry; // Telemetry object used for output
     Gamepad gamepad; // Gamepad to use for settings control
     boolean menuEnabled = false; // True if the setting menu is currently up
-    ArrayList<MenuOption> menuStack = new ArrayList<>(); // Stack of menus, the last is the current
-    Supplier<String> statsCallback; // If non-null, we're showing stats and this is the callback
-        // to obtain them; if null, we're just showing the menu
+    ArrayList<Option> menuStack = new ArrayList<>(); // Stack of menus, the last is the current
 
     abstract private static class Option {
         String description;
@@ -37,7 +35,7 @@ public class Settings {
     }
     private static class MenuOption extends Option {
         ArrayList<Option> options = new ArrayList<>(); // List of options in this menu
-        int current; // Index of Option in options that has the UI focus
+        int current; // Index in options that has the UI focus
         public MenuOption(String descriptor) {
             super(descriptor);
         }
@@ -122,23 +120,35 @@ public class Settings {
             return gamepad; // ====>
         }
 
-        // TODO: Make this more orthogonal
+        Option currentOption = menuStack.get(menuStack.size() - 1);
+        StringBuilder output = new StringBuilder();
+
+        // Draw the mandatory header if we're not on a stats option:
+        if (!(currentOption instanceof StatsOption))
+            output.append(Stats.getHeader());
+
+        // Add a header with submenu names:
+        output.append("<h2>");
+        for (int i = 0; i < menuStack.size(); i++) {
+            if (i > 0)
+                output.append("·");
+            output.append(menuStack.get(i).description);
+        }
+        output.append("</h2>");
+
         // Show the stats if that's our current mode:
-        if (statsCallback != null) {
+        if (currentOption instanceof StatsOption) {
             if (cancel()) {
-                statsCallback = null; // Return to the menu
+                menuStack.remove(menuStack.size() - 1);
             } else {
-                StringBuilder output = new StringBuilder();
-                output.append(statsCallback.get());
-                output.append("\n\nPress <b>B</b> to exit.");
+                output.append(((StatsOption) currentOption).callback.get());
                 output.append("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
                 telemetry.addLine(output.toString());
                 return null; // We own the gamepad
             }
         }
 
-        // The current menu is always at the bottom:
-        MenuOption menu = menuStack.get(menuStack.size() - 1);
+        MenuOption menu = (MenuOption) menuStack.get(menuStack.size() - 1);
         if (up()) {
             menu.current--;
             if (menu.current < 0)
@@ -150,24 +160,10 @@ public class Settings {
                 menu.current = menu.options.size() - 1;
         }
 
-        StringBuilder output = new StringBuilder();
-
-        // Draw the mandatory header:
-        output.append(Stats.getHeader());
-
-        // Add a header with submenu names:
-        output.append("<h2>");
-        for (int i = 0; i < menuStack.size(); i++) {
-            if (i > 0)
-                output.append("·");
-            output.append(menuStack.get(i).description);
-        }
-        output.append("</h2>");
-
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
             if (i == menu.current)
-                output.append("<span style='background: #78184a'>" + menu.options.get(i).string() + "</span>\n"); // 575757 4682b4
+                output.append("<span style='background: #78184a'>" + menu.options.get(i).string() + "</span>\n");
             else
                 output.append(menu.options.get(i).string() + "\n");
         }
@@ -211,12 +207,11 @@ public class Settings {
             }
         } else if (option instanceof StatsOption) {
             if (select()) {
-                StatsOption statsOption = (StatsOption) option;
-                statsCallback = statsOption.callback;
+                menuStack.add(option);
             }
         } else if (option instanceof MenuOption) {
             if (select()) {
-                menuStack.add((MenuOption) option);
+                menuStack.add(option);
             }
         }
         return null; // We own the Gamepad, the caller can't have it
@@ -224,7 +219,7 @@ public class Settings {
 
     // Add a new option to the appropriate spot in the menu hierarchy:
     private void register(String descriptor, Option newOption) {
-        MenuOption menu = menuStack.get(0); // Root menu
+        MenuOption menu = (MenuOption) menuStack.get(0); // Root menu
 
         // Peel off the hierarchy which is in the form "Vision::Configuration::Setting":
         while (true) {

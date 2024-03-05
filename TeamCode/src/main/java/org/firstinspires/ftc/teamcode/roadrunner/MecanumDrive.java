@@ -44,7 +44,6 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Stats;
-import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
@@ -57,8 +56,8 @@ public final class MecanumDrive {
 
     public static class Params {
         Params() {
-            // path profile parameters (in inches)
-            maxWheelVel = 50 / 2; // @@@
+            // path profile parameters (in inches and seconds)
+            maxWheelVel = 50 / 2;
             minProfileAccel = -30;
             maxProfileAccel = 50;
 
@@ -127,11 +126,6 @@ public final class MecanumDrive {
         public double headingVelGain;
     }
 
-    public TimeSplitter getVoltageTime = TimeSplitter.create("getVoltage");
-    public TimeSplitter setPowerTime = TimeSplitter.create("setPower");
-    public TimeSplitter getEncodersTime = TimeSplitter.create("getEncoders");
-    public TimeSplitter getImuTime = TimeSplitter.create("getImu");
-
     public static String getBotName() {
         InspectionState inspection=new InspectionState();
         inspection.initializeLocal();
@@ -188,17 +182,18 @@ public final class MecanumDrive {
 
         @Override
         public Twist2dDual<Time> update() {
-            getEncodersTime.startSplit();
+            Stats.startTimer("io::getEncoders");
             PositionVelocityPair leftFrontPosVel = leftFront.getPositionAndVelocity();
             PositionVelocityPair leftBackPosVel = leftBack.getPositionAndVelocity();
             PositionVelocityPair rightBackPosVel = rightBack.getPositionAndVelocity();
             PositionVelocityPair rightFrontPosVel = rightFront.getPositionAndVelocity();
-            getEncodersTime.endSplit();
+            Stats.endTimer("io::getEncoders");
 
-            getImuTime.startSplit();
+            Stats.startTimer("io::getImu");
             Rotation2d heading = Rotation2d.exp(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS));
-            getImuTime.endSplit();
+            Stats.endTimer("io::getImu");
 
+            Stats.startTimer("io::encoder?");
             double headingDelta = heading.minus(lastHeading);
 
             Twist2dDual<Time> twist = kinematics.forward(new MecanumKinematics.WheelIncrements<>(
@@ -227,10 +222,13 @@ public final class MecanumDrive {
 
             lastHeading = heading;
 
-            return new Twist2dDual<>(
+            Twist2dDual<Time> result = new Twist2dDual<>(
                     twist.line,
                     DualNum.cons(headingDelta, twist.angle.drop(1))
             );
+
+            Stats.endTimer("io::encoder?");
+            return result;
         }
     }
 
@@ -289,12 +287,6 @@ public final class MecanumDrive {
         }
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
-
-        // Register our I/O times:
-        Stats.ioTimes.add(getVoltageTime);
-        Stats.ioTimes.add(setPowerTime);
-        Stats.ioTimes.add(getEncodersTime);
-        Stats.ioTimes.add(getImuTime);
     }
 
     public void setDrivePowers(PoseVelocity2d powers) {
@@ -384,9 +376,9 @@ public final class MecanumDrive {
 
         MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
 
-        getVoltageTime.startSplit();
+        Stats.startTimer("io::getVoltage");
         double voltage = voltageSensor.getVoltage();
-        getVoltageTime.endSplit();
+        Stats.endTimer("io::getVoltage");
 
         final MotorFeedforward feedforward = new MotorFeedforward(
                 PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick);
@@ -410,12 +402,12 @@ public final class MecanumDrive {
         double maxPower = max(max(max(max(1, leftFrontPower), leftBackPower), rightBackPower), rightFrontPower);
 
         // Set the power to the motors:
-        setPowerTime.startSplit();
+        Stats.startTimer("io::setPower");
         leftFront.setPower(leftFrontPower / maxPower);
         leftBack.setPower(leftBackPower / maxPower);
         rightBack.setPower(rightBackPower / maxPower);
         rightFront.setPower(rightFrontPower / maxPower);
-        setPowerTime.endSplit();
+        Stats.endTimer("io::setPower");
     }
 
     public final class FollowTrajectoryAction implements Action {

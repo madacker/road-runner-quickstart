@@ -355,8 +355,12 @@ public class Driver extends LinearOpMode {
         while (opModeIsActive()) {
             Globals.startLoop();
             Gamepad gamepad1 = settings.update();
-            Stats.update();
+            stats.update();
+
+            Stats.startTimer("* totalPose");
             poser.update();
+            Stats.endTimer("* totalPose");
+
             led.update();
 
             if (poser.isConfident())

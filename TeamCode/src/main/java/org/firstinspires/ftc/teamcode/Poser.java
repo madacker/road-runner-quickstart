@@ -504,9 +504,9 @@ class DistanceLocalizer {
         currentWall = wallTrackers[selection].wall;
 
         // Query the hardware and return the result:
-        Poser.getDistanceTime.startSplit();
+        Stats.startTimer("io::getDistance");
         double measurement = currentSensor.hardware.getDistance(DistanceUnit.INCH);
-        Poser.getDistanceTime.endSplit();
+        Stats.endTimer("io::getDistance");
 
         return new Result(currentSensor, currentWall, LATENCY, measurement);
     }
@@ -880,9 +880,9 @@ class AprilTagLocalizer {
         if (camera == null)
             return null; // ====>
 
-        Poser.getCamera.startSplit();
+        Stats.startTimer("io::getFreshDetections");
         List<AprilTagDetection> tagDetections = camera.aprilTagProcessor.getFreshDetections();
-        Poser.getCamera.endSplit();
+        Stats.endTimer("io::getFreshDetections");
 
         if (tagDetections == null)
             return null; // ====>
@@ -1038,13 +1038,13 @@ class OpticalLocalizer {
 
     Pose2d update() {
         // Do our I/O:
-        Poser.getMotion.startSplit();
+        Stats.startTimer("io::getMotion");
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
-        Poser.getMotion.endSplit();
+        Stats.endTimer("io::getMotion");
 
-        Poser.getImuTime.startSplit();
+        Stats.startTimer("io::getImu2");
         double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        Poser.getImuTime.endSplit();
+        Stats.endTimer("io::getImu2");
 
         // Calculate the angles:
         double deltaTheta = Globals.normalizeAngle(currentYaw - previousYaw);
@@ -1091,12 +1091,6 @@ public class Poser {
     private OpticalLocalizer opticalLocalizer;
     private AprilTagFilter aprilTagFilter;
 
-    // Performance trackers:
-    public static TimeSplitter getImuTime = TimeSplitter.create("getImu (localizer)");
-    public static TimeSplitter getDistanceTime = TimeSplitter.create("getDistanceSensor");
-    public static TimeSplitter getCamera = TimeSplitter.create("getCamera");
-    public static TimeSplitter getMotion = TimeSplitter.create("getMotion");
-
     // Record structure for the history:
     static class HistoryRecord {
         double time; // Time, in seconds, of the record
@@ -1112,6 +1106,7 @@ public class Poser {
     }
 
     // Constructor:
+    @SuppressLint("DefaultLocale")
     public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
         pose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
@@ -1123,12 +1118,6 @@ public class Poser {
         opticalLocalizer = new OpticalLocalizer(hardwareMap, imu);
 
         aprilTagFilter = new AprilTagFilter(initialPose != null);
-
-        // Register our I/O performance:
-        Stats.ioTimes.add(getImuTime);
-        Stats.ioTimes.add(getDistanceTime);
-        Stats.ioTimes.add(getCamera);
-        Stats.ioTimes.add(getMotion);
 
         // Add a menu option to reset the IMU yaw:
         Settings.registerActivationOption("", reset -> {
@@ -1349,7 +1338,11 @@ public class Poser {
     // Update the pose estimate:
     public void update() {
         double time = Globals.time();
+
+        Stats.startTimer("odom");
         Twist2dDual<Time> dualTwist = odometryLocalizer.update();
+        Stats.endTimer("odom");
+
         velocity = dualTwist.velocity().value();
 
         // Create a tracking record:
@@ -1365,10 +1358,12 @@ public class Poser {
         }
 
         // Process April Tags:
+        Stats.startTimer("aprilTag");
         AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, aprilTagFilter.isConfident());
         if (aprilTag != null) {
             reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
+        Stats.endTimer("aprilTag");
 
         // Process the distance sensor. Only act on it if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:

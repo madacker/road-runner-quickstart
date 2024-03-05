@@ -4,15 +4,17 @@ import android.annotation.SuppressLint;
 
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 
-import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
-
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 
 public class Stats {
-    private static double windowStartTime = Globals.time(); // Start time of loop time window
-    private static int windowCount = 0; // Count of loops in window
-    private static double loopTime = 0; // Average sensor loop time over a second, in seconds
+    private static HashMap<String, Timer> timers = new HashMap<>(); // All internal timers
+    private static ArrayList<Timer> ioTimers = new ArrayList<>(); // I/O timers
+    private static double timerStart = Globals.time(); // Start of the timing window
+
+    private final static String LOOP_TIMER = "Total loop time"; // Key
+    private final double WINDOW_DURATION = 5.0; // Sliding window duration, in seconds
 
     public static double cameraFps; // Camera frame-rate
     public static double pipelineLatency; // Pipeline latency for the camera, in seconds
@@ -31,61 +33,107 @@ public class Stats {
     public static double previousAngularSpeed = 0;
     public static double fullAxialSpeed = 0;
 
-    // Track all I/O performance:
-    public static ArrayList<TimeSplitter> ioTimes = new ArrayList<>();
+    // Class for tracking internal timing:
+    static class Timer {
+        String descriptor; // Full descriptor including any "::"
+        double result; // Average of the previous window in seconds
+        int count; // Count of timings in current window
+        double sum; // Sum of all timings in current window, in seconds
+        double startTime; // Time of the start of the timing bracket; 0 if not in a timing bracket
+
+        Timer(String descriptor) { this.descriptor = descriptor; }
+    }
 
     Stats() {
-        Settings.registerStats("Stats::Performance", Stats::getPerformance);
-        Settings.registerStats("Stats::I/O", Stats::getIo);
+        Settings.registerStats("I/O", Stats::getIoSummary);
+        Settings.registerStats("Performance", Stats::getPerformanceSummary);
+
+        startTimer(LOOP_TIMER);
     }
 
     // Call this update every loop iteration:
-    static public void update() {
-        // Use a 1-second sliding window to track our loop time:
-        windowCount++;
-        double intervalDuration = Globals.time() - windowStartTime;
-        if (intervalDuration > 1.0) {
-            loopTime = intervalDuration / windowCount;
-            windowStartTime = Globals.time();
-            windowCount = 0;
+    public void update() {
+        Stats.endTimer(LOOP_TIMER);
+        double windowDuration = Globals.time() - timerStart;
+
+        if (windowDuration > WINDOW_DURATION) {
+            for (Timer timer: Stats.timers.values()) {
+                timer.result = 0;
+                if (timer.count > 0) {
+                    timer.result = timer.sum / timer.count;
+                }
+                timer.sum = 0;
+                timer.count = 0;
+            }
+            timerStart = Globals.time();
         }
+        Stats.startTimer(LOOP_TIMER);
+    }
+
+    // Start a timer:
+    static public void startTimer(String descriptor) {
+        Timer timer = timers.get(descriptor);
+        if (timer == null) {
+            timer = new Timer(descriptor);
+            timers.put(descriptor, timer);
+            ioTimers.add(timer);
+        }
+        assert(timer.startTime == 0);
+        timer.startTime = Globals.time();
+    }
+
+    // End a timer:
+    static public void endTimer(String descriptor) {
+        Timer timer = timers.get(descriptor);
+        assert(timer != null);
+        assert(timer.startTime != 0);
+        timer.count++;
+        timer.sum += Globals.time() - timer.startTime;
+        timer.startTime = 0;
     }
 
     // Always show this header at the top of the screen:
     static public String getHeader() {
         return String.format("<h6>Loop: %.1fms, Camera FPS: %.1f, Latency: %.1f</h6>",
-                loopTime * 1000.0, cameraFps, pipelineLatency * 1000.0);
+                timers.get(LOOP_TIMER).result * 1000.0, cameraFps, pipelineLatency * 1000.0);
     }
 
     // Get a summary of the I/O times:
-    static public String getIo() {
+    static public String getIoSummary() {
         double sumMs = 0;
-        double loopMs = Stats.loopTime * 1000.0;
+        double loopMs = timers.get(LOOP_TIMER).result * 1000.0;
 
         // Sort in decreasing order:
-        ioTimes.sort(Comparator.comparingDouble(x -> loopMs - x.getMs()));
+        ioTimers.sort(Comparator.comparingDouble(x -> loopMs - x.result));
 
         StringBuilder builder = new StringBuilder();
-        builder.append("I/O breakdown:\n");
-        for (TimeSplitter time: ioTimes) {
-            double ms = time.getMs();
-            if (ms > 0) {
-                builder.append(String.format("&emsp;%.1f ms: %s\n", ms, time.getDescription()));
+        for (Timer timer: ioTimers) {
+            double ms = timer.result * 1000.0;
+            if ((ms > 0.01) && (timer.descriptor.startsWith("io::"))) {
+                builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
                 sumMs += ms;
             }
         }
-        builder.append(String.format("&emsp;%.1f ms: Unknown\n", loopMs - sumMs));
+        builder.append(String.format("&emsp;%.1f ms - Unknown\n", loopMs - sumMs));
         builder.append("------------------\n");
-        builder.append(String.format("&emsp;%.1f ms: Total loop time", loopMs));
+        builder.append(String.format("&emsp;%.1f ms - Total loop time\n", loopMs));
+
+        builder.append("\n");
+        for (Timer timer: ioTimers) {
+            double ms = timer.result * 1000.0;
+            if ((ms > 0.01) && (!timer.descriptor.startsWith("io::")) && !timer.descriptor.equals(LOOP_TIMER)) {
+                builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
+                sumMs += ms;
+            }
+        }
 
         return builder.toString();
     }
 
     // Summarize all of the statistics into a nice string:
     @SuppressLint("DefaultLocale")
-    static public String getPerformance() {
-        String result = "<h1>Stats</h1>";
-        result += poseStatus + "\n";
+    static public String getPerformanceSummary() {
+        String result = poseStatus + "\n";
 
         double degreesCorrection = Math.toDegrees(yawCorrection);
         while (degreesCorrection <= -45)
