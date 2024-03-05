@@ -12,6 +12,7 @@ public class Stats {
     private static HashMap<String, Timer> timers = new HashMap<>(); // All internal timers
     private static ArrayList<Timer> ioTimers = new ArrayList<>(); // I/O timers
     private static double timerStart = Globals.time(); // Start of the timing window
+    private static HashMap<String, String> data = new HashMap<String, String>(); // For 'addData()'
 
     private final static String LOOP_TIMER = "Total loop time"; // Key
     private final double WINDOW_DURATION = 5.0; // Sliding window duration, in seconds
@@ -47,6 +48,7 @@ public class Stats {
     Stats() {
         Settings.registerStats("I/O", Stats::getIoSummary);
         Settings.registerStats("Performance", Stats::getPerformanceSummary);
+        Settings.registerStats("Telemetry", Stats::getTelemetry);
 
         startTimer(LOOP_TIMER);
     }
@@ -126,12 +128,10 @@ public class Stats {
                 sumMs += ms;
             }
         }
-
         return builder.toString();
     }
 
     // Summarize all of the statistics into a nice string:
-    @SuppressLint("DefaultLocale")
     static public String getPerformanceSummary() {
         String result = poseStatus + "\n";
 
@@ -148,6 +148,15 @@ public class Stats {
                 maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration);
 
         return result;
+    }
+
+    // Get telemetry:
+    static public String getTelemetry() {
+        StringBuilder builder = new StringBuilder();
+        for (String key: data.keySet()) {
+            builder.append(key + ": " + data.get(key));
+        }
+        return builder.toString();
     }
 
     // Log interesting velocity data:
@@ -173,5 +182,11 @@ public class Stats {
         }
         previousAngularSpeed = angularSpeed;
         maxAngularSpeed = Math.max(angularSpeed, maxAngularSpeed);
+    }
+
+    // Add stats data for our own telemetry and for graphing in FTC Dashboard:
+    static public void addData(String caption, Object datum) {
+        Globals.packet.put(caption, datum);
+        data.put(caption, datum.toString());
     }
 }

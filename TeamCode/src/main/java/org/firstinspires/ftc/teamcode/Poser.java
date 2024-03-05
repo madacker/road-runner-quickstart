@@ -27,7 +27,6 @@ import androidx.annotation.Nullable;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -1002,10 +1001,12 @@ class OpticalLocalizer {
         }
     }
 
-    OpticalTrackingPaa5100 device;
-    IMU imu;
-    double previousYaw;
-    Pose2d sensorPose;
+    OpticalTrackingPaa5100 device; // SDK device object
+    IMU imu; // IMU reference
+    double previousYaw; // Yaw from the previous call to update()
+    Pose2d sensorPose; // Pose for the sensor where it's on the robot (not pose for the robot center)
+    Pose2d inferiorSensorPose; // Inferior pose as determined by the sensor
+    boolean visualizeInferiorPose; // Setting for whether to show the inferior pose or not
 
     OpticalLocalizer(HardwareMap hardwareMap, IMU imu) {
         this.imu = imu;
@@ -1016,6 +1017,9 @@ class OpticalLocalizer {
         device.getMotion(); // Zero the movement
         previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
         sensorPose = new Pose2d(-descriptor.offset.x, -descriptor.offset.y, 0);
+        inferiorSensorPose = new Pose2d(-descriptor.offset.x, -descriptor.offset.y, 0);
+
+        Settings.registerToggleOption("Toggle optical inferior pose", true, enable -> visualizeInferiorPose = enable );
     }
 
     // Convert the robot-relative change-in-pose to field-relative change-in-position.
@@ -1036,7 +1040,11 @@ class OpticalLocalizer {
         return new Point(deltaXPrime, deltaYPrime);
     }
 
-    Pose2d update() {
+    static Point inferiorDeltaFieldPosition(double theta, double deltaX, double deltaY, double deltaTheta) {
+        return new Point(deltaX, deltaY).rotate(theta + deltaTheta);
+    }
+
+    void update() {
         // Do our I/O:
         Stats.startTimer("io::getMotion");
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
@@ -1045,6 +1053,9 @@ class OpticalLocalizer {
         Stats.startTimer("io::getImu2");
         double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
         Stats.endTimer("io::getImu2");
+
+        // Query the quality:
+        Stats.addData("Optical tracker quality", device.getQuality());
 
         // Calculate the angles:
         double deltaTheta = Globals.normalizeAngle(currentYaw - previousYaw);
@@ -1063,7 +1074,25 @@ class OpticalLocalizer {
         Point centerOffset = descriptor.offset.negate().rotate(thetaPrime);
 
         sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
-        return new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+        Pose2d robotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+
+        // #########################################################################################
+        theta = inferiorSensorPose.heading.log();
+        deltaPosition = inferiorDeltaFieldPosition(theta, motionVector.x, motionVector.y, deltaTheta);
+        xPrime = inferiorSensorPose.position.x + deltaPosition.x;
+        yPrime = inferiorSensorPose.position.y + deltaPosition.y;
+        thetaPrime = theta + deltaTheta;
+        inferiorSensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
+        Pose2d inferiorRobotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+
+        // Draw the poses:
+        if (visualizeInferiorPose) {
+            Globals.canvas.setStroke("#ff0000"); // Red
+            MecanumDrive.drawRobot(Globals.canvas, inferiorRobotPose);
+        }
+
+        Globals.canvas.setStroke("#E9967A"); // Olive
+        MecanumDrive.drawRobot(Globals.canvas, robotPose);
     }
 }
 
@@ -1225,7 +1254,7 @@ public class Poser {
     }
 
     // Draw the history visualizations for FTC Dashboard:
-    private void visualize(Pose2d opticalPose) {
+    private void visualize() {
         Canvas c = Globals.canvas;
         HistoryRecord lastDistance = null;
 
@@ -1320,10 +1349,6 @@ public class Poser {
             c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
-        // Draw the optical pose:
-        c.setStroke("#E9967A"); // Olive
-        MecanumDrive.drawRobot(Globals.canvas, opticalPose);
-
         // Finally, draw our current pose, drawing a rectangle instead of using drawRobot():
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
@@ -1339,10 +1364,7 @@ public class Poser {
     public void update() {
         double time = Globals.time();
 
-        Stats.startTimer("odom");
         Twist2dDual<Time> dualTwist = odometryLocalizer.update();
-        Stats.endTimer("odom");
-
         velocity = dualTwist.velocity().value();
 
         // Create a tracking record:
@@ -1373,7 +1395,7 @@ public class Poser {
         }
 
         // Update the optical localizer:
-        Pose2d opticalPose = opticalLocalizer.update();
+        opticalLocalizer.update();
 
         // @@@ Think about clamping rate change
 
@@ -1394,7 +1416,7 @@ public class Poser {
 //        }
 
         // Output telemetry and visualizations:
-        visualize(opticalPose);
+        visualize();
         aprilTagFilter.telemetry();
 
         Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;

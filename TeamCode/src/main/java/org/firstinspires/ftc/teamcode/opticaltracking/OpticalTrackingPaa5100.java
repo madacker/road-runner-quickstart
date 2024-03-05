@@ -42,6 +42,9 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         }
     }
 
+    // Quality of the signal from the most recent getMotion() call:
+    private int lastQuality = 0;
+
     // Special opcode for bulkWrite() encodings:
     private final int WAIT = -1;
 
@@ -82,10 +85,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         SPI_RAWDATA_GRAB(0x58),
         SPI_RAWDATA_GRAB_STATUS(0x59);
 
-        public int bVal;
+        public final int bVal;
         Register(int bVal) { this.bVal = bVal; }
     }
 
+    // Driver registration. Hardware initialization comes later, when doInitialize() is called.
     public OpticalTrackingPaa5100(I2cDeviceSynch deviceClient, boolean deviceClientIsOwned) {
         super(deviceClient, deviceClientIsOwned);
 
@@ -207,9 +211,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             throw new RuntimeException(e);
         }
         for (int i = 0; i < 5; i++) {
-            // Here we're seeing:
-            //     Write 50, 0f, 02, 00
-            //     Read 51, 00, 00, 00 // @@@ Why that length?
             readRegister(Register.SPI_DATA_READY.bVal + i);
         }
 
@@ -375,7 +376,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         });
     }
 
-    // Initialize the driver:
+    // Initialize the hardware:
     @Override
     protected boolean doInitialize() {
         // Configure the SPI interface of the bridge:
@@ -395,10 +396,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // Enable the LEDs:
         setLedState(true);
 
-//        // Do a quick check to see if chip startup succeeded:
-//        if (!startupCheck())
-//            return false;
-
         return true;
     }
 
@@ -409,29 +406,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
 
     @Override
     public String getDeviceName() { return "Optical Tracking Sensor PAA5100/SC18IS602B"; }
-
-    // Return true if the startup check succeeds, false otherwise:
-    boolean startupCheck()
-    {
-        int startupFail = 0;
-        writeRegister(0x7F, 0x00);
-        writeRegister(0x55, 0x01);
-        writeRegister(0x50, 0x07);
-        writeRegister(0x7F, 0x0E);
-        writeRegister(0x43, 0x10);
-
-        if(readRegister(0x47) != 0x08) {
-            // Checks register 0x47 three times. If the value is incorrect 3 times, throw a fail
-            // condition.
-            for(int i=0; i<3; i++) {
-                if(readRegister(0x47) != 0x08) {
-                    writeRegister(0x43, 0x10);
-                    startupFail++;
-                }
-            }
-        }
-        return startupFail < 3;
-    }
 
     // Public API for returning the accumulated motion since the last call:
     public Motion getMotion() {
@@ -467,18 +441,24 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         int dr = TypeConversion.unsignedByteToInt(result[1]);
         int quality = TypeConversion.unsignedByteToInt(result[7]);
 
+        // Remember the quality for later:
+        lastQuality = quality;
+
         // Note that we switch X and Y to preserve a clockwise coordinate system:
         int deltaY = (TypeConversion.unsignedByteToInt(result[3]))
                    | (result[4] << 8); // Signed conversion
         int deltaX = (TypeConversion.unsignedByteToInt(result[5]))
                    | (result[6] << 8); // Signed conversion
 
-// RobotLog.dd(MYTAG, String.format("dr: 0x%02x, quality: 0x%02x", dr, quality));
-
         if (((dr & 0b10000000) != 0) && (quality >= MOV_MIN_QUALITY)) {
             return new Motion(deltaX, deltaY);
         } else {
             return new Motion(0, 0);
         }
+    }
+
+    // Return the raw quality value:
+    public int getQuality() {
+        return lastQuality;
     }
 }
