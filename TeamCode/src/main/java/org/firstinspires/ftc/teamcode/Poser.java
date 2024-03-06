@@ -985,7 +985,7 @@ class AprilTagLocalizer {
  */
 class OpticalLocalizer {
     OpticalDescriptor[] OPTICAL_DESCRIPTORS = {
-        new OpticalDescriptor("optical1", 0.003569, Math.toRadians(90.42), new Point(-3.34, -0.59)),
+//        new OpticalDescriptor("optical1", 0.003569, Math.toRadians(90.42), new Point(-3.34, -0.59)),
         new OpticalDescriptor("optical2", 0.001035, Math.toRadians(90.78), new Point(-4.47, 2.6)),
     };
 
@@ -1179,7 +1179,7 @@ public class Poser {
             }
         }
 
-        if (record.aprilTag != null) {
+        if ((record.aprilTag != null) && (record.aprilTag.pose != null)) {
             Pose2d aprilTagPose = record.aprilTag.pose;
             if (record.wallTrackers != null) {
                 for (DistanceLocalizer.WallTracker tracker : record.wallTrackers) {
@@ -1349,15 +1349,34 @@ public class Poser {
             c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
-        // Finally, draw our current pose, drawing a rectangle instead of using drawRobot():
+        // Finally, draw our current pose, drawing a rectangle instead of using drawRobot().
+        // Don't use Canvas's 'setRotation()' and 'setTranslation()' because there is no
+        // apparent clean way to robustly reset them.
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
+        double theta = pose.heading.log();
+        Point offset = new Point(pose.position);
         c.setStroke("#3F51B5");
-        c.setRotation(pose.heading.log());
-        c.setTranslation(pose.position.x, pose.position.y);
-        c.strokePolyline(new double[] { -halfWidth, halfWidth, halfWidth, -halfWidth, -halfWidth },
-                         new double[] { halfLength, halfLength, -halfLength, -halfLength, halfLength });
-        c.strokeLine(0, 0, halfWidth, 0);
+        Point[] corners = {
+                new Point(-halfWidth, halfLength).rotate(theta).add(offset),
+                new Point(halfWidth, halfLength).rotate(theta).add(offset),
+                new Point(halfWidth, -halfLength).rotate(theta).add(offset),
+                new Point(-halfWidth, -halfLength).rotate(theta).add(offset),
+                new Point(-halfWidth, halfLength).rotate(theta).add(offset)
+        };
+
+        // Who thought it was a good idea for Polyline to take separate arrays for x and for y?
+        double[] xArray = new double[corners.length];
+        double[] yArray = new double[corners.length];
+        for (int i = 0; i < corners.length; i++) {
+            xArray[i] = corners[i].x;
+            yArray[i] = corners[i].y;
+        }
+        c.strokePolyline(xArray, yArray);
+
+        // Draw the direction segment from the middle of the robot to the middle of the front:
+        Point middleFront = new Point(halfWidth, 0).rotate(theta).add(offset);
+        c.strokeLine(pose.position.x, pose.position.y, middleFront.x, middleFront.y);
     }
 
     // Update the pose estimate:

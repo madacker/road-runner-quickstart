@@ -1,13 +1,19 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.acmerobotics.roadrunner.Vector2d;
+
 /**
  * Math helper for points and vectors:
  */
-public class Point {
+public class Point { // Can't derive from vector2d because it's marked as final (by default?)
     public double x, y;
     public Point(double x, double y) {
         this.x = x;
         this.y = y;
+    }
+    public Point(Vector2d vector) {
+        x = vector.x;
+        y = vector.y;
     }
     public Point add(Point other) {
         return new Point(this.x + other.x, this.y + other.y);
