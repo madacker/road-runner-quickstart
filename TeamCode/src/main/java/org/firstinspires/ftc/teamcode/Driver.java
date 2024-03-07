@@ -16,6 +16,10 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
+/**
+ * Led control class.
+ * @noinspection FieldCanBeLocal
+ */
 class Led {
     public enum Color { OFF, RED, GREEN }
 
@@ -49,6 +53,7 @@ class Led {
         greenLed.setState(!greenOn);
     }
 
+    /** @noinspection BooleanMethodIsAlwaysInverted*/
     private boolean isPulseActive() {
         return ((pulseEndTime != -1.0) && (nanoTime() * 1e-9 < pulseEndTime));
     }
@@ -135,7 +140,10 @@ class AutoParker {
         angularSpeed = velocity.angVel;
     }
 
-    // Returns false when done, true while still working on it:
+    /**
+     * Returns false when done, true while still working on it:
+     * @noinspection CommentedOutCode
+      */
     boolean park() {
         // Radial vector towards the target:
         Vector2d radialVector = target.position.minus(poser.pose.position);
@@ -243,7 +251,10 @@ class Wall {
         this.poser = poser; this.drive = drive; wallPoint = point; wallVector = vector;
     }
 
-    // The velocity must be field-relative, calibrated inches/s and radians/s:
+    /**
+     * The velocity must be field-relative, calibrated inches/s and radians/s:
+     * @noinspection UnusedReturnValue
+     */
     PoseVelocity2d repulse(PoseVelocity2d velocity) {
 
         // Length of the velocity vector:
@@ -324,6 +335,7 @@ public class Driver extends LinearOpMode {
         return shapedValue * scale;
     }
 
+    /** @noinspection ConstantValue*/
     @Override
     public void runOpMode() throws InterruptedException {
         Globals.initialize(telemetry);
@@ -423,6 +435,7 @@ public class Driver extends LinearOpMode {
 
             // Manually drive:
             if ((!parkingActivated) && (!roadrunnerActivated)) {
+                //noinspection ConstantValue
                 if (true) {
                     PoseVelocity2d calibratedVelocity = new PoseVelocity2d(new Vector2d(
                             scaleStick(-this.gamepad1.left_stick_y, MecanumDrive.PARAMS.maxWheelVel), // fullAxialSpeed),

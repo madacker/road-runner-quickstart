@@ -86,6 +86,8 @@ class DistanceFilter {
 
     // Filter the result:
     double filter(double time, double measuredDistance, double estimatedDistance) {
+        assert(Math.abs(estimatedDistance - measuredDistance) < DistanceLocalizer.CORRECTNESS_THRESHOLD);
+
         // We might have gone back in time so remove any newer results:
         while ((residuals.size() > 0) && (residuals.getFirst().time >= time))
             residuals.removeFirst();
@@ -402,7 +404,7 @@ class DistanceLocalizer {
     }
 
     // Calculate the distance from the sensor to the specified wall:
-    static public double distanceToWall(Pose2d pose, SensorState sensor, Segment wall) {
+    static public double poseDistanceToWall(Pose2d pose, SensorState sensor, Segment wall) {
         // Sensor offset from robot center in field coordinates:
         double sensorAngle = sensor.descriptor.theta + pose.heading.log();
         Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
@@ -506,6 +508,8 @@ class DistanceLocalizer {
         double measurement = currentSensor.hardware.getDistance(DistanceUnit.INCH);
         Stats.endTimer("io::getDistance");
 
+        Stats.addData("getDistance", measurement); // @@@ Keep?
+
         return new Result(currentSensor, currentWall, LATENCY, measurement);
     }
 
@@ -520,7 +524,7 @@ class DistanceLocalizer {
             SensorState sensor, // Distance sensor descriptor
             Segment wallSegment, // Wall segment
             double measuredDistance, // Distance measured by the sensor
-            Poser.HistoryRecord history) // For recording telemetry data, can be null
+            Poser.HistoryRecord history) // Null if correcting April-tag pose, must be non-null otherwise
     {
         boolean valid = false; // Assume failure, we'll convert to success later
 
@@ -553,6 +557,14 @@ class DistanceLocalizer {
             // Ignore measurements that are much shorter than expected (as can happen when
             // another robot blocks the view) or much farther:
             if (Math.abs(expectedDistance - measuredDistance) < CORRECTNESS_THRESHOLD) {
+                // The raw measured result passes all of our conditions! If we're adding to the
+                // history (as opposed to doing an April-tag fixup), filter the result (and add
+                // it to the filter history):
+                if (history != null) {
+                    measuredDistance = history.distance.sensor.filter.filter(
+                            history.time, measuredDistance, expectedDistance);
+                }
+
                 // Yay, it looks like a valid result. Push the pose out, or pull it in,
                 // accordingly:
                 double fixupFactor = measuredDistance / expectedDistance;
@@ -1166,14 +1178,8 @@ public class Poser {
         Pose2d pose = record.posteriorPose.plus(record.twist);
 
         if (record.distance != null) {
-            double estimatedDistance = DistanceLocalizer.distanceToWall(
-                    pose, record.distance.sensor, record.distance.wall);
-            if (estimatedDistance < Double.MAX_VALUE) {
-                double filteredDistance = record.distance.sensor.filter.filter(
-                        record.time, record.distance.measurement, estimatedDistance);
-                pose = DistanceLocalizer.localize(
-                        pose, record.distance.sensor, record.distance.wall, filteredDistance, record);
-            }
+            pose = DistanceLocalizer.localize(
+                pose, record.distance.sensor, record.distance.wall, record.distance.measurement, record);
         }
 
         if ((record.aprilTag != null) && (record.aprilTag.pose != null)) {
@@ -1183,10 +1189,10 @@ public class Poser {
                     // Only use this tracking wall data if there already was a hit so the
                     // residual buffer is non-empty:
                     if ((tracker.wall != null) && (tracker.sensor.filter.residuals.size() != 0)) {
-                        double currentDistance = DistanceLocalizer.distanceToWall(
-                                pose, tracker.sensor, tracker.wall);
+                        double currentDistance = DistanceLocalizer.poseDistanceToWall(
+                            pose, tracker.sensor, tracker.wall);
                         aprilTagPose = DistanceLocalizer.localize(
-                                aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
+                            aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
                     }
                 }
             }
