@@ -68,7 +68,7 @@ class Ray {
  * to the odometry poses.
  */
 class DistanceFilter {
-    static final double WINDOW_DURATION = 0.500; // Seconds
+    static final double WINDOW_DURATION = 3.0; // @@@ 0.500; // Seconds
     static final double WATCHDOG_WINDOW_FRACTION = 0.5; // Fraction of the window duration
 
     LinkedList<Storage> residuals = new LinkedList<>();
@@ -120,7 +120,7 @@ class DistanceFilter {
 
         // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage residual: residuals) {
-            residual.residual = distanceCorrection - residual.residual;
+            residual.residual -= distanceCorrection;
         }
 
         // Correct the estimation to create the new result:
@@ -149,8 +149,8 @@ class AprilTagFilter {
     private boolean isConfident; // True if we're now confident in the results coming out
 
     // The residuals are maintained in newest-to-oldest order:
-    private LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
-    private LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
+    public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
+    public LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
 
     // Storage for filter data:
     static class Storage<T> {
@@ -238,10 +238,10 @@ class AprilTagFilter {
 
         // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage<Vector2d> position: positionResiduals) {
-            position.residual = positionCorrection.minus(position.residual);
+            position.residual = position.residual.minus(positionCorrection);
         }
         for (Storage<Double> heading: headingResiduals) {
-            heading.residual = headingCorrection - heading.residual;
+            heading.residual = heading.residual - headingCorrection;
         }
 
         // Correct the current pose to create the new pose:
@@ -563,6 +563,8 @@ class DistanceLocalizer {
                 if (history != null) {
                     measuredDistance = history.distance.sensor.filter.filter(
                             history.time, measuredDistance, expectedDistance);
+
+                    Stats.addData("filtered distance", measuredDistance); // @@@
                 }
 
                 // Yay, it looks like a valid result. Push the pose out, or pull it in,
@@ -1417,6 +1419,11 @@ public class Poser {
         if ((aprilTagFilter.isConfident()) && (distance != null)) {
             reviseHistory(time - distance.latency, null, distance);
         }
+
+        if (distanceLocalizer.currentSensor != null)
+            Stats.addData("distanceFilter size", distanceLocalizer.currentSensor.filter.residuals.size());
+        Stats.addData("aprilTagFilter position size", aprilTagFilter.positionResiduals.size());
+        Stats.addData("aprilTagFilter heading size", aprilTagFilter.headingResiduals.size());
 
         // Update the optical localizer:
         opticalLocalizer.update();
