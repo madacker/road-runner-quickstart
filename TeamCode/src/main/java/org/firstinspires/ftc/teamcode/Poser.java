@@ -234,7 +234,6 @@ class AprilTagFilter {
         Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
         double headingCorrection = aggregateHeaderResidual;
 
-
         // Negatively offset everything in the history to account for the offset we're adding:
         for (Storage<Vector2d> position: positionResiduals) {
             position.residual = positionCorrection.minus(position.residual);
@@ -684,12 +683,11 @@ class AprilTagLocalizer {
     AprilTagLocalizer(HardwareMap hardwareMap) {
         for (int i = 0; i < CAMERA_DESCRIPTORS.length; i++) {
             cameras[i] = initializeCamera(i, hardwareMap);
-            final int lambaIndex = i;
+            final int lambdaIndex = i;
             Settings.registerToggleOption(String.format("Enable %s", cameras[i].descriptor.name),
-                    true, enable -> cameras[lambaIndex].enabled = enable );
+                    true, enable -> cameras[lambdaIndex].enabled = enable );
         }
-        Settings.registerToggleOption("Enable screen preview", false,
-                enable -> enableLiveView(enable));
+        Settings.registerToggleOption("Enable screen preview", false, this::enableLiveView);
     }
 
     // Create the AprilTagProcessor and VisionPortal objects for the specified camera:
@@ -870,7 +868,6 @@ class AprilTagLocalizer {
     }
 
     // Update loop for April Tags:
-    @SuppressLint("DefaultLocale")
     public Result update(Pose2d currentPose, boolean confident) { // Returns null if no new updates
         ArrayList<VisionPose> visionPoses = new ArrayList<>();
         double minResidual = Float.MAX_VALUE;
@@ -1198,8 +1195,10 @@ public class Poser {
         return pose;
     }
 
+
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
+    /** @noinspection ConstantValue*/
     private void reviseHistory(
             double time,
             AprilTagLocalizer.Result newAprilTag,

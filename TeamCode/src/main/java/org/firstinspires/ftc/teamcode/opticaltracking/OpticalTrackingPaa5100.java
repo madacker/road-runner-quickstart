@@ -82,8 +82,8 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         SPI_POWER_UP_RESET(0x3a),
         SPI_ORIENTATION(0x5b),
         SPI_RESOLUTION(0xe), // PA5100 only
-        SPI_RAWDATA_GRAB(0x58),
-        SPI_RAWDATA_GRAB_STATUS(0x59);
+        SPI_RAW_DATA_GRAB(0x58),
+        SPI_RAW_DATA_GRAB_STATUS(0x59);
 
         public final int bVal;
         Register(int bVal) { this.bVal = bVal; }
@@ -103,8 +103,10 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         this.deviceClient.engage();
     }
 
-    //----------------------------------------------------------------------------------------------
-    // Configure the SPI interface of the bridge:
+    /**
+     * Configure the SPI interface of the bridge
+     * @noinspection ConstantValue, PointlessBitwiseExpression
+     * */
     void configureBridge() {
         // Clock rate: 0 = 1843 kHz
         //             1 = 461 kHz
@@ -160,7 +162,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
                 if (payload.size() == 0) {
                     payload.add((byte) SLAVE_SELECT_MASK);
                 }
-                payload.add((byte) (data[dataIndex + 0] | 0x80)); // MSB indicates an SPI write
+                payload.add((byte) (data[dataIndex] | 0x80)); // MSB indicates an SPI write
                 payload.add((byte) (data[dataIndex + 1]));
             } else {
                 // Write all accumulated payload in one blast:
@@ -174,6 +176,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
                     return; // ====>
                 if (data[dataIndex] == WAIT) {
                     try {
+                        //noinspection BusyWait
                         sleep(data[dataIndex + 1]);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
@@ -366,7 +369,11 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
             0x73, 0x00
         });
     }
-    // Start and stop the LEDs:
+
+    /**
+     * Start and stop the LEDs
+     * @noinspection SameParameterValue
+     */
     void setLedState(boolean enable) {
         bulkWrite(new int[]{
             WAIT, 0xF0,

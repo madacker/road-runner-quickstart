@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode;
 
-import android.annotation.SuppressLint;
-
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 
 import java.util.ArrayList;
@@ -11,10 +9,12 @@ import java.util.HashMap;
 public class Stats {
     private static HashMap<String, Timer> timers = new HashMap<>(); // All internal timers
     private static ArrayList<Timer> ioTimers = new ArrayList<>(); // I/O timers
-    private static double timerStart = Globals.time(); // Start of the timing window
-    private static HashMap<String, String> data = new HashMap<String, String>(); // For 'addData()'
+    private static double windowStartTime = Globals.time(); // Start of the timing window
+    private static int windowLoopCount = 0; // Count of sensor loops during this window
+    private static HashMap<String, String> data = new HashMap<>(); // For 'addData()'
 
     private final static String LOOP_TIMER = "Total loop time"; // Key
+    /** @noinspection FieldCanBeLocal*/
     private final double WINDOW_DURATION = 5.0; // Sliding window duration, in seconds
 
     public static double cameraFps; // Camera frame-rate
@@ -37,10 +37,11 @@ public class Stats {
     // Class for tracking internal timing:
     static class Timer {
         String descriptor; // Full descriptor including any "::"
-        double result; // Average of the previous window in seconds
-        int count; // Count of timings in current window
-        double sum; // Sum of all timings in current window, in seconds
+        int currentCount; // Count of timings in current window
+        double currentSum; // Sum of all timings in current window, in seconds
         double startTime; // Time of the start of the timing bracket; 0 if not in a timing bracket
+        double resultTime; // Average of the previous window in seconds
+        int resultCount; // Count of invocations in the previous window
 
         Timer(String descriptor) { this.descriptor = descriptor; }
     }
@@ -56,18 +57,19 @@ public class Stats {
     // Call this update every loop iteration:
     public void update() {
         Stats.endTimer(LOOP_TIMER);
-        double windowDuration = Globals.time() - timerStart;
+        double windowDuration = Globals.time() - windowStartTime;
 
+        windowLoopCount++;
         if (windowDuration > WINDOW_DURATION) {
             for (Timer timer: Stats.timers.values()) {
-                timer.result = 0;
-                if (timer.count > 0) {
-                    timer.result = timer.sum / timer.count;
-                }
-                timer.sum = 0;
-                timer.count = 0;
+                // Compute the per-sensor-loop average, not the per-timer-invocation average:
+                timer.resultTime = timer.currentSum / windowLoopCount;
+                timer.resultCount = timer.currentCount;
+                timer.currentSum = 0;
+                timer.currentCount = 0;
             }
-            timerStart = Globals.time();
+            windowStartTime = Globals.time();
+            windowLoopCount = 0;
         }
         Stats.startTimer(LOOP_TIMER);
     }
@@ -89,40 +91,42 @@ public class Stats {
         Timer timer = timers.get(descriptor);
         assert(timer != null);
         assert(timer.startTime != 0);
-        timer.count++;
-        timer.sum += Globals.time() - timer.startTime;
+        timer.currentCount++;
+        timer.currentSum += Globals.time() - timer.startTime;
         timer.startTime = 0;
     }
 
     // Always show this header at the top of the screen:
     static public String getHeader() {
+        //noinspection DataFlowIssue
         return String.format("<h6>Loop: %.1fms, Camera FPS: %.1f, Latency: %.1f</h6>",
-                timers.get(LOOP_TIMER).result * 1000.0, cameraFps, pipelineLatency * 1000.0);
+                timers.get(LOOP_TIMER).resultTime * 1000.0, cameraFps, pipelineLatency * 1000.0);
     }
 
     // Get a summary of the I/O times:
     static public String getIoSummary() {
         double sumMs = 0;
-        double loopMs = timers.get(LOOP_TIMER).result * 1000.0;
+        //noinspection DataFlowIssue
+        double loopMs = timers.get(LOOP_TIMER).resultTime * 1000.0;
 
         // Sort in decreasing order:
-        ioTimers.sort(Comparator.comparingDouble(x -> loopMs - x.result));
+        ioTimers.sort(Comparator.comparingDouble(x -> loopMs - x.resultTime));
 
         StringBuilder builder = new StringBuilder();
         for (Timer timer: ioTimers) {
-            double ms = timer.result * 1000.0;
+            double ms = timer.resultTime * 1000.0;
             if ((ms > 0.01) && (timer.descriptor.startsWith("io::"))) {
-                builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
+                builder.append(String.format("&emsp;%.1f ms - %s (%d)\n", ms, timer.descriptor, timer.resultCount));
                 sumMs += ms;
             }
         }
-        builder.append(String.format("&emsp;%.1f ms - Unknown\n", loopMs - sumMs));
+        builder.append(String.format("&emsp;%.1f ms - Unaccounted\n", loopMs - sumMs));
         builder.append("------------------\n");
         builder.append(String.format("&emsp;%.1f ms - Total loop time\n", loopMs));
 
         builder.append("\n");
         for (Timer timer: ioTimers) {
-            double ms = timer.result * 1000.0;
+            double ms = timer.resultTime * 1000.0;
             if ((ms > 0.01) && (!timer.descriptor.startsWith("io::")) && !timer.descriptor.equals(LOOP_TIMER)) {
                 builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
                 sumMs += ms;
@@ -154,6 +158,7 @@ public class Stats {
     static public String getTelemetry() {
         StringBuilder builder = new StringBuilder();
         for (String key: data.keySet()) {
+            //noinspection StringConcatenationInsideStringBufferAppend
             builder.append(key + ": " + data.get(key));
         }
         return builder.toString();
