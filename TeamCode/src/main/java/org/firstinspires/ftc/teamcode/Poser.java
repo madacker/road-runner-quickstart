@@ -267,7 +267,7 @@ class AprilTagFilter {
 class DistanceLocalizer {
     // Description of the distance sensor on the robot:
     public static final DistanceDescriptor[] DISTANCE_SENSOR_DESCRIPTORS = {
-        new DistanceDescriptor("distance", new Point(-3, -2), Math.PI)
+        new DistanceDescriptor("distance", new Point(-1, 3.5), Math.PI)
     };
 
     // Active state for each one of the distance sensors. This is maintained 1-to-1 with
@@ -402,14 +402,15 @@ class DistanceLocalizer {
         return null;
     }
 
-    // Calculate the distance from the sensor to the specified wall:
+    // Calculate the expected distance from the sensor to the specified wall:
     static public double poseDistanceToWall(Pose2d pose, SensorState sensor, Segment wall) {
         // Sensor offset from robot center in field coordinates:
-        double sensorAngle = sensor.descriptor.theta + pose.heading.log();
-        Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
+        double poseHeading = pose.heading.log();
+        Point sensorOffset = sensor.descriptor.offset.rotate(poseHeading);
+        double sensorAngle = sensor.descriptor.theta + poseHeading;
 
         // Ray representing the sensor's position and orientation on the field:
-        Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
+        Point sensorPoint = new Point(pose.position).add(sensorOffset);
         Point sensorDirection = new Point(Math.cos(sensorAngle), Math.sin(sensorAngle));
         Ray sensorRay = new Ray(sensorPoint, sensorDirection);
 
@@ -444,8 +445,9 @@ class DistanceLocalizer {
             // Set an entry even if the sensor is disabled:
             wallTrackers[sensor.index] = new WallTracker(sensor, null, Double.MAX_VALUE);
             if (sensor.enabled) {
-                double sensorAngle = sensor.descriptor.theta + pose.heading.log();
-                Point sensorOffset = sensor.descriptor.offset.rotate(sensorAngle);
+                double poseHeading = pose.heading.log();
+                Point sensorOffset = sensor.descriptor.offset.rotate(poseHeading);
+                double sensorAngle = sensor.descriptor.theta + poseHeading;
 
                 // Ray representing the sensor's position and orientation on the field:
                 Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorOffset);
@@ -528,8 +530,9 @@ class DistanceLocalizer {
         boolean valid = false; // Assume failure, we'll convert to success later
 
         // Sensor offset from robot center in field coordinates:
-        double sensorFieldAngle = sensor.descriptor.theta + pose.heading.log();
-        Point sensorFieldOffset = sensor.descriptor.offset.rotate(sensorFieldAngle);
+        double poseHeading = pose.heading.log();
+        Point sensorFieldOffset = sensor.descriptor.offset.rotate(poseHeading);
+        double sensorFieldAngle = sensor.descriptor.theta + poseHeading;
 
         // Create the rays representing the edges of the field-of-view:
         Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorFieldOffset);
@@ -550,6 +553,8 @@ class DistanceLocalizer {
 
             Point hitPoint = raySegmentIntersection(sensorRay, wallSegment);
             assert(hitPoint != null);
+
+            // Note that this hitVector points from the hit-point back to the robot:
             Point hitVector = new Point(pose.position.x, pose.position.y).subtract(hitPoint);
             double expectedDistance = hitVector.length();
 
@@ -1034,11 +1039,11 @@ class OpticalFlowLocalizer {
 
     // Set the pose once it's locked in:
     void setPose(Pose2d pose) {
-        double heading = pose.heading.log();
-        Point fieldSensorOffset = descriptor.offset.rotate(heading);
+        double poseHeading = pose.heading.log();
+        Point fieldSensorOffset = descriptor.offset.rotate(poseHeading);
 
-        sensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), heading);
-        inferiorSensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), heading);
+        sensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), poseHeading);
+        inferiorSensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), poseHeading);
         robotPose = pose;
     }
 
@@ -1235,6 +1240,9 @@ public class Poser {
                 compositePose, record.distance.sensor, record.distance.wall, record.distance.measurement, record);
         }
 
+double newDistance = -1;
+DistanceLocalizer.WallTracker myTracker = null;
+
         if ((record.aprilTag != null) && (record.aprilTag.pose != null)) {
             Pose2d aprilTagPose = record.aprilTag.pose;
             if (record.wallTrackers != null) {
@@ -1248,15 +1256,23 @@ public class Poser {
                         aprilTagPose = DistanceLocalizer.localize(
                             aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
 
-    double newDistance = DistanceLocalizer.poseDistanceToWall( // @@@
-            compositePose, tracker.sensor, tracker.wall);
+myTracker = tracker;
+newDistance = DistanceLocalizer.poseDistanceToWall(aprilTagPose, tracker.sensor, tracker.wall); // @@@
 
-    Stats.addData("Fixup delta (should be zero)", newDistance); // @@@
+Stats.addData("Fixup delta (should be zero)", newDistance - currentDistance); // @@@
 
                     }
                 }
             }
             compositePose = aprilTagFilter.filter(record.time, compositePose, aprilTagPose, record.aprilTag.isConfident);
+
+if (myTracker != null) {
+    double compositeDistance = DistanceLocalizer.poseDistanceToWall( // @@@
+            compositePose, myTracker.sensor, myTracker.wall);
+    Stats.addData("AprilTag delta (should be close to zero)", compositeDistance - newDistance);
+    Stats.addData("AprilTag distance", compositeDistance);
+}
+
         }
         return compositePose;
     }
@@ -1402,13 +1418,9 @@ public class Poser {
         if ((lastDistance != null) && (lastDistance.distance.valid) &&
                 (Globals.time() - lastDistance.time < DistanceLocalizer.READ_INTERVAL)) {
             c.setStroke("#a0a0a0"); // Grey
-            DistanceLocalizer.DistanceDescriptor descriptor
-                    = lastDistance.distance.sensor.descriptor;
-            Point offset = new Point(descriptor.offset.x, descriptor.offset.y)
-                    .rotate(lastDistance.posteriorPose.heading.log() - Math.PI / 2);
-            Point origin = new Point(
-                    lastDistance.posteriorPose.position.x + offset.x,
-                    lastDistance.posteriorPose.position.y + offset.y);
+            double poseHeading = posteriorPose.heading.log();
+            Point offset = lastDistance.distance.sensor.descriptor.offset.rotate(poseHeading);
+            Point origin = new Point(lastDistance.posteriorPose.position).add(offset);
             c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
         }
 
