@@ -171,8 +171,8 @@ class AprilTagFilter {
     // Filter the prediction and measurements and return a posterior:
     @NonNull Pose2d filter(
             double time, // Globals.time() for when the filtering should be done
-            @NonNull Pose2d odometryPose, // Odometry measured pose
-            @Nullable Pose2d aprilTagPose, // April-tag
+            @NonNull Pose2d currentCompositePose, // Current composite pose
+            @Nullable Pose2d newAprilTagPose, // Incoming April-Tag pose
             boolean confidentAprilTag) { // True if confident in the April-tag
 
         // We might have gone back in time so remove any newer results:
@@ -200,15 +200,15 @@ class AprilTagFilter {
             headingResiduals.removeLast(); // Newest to oldest
 
         // Add April Tag and distance sensor results to the position history:
-        if (aprilTagPose != null) {
-            Vector2d positionResidual = aprilTagPose.position.minus(odometryPose.position);
+        if (newAprilTagPose != null) {
+            Vector2d positionResidual = newAprilTagPose.position.minus(currentCompositePose.position);
             positionResiduals.addFirst(new Storage<>(positionResidual)); // Newest to oldest
         }
 
         // Add confident April Tags to the headings history:
         if (confidentAprilTag) {
-            assert(aprilTagPose != null);
-            double headingResidual = Globals.normalizeAngle(aprilTagPose.heading.log() - odometryPose.heading.log());
+            assert(newAprilTagPose != null);
+            double headingResidual = Globals.normalizeAngle(newAprilTagPose.heading.log() - currentCompositePose.heading.log());
             headingResiduals.addFirst(new Storage<>(headingResidual)); // Newest to oldest
 
             confidentAprilTagCount++;
@@ -246,8 +246,8 @@ class AprilTagFilter {
 
         // Correct the current pose to create the new pose:
         return new Pose2d(
-                odometryPose.position.plus(positionCorrection),
-                odometryPose.heading.log() + headingCorrection);
+                currentCompositePose.position.plus(positionCorrection),
+                currentCompositePose.heading.log() + headingCorrection);
     }
 
     // True if we have high confidence in the results:
@@ -994,7 +994,7 @@ class AprilTagLocalizer {
 /**
  * Localizer for the Optical Tracking sensor.
  */
-class OpticalLocalizer {
+class OpticalFlowLocalizer {
     OpticalDescriptor[] OPTICAL_DESCRIPTORS = {
 //        new OpticalDescriptor("optical1", 0.003569, Math.toRadians(90.42), new Point(-3.34, -0.59)),
         new OpticalDescriptor("optical2", 0.001035, Math.toRadians(90.78), new Point(-4.47, 2.6)),
@@ -1019,7 +1019,7 @@ class OpticalLocalizer {
     Pose2d inferiorSensorPose; // Inferior pose as determined by the sensor
     boolean visualizeInferiorPose; // Setting for whether to show the inferior pose or not
 
-    OpticalLocalizer(HardwareMap hardwareMap, IMU imu) {
+    OpticalFlowLocalizer(HardwareMap hardwareMap, IMU imu) {
         this.imu = imu;
 
         OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
@@ -1113,7 +1113,7 @@ class OpticalLocalizer {
  */
 public class Poser {
     // These public fields are updated after every call to update():
-    public Pose2d pose; // Current pose
+    public Pose2d masterPose; // Current pose
     public PoseVelocity2d velocity; // Current velocity, robot-relative not field-relative
 
     // Keep the history around for this many seconds:
@@ -1126,9 +1126,9 @@ public class Poser {
     // Component localizers:
     private IMU imu;
     private Localizer odometryLocalizer;
+    private OpticalFlowLocalizer opticalFlowLocalizer;
     private DistanceLocalizer distanceLocalizer;
     private AprilTagLocalizer aprilTagLocalizer;
-    private OpticalLocalizer opticalLocalizer;
     private AprilTagFilter aprilTagFilter;
 
     // Record structure for the history:
@@ -1148,14 +1148,14 @@ public class Poser {
     // Constructor:
     @SuppressLint("DefaultLocale")
     public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
-        pose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
+        masterPose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
         imu = drive.imu;
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
-        opticalLocalizer = new OpticalLocalizer(hardwareMap, imu);
+        opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap, imu);
 
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
@@ -1177,11 +1177,11 @@ public class Poser {
 
     // Combine the various poses in a historical record:
     Pose2d filterHistoryRecord(HistoryRecord record) {
-        Pose2d pose = record.posteriorPose.plus(record.twist);
+        Pose2d compositePose = record.posteriorPose.plus(record.twist);
 
         if (record.distance != null) {
-            pose = DistanceLocalizer.localize(
-                pose, record.distance.sensor, record.distance.wall, record.distance.measurement, record);
+            compositePose = DistanceLocalizer.localize(
+                compositePose, record.distance.sensor, record.distance.wall, record.distance.measurement, record);
         }
 
         if ((record.aprilTag != null) && (record.aprilTag.pose != null)) {
@@ -1192,28 +1192,34 @@ public class Poser {
                     // residual buffer is non-empty:
                     if ((tracker.wall != null) && (tracker.sensor.filter.residuals.size() != 0)) {
                         double currentDistance = DistanceLocalizer.poseDistanceToWall(
-                            pose, tracker.sensor, tracker.wall);
+                            compositePose, tracker.sensor, tracker.wall);
+
                         aprilTagPose = DistanceLocalizer.localize(
                             aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
+
+    double newDistance = DistanceLocalizer.poseDistanceToWall( // @@@
+            compositePose, tracker.sensor, tracker.wall);
+
+    Stats.addData("Fixup delta (should be zero)", newDistance); // @@@
+
                     }
                 }
             }
-            pose = aprilTagFilter.filter(record.time, pose, aprilTagPose, record.aprilTag.isConfident);
+            compositePose = aprilTagFilter.filter(record.time, compositePose, aprilTagPose, record.aprilTag.isConfident);
         }
-        return pose;
+        return compositePose;
     }
 
 
     // Update an April-tag or a distance record for a particular time in the past and then
     // recompute all the history back to the present:
     /** @noinspection ConstantValue*/
-    private void reviseHistory(
+    private Pose2d reviseHistory(
             double time,
             AprilTagLocalizer.Result newAprilTag,
             DistanceLocalizer.Result newDistance) {
 
-        if (history.size() == 0)
-            return; // ===>
+        assert(history.size() > 0);
 
         // Find the first record older than the target:
         ListIterator<HistoryRecord> iterator = history.listIterator();
@@ -1250,14 +1256,13 @@ public class Poser {
         // Now replay all of the history records back so we can recompute the poses up to the
         // current time:
         while (true) {
-            pose = filterHistoryRecord(iteratorRecord);
+            Pose2d compositePose = filterHistoryRecord(iteratorRecord);
             if (!iterator.hasPrevious())
-                break; // ====>
+                return compositePose; // ====>
 
             iteratorRecord = iterator.previous();
-            iteratorRecord.posteriorPose = copyPose(pose);
+            iteratorRecord.posteriorPose = copyPose(compositePose);
         }
-
     }
 
     // Draw the history visualizations for FTC Dashboard:
@@ -1277,9 +1282,9 @@ public class Poser {
         // Draw the active camera's field of view:
         if (aprilTagLocalizer.activeCamera != -1) {
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
-            double cameraAngle = pose.heading.log() + descriptor.theta;
-            Point cameraOffset = descriptor.offset.rotate(pose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
-            Point cameraOrigin = new Point(pose.position.x + cameraOffset.x, pose.position.y + cameraOffset.y);
+            double cameraAngle = masterPose.heading.log() + descriptor.theta;
+            Point cameraOffset = descriptor.offset.rotate(masterPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
+            Point cameraOrigin = new Point(masterPose.position.x + cameraOffset.x, masterPose.position.y + cameraOffset.y);
             double rayLength = 100;
             double halfFov = descriptor.fov / 2.0;
 
@@ -1361,8 +1366,8 @@ public class Poser {
         // apparent clean way to robustly reset them.
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
-        double theta = pose.heading.log();
-        Point offset = new Point(pose.position);
+        double theta = masterPose.heading.log();
+        Point offset = new Point(masterPose.position);
         c.setStroke("#3F51B5");
         Point[] corners = {
                 new Point(-halfWidth, halfLength).rotate(theta).add(offset),
@@ -1383,50 +1388,48 @@ public class Poser {
 
         // Draw the direction segment from the middle of the robot to the middle of the front:
         Point middleFront = new Point(halfWidth, 0).rotate(theta).add(offset);
-        c.strokeLine(pose.position.x, pose.position.y, middleFront.x, middleFront.y);
+        c.strokeLine(masterPose.position.x, masterPose.position.y, middleFront.x, middleFront.y);
     }
 
     // Update the pose estimate:
     public void update() {
         double time = Globals.time();
 
+        // Update odometry:
         Twist2dDual<Time> dualTwist = odometryLocalizer.update();
         velocity = dualTwist.velocity().value();
 
-        // Create a tracking record:
-        HistoryRecord record = new HistoryRecord(time, pose, dualTwist.value());
-        history.addFirst(record);
+        // Update the optical flow localizer:
+        opticalFlowLocalizer.update();
 
-        // Update the pose accordingly. This may get recomputed via 'changeHistory' below:
-        pose = filterHistoryRecord(record);
+        // Create a tracking record and update the master pose accordingly. This may
+        // get recomputed via 'reviseHistory()' calls below:
+        HistoryRecord record = new HistoryRecord(time, masterPose, dualTwist.value());
+        history.addFirst(record); // Newest first
+        masterPose = filterHistoryRecord(record);
 
-        // Delete old history records:
+        // Delete expired history records:
         while (time - history.getLast().time > HISTORY_DURATION) {
-            history.removeLast();
+            history.removeLast(); // Oldest last
         }
 
         // Process April Tags:
-        Stats.startTimer("aprilTag");
-        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(pose, aprilTagFilter.isConfident());
+        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(masterPose, aprilTagFilter.isConfident());
         if (aprilTag != null) {
-            reviseHistory(time - aprilTag.latency, aprilTag, null);
+            masterPose = reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
-        Stats.endTimer("aprilTag");
 
         // Process the distance sensor. Only act on it if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
-        DistanceLocalizer.Result distance = distanceLocalizer.update(pose, record);
+        DistanceLocalizer.Result distance = distanceLocalizer.update(masterPose, record);
         if ((aprilTagFilter.isConfident()) && (distance != null)) {
-            reviseHistory(time - distance.latency, null, distance);
+            masterPose = reviseHistory(time - distance.latency, null, distance);
         }
 
         if (distanceLocalizer.currentSensor != null)
             Stats.addData("distanceFilter size", distanceLocalizer.currentSensor.filter.residuals.size());
         Stats.addData("aprilTagFilter position size", aprilTagFilter.positionResiduals.size());
-        Stats.addData("aprilTagFilter heading size", aprilTagFilter.headingResiduals.size());
-
-        // Update the optical localizer:
-        opticalLocalizer.update();
+        Stats.addData("aprilTagFilter heading size", aprilTagFilter.headingResiduals.size()); // @@@
 
         // @@@ Think about clamping rate change
 
@@ -1451,7 +1454,7 @@ public class Poser {
         aprilTagFilter.telemetry();
 
         Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
-        Stats.yawCorrection = pose.heading.log() - Stats.imuYaw;
+        Stats.yawCorrection = masterPose.heading.log() - Stats.imuYaw;
     }
 
     // Close when done running our OpMode:
