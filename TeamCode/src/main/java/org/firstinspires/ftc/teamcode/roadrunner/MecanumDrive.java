@@ -57,9 +57,9 @@ public final class MecanumDrive {
     public static class Params {
         Params() {
             // path profile parameters (in inches and seconds)
-            maxWheelVel = 50 / 2;
-            minProfileAccel = -30;
-            maxProfileAccel = 50;
+            maxWheelVel = 50.0 / 2;
+            minProfileAccel = -30.0;
+            maxProfileAccel = 50.0;
 
             // turn profile parameters (in radians)
             maxAngVel = Math.PI / 2.5; // shared with path
@@ -135,6 +135,8 @@ public final class MecanumDrive {
     public static boolean isDevBot = getBotName().equals("DevBot");
 
     public static Params PARAMS = new Params();
+
+    public boolean poseOwnedByPoser = false; // True if the Poser() class owns updating MecanumDrive's pose
 
     public final MecanumKinematics kinematics = new MecanumKinematics(
             PARAMS.inPerTick * PARAMS.trackWidthTicks, PARAMS.inPerTick / PARAMS.lateralInPerTick);
@@ -315,7 +317,7 @@ public final class MecanumDrive {
      * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
      * at the same time in which case the velocities are added together (to allow assist and stick
      * control to blend together, for example).
-     *
+     * <br>
      * It's also possible to map the controller input to inches/s and radians/s instead of the
      * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
      * .maxAngVel to determine the range to specify. Note however that the robot can actually
@@ -562,6 +564,8 @@ public final class MecanumDrive {
     }
 
     public void updatePoseEstimate() {
+        assert(!poseOwnedByPoser);
+
         Twist2dDual<Time> twist = localizer.update();
         pose = pose.plus(twist.value());
 

@@ -11,7 +11,6 @@ import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Rotation2d;
 import com.acmerobotics.roadrunner.Time;
-import com.acmerobotics.roadrunner.Twist2d;
 import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -995,19 +994,19 @@ class AprilTagLocalizer {
  * Localizer for the Optical Tracking sensor.
  */
 class OpticalFlowLocalizer {
-    OpticalDescriptor[] OPTICAL_DESCRIPTORS = {
+    OpticalFlowDescriptor[] OPTICAL_DESCRIPTORS = {
 //        new OpticalDescriptor("optical1", 0.003569, Math.toRadians(90.42), new Point(-3.34, -0.59)),
-        new OpticalDescriptor("optical2", 0.001035, Math.toRadians(90.78), new Point(-4.47, 2.6)),
+        new OpticalFlowDescriptor("optical2", 0.001035, Math.toRadians(90.78), new Point(-4.47, 2.6)),
     };
 
     // Structure for describing cameras on the robot:
-    static class OpticalDescriptor {
+    static class OpticalFlowDescriptor {
         String name; // Device name in the robot's configuration
         double inchesPerTick;
         double headingAdjustment;
         Point offset;
 
-        public OpticalDescriptor(String name, double inchesPerTick, double headingAdjustment, Point offset) {
+        public OpticalFlowDescriptor(String name, double inchesPerTick, double headingAdjustment, Point offset) {
             this.name = name; this.inchesPerTick = inchesPerTick; this.headingAdjustment = headingAdjustment; this.offset = offset;
         }
     }
@@ -1017,20 +1016,30 @@ class OpticalFlowLocalizer {
     double previousYaw; // Yaw from the previous call to update()
     Pose2d sensorPose; // Pose for the sensor where it's on the robot (not pose for the robot center)
     Pose2d inferiorSensorPose; // Inferior pose as determined by the sensor
+    Pose2d robotPose; // Pose for the robot from the last iteration
     boolean visualizeInferiorPose; // Setting for whether to show the inferior pose or not
+    OpticalFlowDescriptor descriptor; // Describes the parameters of the sensor
 
     OpticalFlowLocalizer(HardwareMap hardwareMap, IMU imu) {
         this.imu = imu;
 
-        OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
-
+        descriptor = OPTICAL_DESCRIPTORS[0];
         device = hardwareMap.get(OpticalTrackingPaa5100.class, descriptor.name);
         device.getMotion(); // Zero the movement
         previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        sensorPose = new Pose2d(-descriptor.offset.x, -descriptor.offset.y, 0);
-        inferiorSensorPose = new Pose2d(-descriptor.offset.x, -descriptor.offset.y, 0);
+        setPose(new Pose2d(0, 0, 0));
 
         Settings.registerToggleOption("Toggle optical inferior pose", true, enable -> visualizeInferiorPose = enable );
+    }
+
+    // Set the pose once it's locked in:
+    void setPose(Pose2d pose) {
+        double heading = pose.heading.log();
+        Point fieldSensorOffset = descriptor.offset.rotate(heading);
+
+        sensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), heading);
+        inferiorSensorPose = new Pose2d(pose.position.minus(fieldSensorOffset.vector2d()), heading);
+        robotPose = pose;
     }
 
     // Convert the robot-relative change-in-pose to field-relative change-in-position.
@@ -1055,7 +1064,7 @@ class OpticalFlowLocalizer {
         return new Point(deltaX, deltaY).rotate(theta + deltaTheta);
     }
 
-    void update() {
+    Poser.Twist update() {
         // Do our I/O:
         Stats.startTimer("io::getMotion");
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
@@ -1073,7 +1082,6 @@ class OpticalFlowLocalizer {
         previousYaw = currentYaw;
         double theta = sensorPose.heading.log();
 
-        OpticalDescriptor descriptor = OPTICAL_DESCRIPTORS[0];
         Point motionVector
                 = new Point(motion.x, motion.y).scale(descriptor.inchesPerTick).rotate(descriptor.headingAdjustment);
         Point deltaPosition = deltaFieldPosition(theta, motionVector.x, motionVector.y, deltaTheta);
@@ -1085,7 +1093,9 @@ class OpticalFlowLocalizer {
         Point centerOffset = descriptor.offset.negate().rotate(thetaPrime);
 
         sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
-        Pose2d robotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+        Pose2d newRobotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+        Poser.Twist twist = new Poser.Twist(newRobotPose, robotPose);
+        robotPose = newRobotPose;
 
         // #########################################################################################
         theta = inferiorSensorPose.heading.log();
@@ -1104,6 +1114,8 @@ class OpticalFlowLocalizer {
 
         Globals.canvas.setStroke("#E9967A"); // Olive
         MecanumDrive.drawRobot(Globals.canvas, robotPose);
+
+        return twist;
     }
 }
 
@@ -1113,11 +1125,15 @@ class OpticalFlowLocalizer {
  */
 public class Poser {
     // These public fields are updated after every call to update():
-    public Pose2d masterPose; // Current pose
+    public Pose2d posteriorPose; // Final pose estimate from the previous sensor loop iteration
     public PoseVelocity2d velocity; // Current velocity, robot-relative not field-relative
 
     // Keep the history around for this many seconds:
     private final static double HISTORY_DURATION = 2.0;
+
+    // True if using optical flow for our master predictions, false if using odometry:
+    /** @noinspection FieldCanBeLocal*/
+    private final boolean USING_OPTICAL_FLOW = false;
 
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
@@ -1131,25 +1147,52 @@ public class Poser {
     private AprilTagLocalizer aprilTagLocalizer;
     private AprilTagFilter aprilTagFilter;
 
+    // True if an initial pose was specified or if April Tags now have locked-on pose tracking:
+    boolean isLockedOn;
+
     // Record structure for the history:
     static class HistoryRecord {
         double time; // Time, in seconds, of the record
         Pose2d posteriorPose; // Result of the *previous* step
-        Twist2d twist; // Odometry twist
+        Twist odometryTwist; // Odometry twist
+        Twist opticalFlowTwist; // Optical flow twist
         DistanceLocalizer.Result distance; // Distance sensor distance, if any
         DistanceLocalizer.WallTracker[] wallTrackers; // Distance sensor tracking walls
         AprilTagLocalizer.Result aprilTag; // April tag result, if any
 
-        public HistoryRecord(double time, Pose2d posteriorPose, Twist2d twist) {
-            this.time = time; this.posteriorPose = posteriorPose; this.twist = twist;
+        public HistoryRecord(double time, Pose2d posteriorPose, Twist odometryTwist, Twist opticalFlowTwist) {
+            this.time = time; this.posteriorPose = posteriorPose; this.odometryTwist = odometryTwist; this.opticalFlowTwist = opticalFlowTwist;
         }
     }
 
-    // Constructor:
+    // Record structure that encodes the robot-relative change in pose:
+    static class Twist {
+        Point robotTranslation; // Robot-relative translation relative to the old pose
+        double rotation; // Amount of rotation
+
+        // Encode the change in pose to be relative to the robot's orientation:
+        Twist(Pose2d newPose, Pose2d oldPose) {
+            double theta = oldPose.heading.log();
+            Vector2d fieldTranslation  = newPose.position.minus(oldPose.position);
+            robotTranslation = new Point(fieldTranslation).rotate(-theta);
+            rotation = newPose.heading.log() - theta;
+        }
+
+        // Apply the delta to the pose:
+        Pose2d apply(Pose2d pose) {
+            double theta = pose.heading.log();
+            Point fieldTranslation = robotTranslation.rotate(theta);
+            return new Pose2d(pose.position.plus(fieldTranslation.vector2d()), theta + rotation);
+        }
+    }
+
+    // Poser constructor:
     @SuppressLint("DefaultLocale")
     public Poser(HardwareMap hardwareMap, MecanumDrive drive, Pose2d initialPose) {
-        masterPose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
+        isLockedOn = false; // Gets lazily set to 'true'
+        posteriorPose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        drive.poseOwnedByPoser = true; // Let MecanumDrive know we own pose estimation
 
         imu = drive.imu;
         odometryLocalizer = drive.localizer;
@@ -1177,7 +1220,11 @@ public class Poser {
 
     // Combine the various poses in a historical record:
     Pose2d filterHistoryRecord(HistoryRecord record) {
-        Pose2d compositePose = record.posteriorPose.plus(record.twist);
+        Pose2d compositePose = record.posteriorPose;
+        if (USING_OPTICAL_FLOW)
+            compositePose = record.opticalFlowTwist.apply(compositePose);
+        else
+            compositePose = record.odometryTwist.apply(compositePose);
 
         if (record.distance != null) {
             compositePose = DistanceLocalizer.localize(
@@ -1282,9 +1329,9 @@ public class Poser {
         // Draw the active camera's field of view:
         if (aprilTagLocalizer.activeCamera != -1) {
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
-            double cameraAngle = masterPose.heading.log() + descriptor.theta;
-            Point cameraOffset = descriptor.offset.rotate(masterPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
-            Point cameraOrigin = new Point(masterPose.position.x + cameraOffset.x, masterPose.position.y + cameraOffset.y);
+            double cameraAngle = posteriorPose.heading.log() + descriptor.theta;
+            Point cameraOffset = descriptor.offset.rotate(posteriorPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
+            Point cameraOrigin = new Point(posteriorPose.position.x + cameraOffset.x, posteriorPose.position.y + cameraOffset.y);
             double rayLength = 100;
             double halfFov = descriptor.fov / 2.0;
 
@@ -1366,8 +1413,8 @@ public class Poser {
         // apparent clean way to robustly reset them.
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
-        double theta = masterPose.heading.log();
-        Point offset = new Point(masterPose.position);
+        double theta = posteriorPose.heading.log();
+        Point offset = new Point(posteriorPose.position);
         c.setStroke("#3F51B5");
         Point[] corners = {
                 new Point(-halfWidth, halfLength).rotate(theta).add(offset),
@@ -1388,25 +1435,33 @@ public class Poser {
 
         // Draw the direction segment from the middle of the robot to the middle of the front:
         Point middleFront = new Point(halfWidth, 0).rotate(theta).add(offset);
-        c.strokeLine(masterPose.position.x, masterPose.position.y, middleFront.x, middleFront.y);
+        c.strokeLine(posteriorPose.position.x, posteriorPose.position.y, middleFront.x, middleFront.y);
     }
 
     // Update the pose estimate:
     public void update() {
         double time = Globals.time();
 
-        // Update odometry:
+        // Check to see if we're no locked on and if so, broadcast to all interested
+        // pose estimators:
+        if ((!isLockedOn) && aprilTagFilter.isConfident()) {
+            isLockedOn = true;
+            opticalFlowLocalizer.setPose(posteriorPose);
+        }
+
+        // Update odometry. Note that MecanumDrive's pose gets updated by 'doActionsWork':
         Twist2dDual<Time> dualTwist = odometryLocalizer.update();
         velocity = dualTwist.velocity().value();
+        Twist odometryTwist = new Twist(posteriorPose.plus(dualTwist.value()), posteriorPose);
 
         // Update the optical flow localizer:
-        opticalFlowLocalizer.update();
+        Twist opticalFlowTwist = opticalFlowLocalizer.update();
 
         // Create a tracking record and update the master pose accordingly. This may
         // get recomputed via 'reviseHistory()' calls below:
-        HistoryRecord record = new HistoryRecord(time, masterPose, dualTwist.value());
+        HistoryRecord record = new HistoryRecord(time, posteriorPose, odometryTwist, opticalFlowTwist);
         history.addFirst(record); // Newest first
-        masterPose = filterHistoryRecord(record);
+        posteriorPose = filterHistoryRecord(record);
 
         // Delete expired history records:
         while (time - history.getLast().time > HISTORY_DURATION) {
@@ -1414,16 +1469,16 @@ public class Poser {
         }
 
         // Process April Tags:
-        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(masterPose, aprilTagFilter.isConfident());
+        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(posteriorPose, aprilTagFilter.isConfident());
         if (aprilTag != null) {
-            masterPose = reviseHistory(time - aprilTag.latency, aprilTag, null);
+            posteriorPose = reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
 
         // Process the distance sensor. Only act on it if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
-        DistanceLocalizer.Result distance = distanceLocalizer.update(masterPose, record);
+        DistanceLocalizer.Result distance = distanceLocalizer.update(posteriorPose, record);
         if ((aprilTagFilter.isConfident()) && (distance != null)) {
-            masterPose = reviseHistory(time - distance.latency, null, distance);
+            posteriorPose = reviseHistory(time - distance.latency, null, distance);
         }
 
         if (distanceLocalizer.currentSensor != null)
@@ -1454,7 +1509,7 @@ public class Poser {
         aprilTagFilter.telemetry();
 
         Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
-        Stats.yawCorrection = masterPose.heading.log() - Stats.imuYaw;
+        Stats.yawCorrection = posteriorPose.heading.log() - Stats.imuYaw;
     }
 
     // Close when done running our OpMode:
@@ -1463,7 +1518,7 @@ public class Poser {
     }
 
     // Return true when sufficiently calibrated:
-    boolean isConfident() {
-        return aprilTagFilter.isConfident();
+    boolean isLockedOn() {
+        return isLockedOn;
     }
 }

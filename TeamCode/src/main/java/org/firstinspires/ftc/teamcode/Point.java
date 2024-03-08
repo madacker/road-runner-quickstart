@@ -15,6 +15,7 @@ public class Point { // Can't derive from vector2d because it's marked as final 
         x = vector.x;
         y = vector.y;
     }
+    Vector2d vector2d() { return new Vector2d(x, y); }
     public Point add(Point other) {
         return new Point(this.x + other.x, this.y + other.y);
     }

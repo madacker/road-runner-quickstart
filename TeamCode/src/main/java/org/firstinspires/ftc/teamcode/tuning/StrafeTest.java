@@ -5,7 +5,6 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DcMotor;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -54,6 +53,7 @@ public final class StrafeTest extends LinearOpMode {
         MecanumDrive.PARAMS.lateralGain = lateralGain;
         MecanumDrive.PARAMS.lateralVelGain = lateralVelGain;
 
+        //noinspection StatementWithEmptyBody
         while (opModeIsActive())
             ;
     }
