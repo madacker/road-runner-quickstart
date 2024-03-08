@@ -1155,7 +1155,7 @@ public class Poser {
         double time; // Time, in seconds, of the record
         Pose2d posteriorPose; // Result of the *previous* step
         Twist odometryTwist; // Odometry twist
-        Twist opticalFlowTwist; // Optical flow twist
+        Twist opticalFlowTwist; // Optical flow twist, if any
         DistanceLocalizer.Result distance; // Distance sensor distance, if any
         DistanceLocalizer.WallTracker[] wallTrackers; // Distance sensor tracking walls
         AprilTagLocalizer.Result aprilTag; // April tag result, if any
@@ -1198,8 +1198,12 @@ public class Poser {
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
-        opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap, imu);
-
+        try {
+            opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap, imu);
+        } catch (IllegalArgumentException e) {
+            // FTC Fast Loads trigger this case:
+            opticalFlowLocalizer = null;
+        }
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
@@ -1446,7 +1450,8 @@ public class Poser {
         // pose estimators:
         if ((!isLockedOn) && aprilTagFilter.isConfident()) {
             isLockedOn = true;
-            opticalFlowLocalizer.setPose(posteriorPose);
+            if (opticalFlowLocalizer != null)
+                opticalFlowLocalizer.setPose(posteriorPose);
         }
 
         // Update odometry. Note that MecanumDrive's pose gets updated by 'doActionsWork':
@@ -1455,7 +1460,7 @@ public class Poser {
         Twist odometryTwist = new Twist(posteriorPose.plus(dualTwist.value()), posteriorPose);
 
         // Update the optical flow localizer:
-        Twist opticalFlowTwist = opticalFlowLocalizer.update();
+        Twist opticalFlowTwist = (opticalFlowLocalizer != null) ? opticalFlowLocalizer.update() : null;
 
         // Create a tracking record and update the master pose accordingly. This may
         // get recomputed via 'reviseHistory()' calls below:
