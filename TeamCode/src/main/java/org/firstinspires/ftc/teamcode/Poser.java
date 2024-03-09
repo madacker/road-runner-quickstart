@@ -255,7 +255,7 @@ class AprilTagFilter {
     }
 
     // Output telemetry:
-    void telemetry() {
+    void telemetry() { // @@@ Remove this
         Globals.telemetry.addLine(String.format("Position residuals: %d, heading residuals: %d",
                 positionResiduals.size(), headingResiduals.size()));
     }
@@ -1135,11 +1135,19 @@ class OpticalFlowLocalizer {
  */
 public class Poser {
     // These public fields are updated after every call to update():
-    public Pose2d posteriorPose; // Final pose estimate from the previous sensor loop iteration
+    public Pose2d bestPose; // Best pose, for external use (rate-limited):
     public PoseVelocity2d velocity; // Current velocity, robot-relative not field-relative
+
+    // Final pose estimate from the previous sensor loop iteration (raw, non-rate-limited):
+    private Pose2d posteriorPose;
 
     // Keep the history around for this many seconds:
     private final static double HISTORY_DURATION = 2.0;
+
+    // Clamp limits:
+    /** @noinspection FieldCanBeLocal*/
+    private final double MAX_POSITION_CHANGE_RATE = 12.0; // 12 inches/s
+    private final double MAX_HEADING_CHANGE_RATE = Math.toRadians(27); // 27 degrees/s
 
     // True if using optical flow for our master predictions, false if using odometry:
     /** @noinspection FieldCanBeLocal*/
@@ -1148,6 +1156,7 @@ public class Poser {
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
     private double originalYaw; // Radians
+    double previousTime; // Time of last call to update();
 
     // Component localizers:
     private IMU imu;
@@ -1202,6 +1211,8 @@ public class Poser {
         isLockedOn = false; // Gets lazily set to 'true'
         posteriorPose = (initialPose != null) ? initialPose : new Pose2d(0, 0, 0);
         velocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+        bestPose = posteriorPose;
+        previousTime = Globals.time();
         drive.poseOwnedByPoser = true; // Let MecanumDrive know we own pose estimation
 
         imu = drive.imu;
@@ -1233,7 +1244,7 @@ public class Poser {
     }
 
     // Combine the various poses in a historical record:
-    Pose2d filterHistoryRecord(HistoryRecord record) {
+    Pose2d historyRecordPose(HistoryRecord record) {
         Pose2d compositePose = record.posteriorPose;
         if (USING_OPTICAL_FLOW)
             compositePose = record.opticalFlowTwist.apply(compositePose);
@@ -1328,7 +1339,7 @@ if (myTracker != null) {
         // Now replay all of the history records back so we can recompute the poses up to the
         // current time:
         while (true) {
-            Pose2d compositePose = filterHistoryRecord(iteratorRecord);
+            Pose2d compositePose = historyRecordPose(iteratorRecord);
             if (!iterator.hasPrevious())
                 return compositePose; // ====>
 
@@ -1338,7 +1349,7 @@ if (myTracker != null) {
     }
 
     // Draw the history visualizations for FTC Dashboard:
-    private void visualize() {
+    private void visualize(Pose2d robotPose) {
         Canvas c = Globals.canvas;
         HistoryRecord lastDistance = null;
 
@@ -1354,9 +1365,9 @@ if (myTracker != null) {
         // Draw the active camera's field of view:
         if (aprilTagLocalizer.activeCamera != -1) {
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
-            double cameraAngle = posteriorPose.heading.log() + descriptor.theta;
-            Point cameraOffset = descriptor.offset.rotate(posteriorPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
-            Point cameraOrigin = new Point(posteriorPose.position.x + cameraOffset.x, posteriorPose.position.y + cameraOffset.y);
+            double cameraAngle = robotPose.heading.log() + descriptor.theta;
+            Point cameraOffset = descriptor.offset.rotate(robotPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
+            Point cameraOrigin = new Point(robotPose.position.x + cameraOffset.x, robotPose.position.y + cameraOffset.y);
             double rayLength = 100;
             double halfFov = descriptor.fov / 2.0;
 
@@ -1423,10 +1434,13 @@ if (myTracker != null) {
         if ((lastDistance != null) && (lastDistance.distance.valid) &&
                 (Globals.time() - lastDistance.time < DistanceLocalizer.READ_INTERVAL)) {
             c.setStroke("#a0a0a0"); // Grey
-            double poseHeading = posteriorPose.heading.log();
+            c.setAlpha(0.5);
+
+            double poseHeading = robotPose.heading.log();
             Point offset = lastDistance.distance.sensor.descriptor.offset.rotate(poseHeading);
             Point origin = new Point(lastDistance.posteriorPose.position).add(offset);
             c.strokeLine(origin.x, origin.y, lastDistance.distance.point.x, lastDistance.distance.point.y);
+            c.setAlpha(1.0);
         }
 
         // Finally, draw our current pose, drawing a rectangle instead of using drawRobot().
@@ -1434,8 +1448,8 @@ if (myTracker != null) {
         // apparent clean way to robustly reset them.
         double halfWidth = 18.5 / 2;
         double halfLength = 17.5 / 2;
-        double theta = posteriorPose.heading.log();
-        Point offset = new Point(posteriorPose.position);
+        double theta = robotPose.heading.log();
+        Point offset = new Point(robotPose.position);
         c.setStroke("#3F51B5");
         Point[] corners = {
                 new Point(-halfWidth, halfLength).rotate(theta).add(offset),
@@ -1456,12 +1470,15 @@ if (myTracker != null) {
 
         // Draw the direction segment from the middle of the robot to the middle of the front:
         Point middleFront = new Point(halfWidth, 0).rotate(theta).add(offset);
-        c.strokeLine(posteriorPose.position.x, posteriorPose.position.y, middleFront.x, middleFront.y);
+        c.strokeLine(robotPose.position.x, robotPose.position.y, middleFront.x, middleFront.y);
     }
 
     // Update the pose estimate:
     public void update() {
+        // Track the current time and the delta-t from the previous update() call:
         double time = Globals.time();
+        double dt = time - previousTime;
+        previousTime = time;
 
         // Check to see if we're no locked on and if so, broadcast to all interested
         // pose estimators:
@@ -1483,7 +1500,10 @@ if (myTracker != null) {
         // get recomputed via 'reviseHistory()' calls below:
         HistoryRecord record = new HistoryRecord(time, posteriorPose, odometryTwist, opticalFlowTwist);
         history.addFirst(record); // Newest first
-        posteriorPose = filterHistoryRecord(record);
+        posteriorPose = historyRecordPose(record);
+
+        // Incrementally update the best pose the same way:
+        bestPose = historyRecordPose(new HistoryRecord(time, bestPose, odometryTwist, opticalFlowTwist));
 
         // Delete expired history records:
         while (time - history.getLast().time > HISTORY_DURATION) {
@@ -1508,26 +1528,28 @@ if (myTracker != null) {
         Stats.addData("aprilTagFilter position size", aprilTagFilter.positionResiduals.size());
         Stats.addData("aprilTagFilter heading size", aprilTagFilter.headingResiduals.size()); // @@@
 
-        // @@@ Think about clamping rate change
+        // Once we're locked in, clamp the rate of any changes of 'posteriorPose' to become
+        // 'bestPose' that all clients use:
+        if (!isLockedOn) {
+            bestPose = posteriorPose;
+        } else {
+            Vector2d positionCorrection = posteriorPose.position.minus(bestPose.position);
+            double headingCorrection = Globals.normalizeAngle(posteriorPose.heading.log() - bestPose.heading.log());
 
-//        // Track the current time and the delta-t from the previous filter operation:
-//        double dt = time - previousTime;
-//        previousTime = time;
-//
-//        // Once we're locked in, clamp the rate of any changes:
-//        if (isConfident) {
-//            double distance = Math.hypot(aggregatePositionResidual.x, aggregatePositionResidual.y);
-//            if (distance > dt * MAX_POSITION_CHANGE_RATE) {
-//                double clampFactor = dt * MAX_POSITION_CHANGE_RATE / distance;
-//                positionCorrection = positionCorrection.times(clampFactor);
-//            }
-//            if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
-//                headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
-//            }
-//        }
+            double correctionMagnitude = new Point(positionCorrection).length();
+            if (correctionMagnitude > dt * MAX_POSITION_CHANGE_RATE) {
+                double clampFactor = dt * MAX_POSITION_CHANGE_RATE / correctionMagnitude;
+                positionCorrection = positionCorrection.times(clampFactor);
+            }
+            if (Math.abs(headingCorrection) > dt * MAX_HEADING_CHANGE_RATE) {
+                headingCorrection = dt * Math.signum(headingCorrection) * MAX_HEADING_CHANGE_RATE;
+            }
+            bestPose = new Pose2d(bestPose.position.plus(positionCorrection),
+                                  bestPose.heading.log() + headingCorrection);
+        }
 
         // Output telemetry and visualizations:
-        visualize();
+        visualize(bestPose);
         aprilTagFilter.telemetry();
 
         Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;

@@ -111,7 +111,7 @@ class AutoParker {
         // Position --------------------------------------------------------------------------------
 
         // Radial vector towards the target:
-        Vector2d radialVector = target.position.minus(poser.posteriorPose.position);
+        Vector2d radialVector = target.position.minus(poser.bestPose.position);
 
         // Tangent vector -90 degrees from radial:
         // noinspection SuspiciousNameCombination
@@ -123,7 +123,7 @@ class AutoParker {
             tangentVector = tangentVector.div(tangentLength);
 
         // Convert the velocity to field-relative coordinates:
-        PoseVelocity2d velocity = poser.posteriorPose.times(poser.velocity);
+        PoseVelocity2d velocity = poser.bestPose.times(poser.velocity);
 
         // Compute the current speed:
         double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
@@ -146,11 +146,11 @@ class AutoParker {
       */
     boolean park() {
         // Radial vector towards the target:
-        Vector2d radialVector = target.position.minus(poser.posteriorPose.position);
+        Vector2d radialVector = target.position.minus(poser.bestPose.position);
         double radialLength = radialVector.norm();
 
         // Angular distance to the target:
-        double angularDelta = normalizeAngle(target.heading.log() - poser.posteriorPose.heading.log());
+        double angularDelta = normalizeAngle(target.heading.log() - poser.bestPose.heading.log());
 
         // We're done if the distance is small enough to the goal!
 //  @@@       if ((radialLength < 0.5) && (Math.abs(angularDelta) < Math.toRadians(2)))
@@ -160,7 +160,7 @@ class AutoParker {
         // orientation:
         if (radialLength > turningDistance) {
             double headingToGoal = Math.atan2(radialVector.y, radialVector.x) + facingOrientation;
-            angularDelta = normalizeAngle(headingToGoal - poser.posteriorPose.heading.log());
+            angularDelta = normalizeAngle(headingToGoal - poser.bestPose.heading.log());
         }
 
         double now = Actions.now();
@@ -213,7 +213,7 @@ class AutoParker {
 
         // Add the component velocities to get our new velocity:
         PoseVelocity2d velocity = new PoseVelocity2d(radialVelocity.plus(tangentVelocity), angularSpeed);
-        drive.setDrivePowers(poser.posteriorPose, poser.velocity, null, velocity);
+        drive.setDrivePowers(poser.bestPose, poser.velocity, null, velocity);
 
         // Remember stuff for the next iteration:
         previousTime = now;
@@ -275,8 +275,8 @@ class Wall {
         double alongWallVelocity = Math.sin(towardWallAngle) * velocityMagnitude;
 
         // Compute the distance to the wall:
-        double dx = wallPoint.x - poser.posteriorPose.position.x;
-        double dy = wallPoint.y - poser.posteriorPose.position.y;
+        double dx = wallPoint.x - poser.bestPose.position.x;
+        double dy = wallPoint.y - poser.bestPose.position.y;
         double pointToPointDistance = Math.hypot(dy, dx);
         double pointToPointAngle = Math.atan2(dy, dx);
         double distance = Math.cos(pointToPointAngle - towardWallAngle) * pointToPointDistance;
@@ -394,22 +394,22 @@ public class Driver extends LinearOpMode {
             }
 
             // The 'left-bumper' button activates Road Runner homing:
-            boolean roadrunnerActivated = drive.doActionsWork(poser.posteriorPose, poser.velocity, Globals.packet);
+            boolean roadrunnerActivated = drive.doActionsWork(poser.bestPose, poser.velocity, Globals.packet);
             if ((gamepad1 != null) && (gamepad1.left_bumper) && (!roadrunnerActivated) && (poser.isLockedOn())) {
                 // Ensure that velocity is zero-ish:
                 if ((Math.abs(poser.velocity.linearVel.x) < 0.1) &&
                         (Math.abs(poser.velocity.linearVel.y) < 0.1) &&
                         (Math.abs(poser.velocity.angVel) < 0.1)) {
 
-                    boolean toBackdrop = poser.posteriorPose.position.x < 6.0;
+                    boolean toBackdrop = poser.bestPose.position.x < 6.0;
                     Action action;
                     if (toBackdrop) {
                         // Go to the blue backdrop:
                         Pose2d keyPose = new Pose2d(-36, -36, Math.PI);
                         double startTangent = Math.atan2(
-                                keyPose.position.y - poser.posteriorPose.position.y,
-                                keyPose.position.x - poser.posteriorPose.position.x);
-                        action = drive.actionBuilder(poser.posteriorPose)
+                                keyPose.position.y - poser.bestPose.position.y,
+                                keyPose.position.x - poser.bestPose.position.x);
+                        action = drive.actionBuilder(poser.bestPose)
                                 .setTangent(startTangent)
                                 .splineToSplineHeading(keyPose, 0)
                                 .splineTo(new Vector2d(12, -36), 0)
@@ -419,9 +419,9 @@ public class Driver extends LinearOpMode {
                         // Go to the blue wing:
                         Pose2d keyPose = new Pose2d(12, -36, Math.PI);
                         double startTangent = Math.atan2(
-                                keyPose.position.y - poser.posteriorPose.position.y,
-                                keyPose.position.x - poser.posteriorPose.position.x);
-                        action = drive.actionBuilder(poser.posteriorPose)
+                                keyPose.position.y - poser.bestPose.position.y,
+                                keyPose.position.x - poser.bestPose.position.x);
+                        action = drive.actionBuilder(poser.bestPose)
                                 .setTangent(startTangent)
                                 .splineToSplineHeading(keyPose, Math.PI)
                                 .splineTo(new Vector2d(-36, -36), Math.PI)
@@ -442,12 +442,12 @@ public class Driver extends LinearOpMode {
                             scaleStick(-this.gamepad1.left_stick_x, MecanumDrive.PARAMS.maxWheelVel)), // fullLateralSpeed)),
                             scaleStick(-this.gamepad1.right_stick_x, MecanumDrive.PARAMS.maxAngVel)); // , fullAngularSpeed));
 
-                    PoseVelocity2d fieldVelocity = poser.posteriorPose.times(calibratedVelocity);
+                    PoseVelocity2d fieldVelocity = poser.bestPose.times(calibratedVelocity);
 
                     if ((wall != null) && (poser.isLockedOn()))
                         wall.repulse(fieldVelocity); // @@@
 
-                    drive.setDrivePowers(poser.posteriorPose, poser.velocity, null, fieldVelocity);
+                    drive.setDrivePowers(poser.bestPose, poser.velocity, null, fieldVelocity);
                 } else {
                     PoseVelocity2d manualPower = new PoseVelocity2d(new Vector2d(
                             shapeStick(-this.gamepad1.left_stick_y),
