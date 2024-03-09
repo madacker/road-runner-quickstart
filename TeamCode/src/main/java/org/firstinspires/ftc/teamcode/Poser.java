@@ -32,6 +32,7 @@ import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+import org.openftc.easyopencv.OpenCvCameraFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -623,14 +624,14 @@ class AprilTagLocalizer {
 
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
-            new CameraDescriptor("webcam1", new Point(-0.5, 7.0), 0,
-                    new Size(640, 480),
-                    -1, -1, -1, -1, // Use default FTC calibration
-                    0.190, Math.toRadians(70.4)),
             new CameraDescriptor("webcam2", new Point(6.0, -5.75), Math.PI,
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.190, Math.toRadians(75)),
+            new CameraDescriptor("webcam1", new Point(-0.5, 7.0), 0,
+                    new Size(640, 480),
+                    -1, -1, -1, -1, // Use default FTC calibration
+                    0.190, Math.toRadians(70.4)),
     };
 
     // Structure for describing cameras on the robot:
@@ -701,8 +702,13 @@ class AprilTagLocalizer {
 
     // Constructor:
     AprilTagLocalizer(HardwareMap hardwareMap) {
+        // For multiple simultaneous cameras, have to call 'makeMultiPortalView()' and then pass
+        // each container ID into 'setCameraMonitorViewId()':
+        int[] containerIds = VisionPortal.makeMultiPortalView(
+                CAMERA_DESCRIPTORS.length, VisionPortal.MultiPortalLayout.HORIZONTAL);
+
         for (int i = 0; i < CAMERA_DESCRIPTORS.length; i++) {
-            cameras[i] = initializeCamera(i, hardwareMap);
+            cameras[i] = initializeCamera(i, hardwareMap, containerIds[i]);
             final int lambdaIndex = i;
             Settings.registerToggleOption(String.format("Enable %s", cameras[i].descriptor.name),
                     true, enable -> cameras[lambdaIndex].enabled = enable );
@@ -711,7 +717,7 @@ class AprilTagLocalizer {
     }
 
     // Create the AprilTagProcessor and VisionPortal objects for the specified camera:
-    CameraState initializeCamera(int cameraIndex, HardwareMap hardwareMap) {
+    CameraState initializeCamera(int cameraIndex, HardwareMap hardwareMap, int containerId) {
         CameraDescriptor descriptor = CAMERA_DESCRIPTORS[cameraIndex];
 
         // Create the AprilTag processor.
@@ -755,7 +761,7 @@ class AprilTagLocalizer {
         builder.setCameraResolution(descriptor.resolution);
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
-        // builder.enableLiveView(true);
+        builder.enableLiveView(true);
 
         // Set the stream format; MJPEG uses less bandwidth than default YUY2.
         // builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
@@ -763,10 +769,13 @@ class AprilTagLocalizer {
         // Choose whether or not LiveView stops if no processors are enabled.
         // If set "true", monitor shows solid orange screen if no processors enabled.
         // If set "false", monitor shows camera view without annotations.
-        builder.setAutoStopLiveView(true); // We have a setting to override live-view // @@@
+        builder.setAutoStopLiveView(false); // We have a setting to override live-view // @@@
 
         // Set and enable the processor.
         builder.addProcessor(aprilTagProcessor);
+
+        // Set the container ID for multi-camera support:
+        builder.setLiveViewContainerId(containerId);
 
         // Build the Vision Portal, using the above settings.
         VisionPortal visionPortal = builder.build();
@@ -874,12 +883,12 @@ class AprilTagLocalizer {
         // Do more work if there's a change in the active camera:
         if (activeCamera != resultIndex) {
             // We can't have more than one portal enabled at a time so disable the portals first:
-            for (int i = 0; i < cameras.length; i++) {
-                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, false);
-            }
-            // Then enable the specified portal, if there is one:
-            if (resultIndex != -1)
-                cameras[resultIndex].visionPortal.setProcessorEnabled(cameras[resultIndex].aprilTagProcessor, true);
+//            for (int i = 0; i < cameras.length; i++) {
+//                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, false);
+//            }
+//            // Then enable the specified portal, if there is one:
+//            if (resultIndex != -1)
+//                cameras[resultIndex].visionPortal.setProcessorEnabled(cameras[resultIndex].aprilTagProcessor, true);
 
             Stats.poseStatus = "";
             Stats.cameraFps = 0;
