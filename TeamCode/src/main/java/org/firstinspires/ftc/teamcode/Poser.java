@@ -535,7 +535,7 @@ class DistanceLocalizer {
         double sensorFieldAngle = sensor.descriptor.theta + poseHeading;
 
         // Create the rays representing the edges of the field-of-view:
-        Point sensorPoint = new Point(pose.position.x, pose.position.y).add(sensorFieldOffset);
+        Point sensorPoint = new Point(pose.position).add(sensorFieldOffset);
         Point sensorDirection1 = new Point(Math.cos(sensorFieldAngle - HALF_FOV),
                                            Math.sin(sensorFieldAngle - HALF_FOV));
         Point sensorDirection2 = new Point(Math.cos(sensorFieldAngle + HALF_FOV),
@@ -554,31 +554,36 @@ class DistanceLocalizer {
             Point hitPoint = raySegmentIntersection(sensorRay, wallSegment);
             assert(hitPoint != null);
 
-            // Note that this hitVector points from the hit-point back to the robot:
-            Point hitVector = new Point(pose.position.x, pose.position.y).subtract(hitPoint);
-            double expectedDistance = hitVector.length();
+            // Note that this hitVector points from the hit-point to the sensor point:
+            Point hitVector = sensorPoint.subtract(hitPoint);
+            double hitLength = hitVector.length();
 
             // Ignore measurements that are much shorter than expected (as can happen when
             // another robot blocks the view) or much farther:
-            if (Math.abs(expectedDistance - measuredDistance) < CORRECTNESS_THRESHOLD) {
+            if (Math.abs(hitLength - measuredDistance) < CORRECTNESS_THRESHOLD) {
                 // The raw measured result passes all of our conditions! If we're adding to the
                 // history (as opposed to doing an April-tag fixup), filter the result (and add
                 // it to the filter history):
                 if (history != null) {
                     measuredDistance = history.distance.sensor.filter.filter(
-                            history.time, measuredDistance, expectedDistance);
+                            history.time, measuredDistance, hitLength);
 
                     Stats.addData("filtered distance", measuredDistance); // @@@
                 }
 
                 // Yay, it looks like a valid result. Push the pose out, or pull it in,
                 // accordingly:
-                double fixupFactor = measuredDistance / expectedDistance;
-                Point fixupVector = new Point(hitVector.x * fixupFactor, hitVector.y * fixupFactor);
-                Point newPosition = hitPoint.add(fixupVector);
+                double fixupFactor = measuredDistance / hitLength;
+                Point fixedUpSensorPoint = hitPoint.add(hitVector.scale(fixupFactor));
+                Point fixupVector = fixedUpSensorPoint.subtract(sensorPoint);
 
-                pose = new Pose2d(new Vector2d(newPosition.x, newPosition.y), pose.heading);
+                pose = new Pose2d(pose.position.plus(fixupVector.vector2d()), pose.heading);
                 valid = true;
+
+if (history == null) {
+    double recompute = poseDistanceToWall(pose, sensor, wallSegment); // @@@
+    Stats.addData("Recomputed (should be zero)", recompute - measuredDistance); // @@@
+}
             }
         }
 
