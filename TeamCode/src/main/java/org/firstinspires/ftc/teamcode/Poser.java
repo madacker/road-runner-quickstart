@@ -32,7 +32,6 @@ import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
-import org.openftc.easyopencv.OpenCvCameraFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -628,7 +627,7 @@ class AprilTagLocalizer {
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.190, Math.toRadians(75)),
-            new CameraDescriptor("webcam1", new Point(-0.5, 7.0), 0,
+            new CameraDescriptor("webcam1", new Point(-0.5, -7.0), 0,
                     new Size(640, 480),
                     -1, -1, -1, -1, // Use default FTC calibration
                     0.190, Math.toRadians(70.4)),
@@ -883,12 +882,17 @@ class AprilTagLocalizer {
         // Do more work if there's a change in the active camera:
         if (activeCamera != resultIndex) {
             // We can't have more than one portal enabled at a time so disable the portals first:
-//            for (int i = 0; i < cameras.length; i++) {
-//                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, false);
-//            }
-//            // Then enable the specified portal, if there is one:
-//            if (resultIndex != -1)
-//                cameras[resultIndex].visionPortal.setProcessorEnabled(cameras[resultIndex].aprilTagProcessor, true);
+            // @@@ True?
+            for (int i = 0; i < cameras.length; i++) {
+                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, false);
+                cameras[i].visionPortal.stopLiveView();
+            }
+
+            // Then enable the specified portal, if there is one:
+            if (resultIndex != -1) {
+                cameras[resultIndex].visionPortal.setProcessorEnabled(cameras[resultIndex].aprilTagProcessor, true);
+                cameras[resultIndex].visionPortal.resumeLiveView();
+            }
 
             Stats.poseStatus = "";
             Stats.cameraFps = 0;
