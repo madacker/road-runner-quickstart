@@ -67,7 +67,7 @@ class Ray {
  * to the odometry poses.
  */
 class DistanceFilter {
-    static final double WINDOW_DURATION = 3.0; // @@@ 0.500; // Seconds
+    static final double WINDOW_DURATION = 0.5; // Seconds
     static final double WATCHDOG_WINDOW_FRACTION = 0.5; // Fraction of the window duration
 
     LinkedList<Storage> residuals = new LinkedList<>();
@@ -567,8 +567,6 @@ class DistanceLocalizer {
                 if (history != null) {
                     measuredDistance = history.distance.sensor.filter.filter(
                             history.time, measuredDistance, hitLength);
-
-                    Stats.addData("filtered distance", measuredDistance); // @@@
                 }
 
                 // Yay, it looks like a valid result. Push the pose out, or pull it in,
@@ -579,11 +577,6 @@ class DistanceLocalizer {
 
                 pose = new Pose2d(pose.position.plus(fixupVector.vector2d()), pose.heading);
                 valid = true;
-
-if (history == null) {
-    double recompute = poseDistanceToWall(pose, sensor, wallSegment); // @@@
-    Stats.addData("Recomputed (should be zero)", recompute - measuredDistance); // @@@
-}
             }
         }
 
@@ -630,16 +623,20 @@ class AprilTagLocalizer {
 
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
+            new CameraDescriptor("webcam1", new Point(-0.5, 7.0), 0,
+                    new Size(640, 480),
+                    -1, -1, -1, -1, // Use default FTC calibration
+                    0.190, Math.toRadians(70.4)),
             new CameraDescriptor("webcam2", new Point(6.0, -5.75), Math.PI,
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
-                    0.19, Math.toRadians(75))
+                    0.190, Math.toRadians(75)),
     };
 
     // Structure for describing cameras on the robot:
     static class CameraDescriptor {
         String name; // Device name in the robot's configuration
-        Point offset; // Offset from camera *to* the center (opposite of what you'd expect!), inches
+        Point offset; // Offset of the camera on the robot
         double theta; // Orientation of the sensor on the robot, in radians
         Size resolution; // Resolution in pixels
         double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
@@ -766,7 +763,7 @@ class AprilTagLocalizer {
         // Choose whether or not LiveView stops if no processors are enabled.
         // If set "true", monitor shows solid orange screen if no processors enabled.
         // If set "false", monitor shows camera view without annotations.
-        builder.setAutoStopLiveView(false); // We have a setting to override live-view
+        builder.setAutoStopLiveView(true); // We have a setting to override live-view // @@@
 
         // Set and enable the processor.
         builder.addProcessor(aprilTagProcessor);
@@ -876,10 +873,13 @@ class AprilTagLocalizer {
 
         // Do more work if there's a change in the active camera:
         if (activeCamera != resultIndex) {
+            // We can't have more than one portal enabled at a time so disable the portals first:
             for (int i = 0; i < cameras.length; i++) {
-                boolean enable = (i == resultIndex);
-                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, enable);
+                cameras[i].visionPortal.setProcessorEnabled(cameras[i].aprilTagProcessor, false);
             }
+            // Then enable the specified portal, if there is one:
+            if (resultIndex != -1)
+                cameras[resultIndex].visionPortal.setProcessorEnabled(cameras[resultIndex].aprilTagProcessor, true);
 
             Stats.poseStatus = "";
             Stats.cameraFps = 0;
@@ -1151,7 +1151,7 @@ public class Poser {
 
     // True if using optical flow for our master predictions, false if using odometry:
     /** @noinspection FieldCanBeLocal*/
-    private final boolean USING_OPTICAL_FLOW = false;
+    private final boolean USE_OPTICAL_FLOW = false;
 
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
@@ -1246,7 +1246,7 @@ public class Poser {
     // Combine the various poses in a historical record:
     Pose2d historyRecordPose(HistoryRecord record) {
         Pose2d compositePose = record.posteriorPose;
-        if (USING_OPTICAL_FLOW)
+        if (USE_OPTICAL_FLOW)
             compositePose = record.opticalFlowTwist.apply(compositePose);
         else
             compositePose = record.odometryTwist.apply(compositePose);
@@ -1255,9 +1255,6 @@ public class Poser {
             compositePose = DistanceLocalizer.localize(
                 compositePose, record.distance.sensor, record.distance.wall, record.distance.measurement, record);
         }
-
-double newDistance = -1;
-DistanceLocalizer.WallTracker myTracker = null;
 
         if ((record.aprilTag != null) && (record.aprilTag.pose != null)) {
             Pose2d aprilTagPose = record.aprilTag.pose;
@@ -1271,24 +1268,10 @@ DistanceLocalizer.WallTracker myTracker = null;
 
                         aprilTagPose = DistanceLocalizer.localize(
                             aprilTagPose, tracker.sensor, tracker.wall, currentDistance, null);
-
-myTracker = tracker;
-newDistance = DistanceLocalizer.poseDistanceToWall(aprilTagPose, tracker.sensor, tracker.wall); // @@@
-
-Stats.addData("Fixup delta (should be zero)", newDistance - currentDistance); // @@@
-
                     }
                 }
             }
             compositePose = aprilTagFilter.filter(record.time, compositePose, aprilTagPose, record.aprilTag.isConfident);
-
-if (myTracker != null) {
-    double compositeDistance = DistanceLocalizer.poseDistanceToWall( // @@@
-            compositePose, myTracker.sensor, myTracker.wall);
-    Stats.addData("AprilTag delta (should be close to zero)", compositeDistance - newDistance);
-    Stats.addData("AprilTag distance", compositeDistance);
-}
-
         }
         return compositePose;
     }
