@@ -31,6 +31,7 @@ import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagPoseFtc;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.ArrayList;
@@ -623,11 +624,13 @@ class AprilTagLocalizer {
 
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
-            new CameraDescriptor("webcam2", new Point(6.0, -5.75), Math.PI,
+            new CameraDescriptor("webcam2", new Point(-5.75, -6),
+                    new Point(6.0, -5.75), Math.PI, // @@@ Bad one here!
                     new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.190, Math.toRadians(75)),
-            new CameraDescriptor("webcam1", new Point(-0.5, -7.0), 0,
+            new CameraDescriptor("webcam1", new Point(7.0, -0.5),
+                    new Point(-0.5, -7.0), 0, // @@@ Bad one here!
                     new Size(640, 480),
                     -1, -1, -1, -1, // Use default FTC calibration
                     0.190, Math.toRadians(70.4)),
@@ -636,43 +639,43 @@ class AprilTagLocalizer {
     // Structure for describing cameras on the robot:
     static class CameraDescriptor {
         String name; // Device name in the robot's configuration
-        Point offset; // Offset of the camera on the robot
+        Point goodOffset; // Offset of the camera on the robot
+        Point badOffset; // *BAD* Offset of the camera on the robot
         double theta; // Orientation of the sensor on the robot, in radians
         Size resolution; // Resolution in pixels
         double fx, fy, cx, cy; // Lens intrinsics; fx = -1 to use system default
         double latency; // End-to-end April Tag processing latency, in seconds
         double fov; // Horizontal field of view, in radians
 
-        public CameraDescriptor(String name, Point offset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency, double fov) {
-            this.name = name; this.offset = offset; this.theta = theta; this.resolution = resolution;
+        public CameraDescriptor(String name, Point goodOffset, Point badOffset, double theta, Size resolution, double fx, double fy, double cx, double cy, double latency, double fov) {
+            this.name = name; this.goodOffset = goodOffset; this.badOffset = badOffset; this.theta = theta; this.resolution = resolution;
             this.fx = fx; this.fy = fy; this.cx = cx; this.cy = cy;
             this.latency = latency; this.fov = fov;
         }
     }
 
     final Location[] TAG_LOCATIONS = {
-            new Location(1, 62.875, 42.750, Math.toRadians(180), false), // Blue left backdrop, small
-            new Location(2, 62.875, 36.625, Math.toRadians(180), false), // Blue middle backdrop, small
-            new Location(3, 62.875, 30.625, Math.toRadians(180), false), // Blue right backdrop, small
-            new Location(4, 62.875, -30.625, Math.toRadians(180), false), // Red left backdrop, small
-            new Location(5, 62.875, -36.750, Math.toRadians(180), false), // Red middle backdrop, small
-            new Location(6, 62.875, -42.625, Math.toRadians(180), false), // Red right backdrop, small
-            new Location(7, -72, -43.0, 0, true),   // Red audience wall, large
-            new Location(8, -72, -37.5, 0, false),  // Red audience wall, small
-            new Location(9, -72, 37.5, 0, false),  // Blue audience wall, small
-            new Location(10, -72, 43.0, 0, true),   // Blue audience wall, large
+        new Location(1, 62.875, 42.750, Math.toRadians(180), false), // Blue left backdrop, small
+        new Location(2, 62.875, 36.625, Math.toRadians(180), false), // Blue middle backdrop, small
+        new Location(3, 62.875, 30.625, Math.toRadians(180), false), // Blue right backdrop, small
+        new Location(4, 62.875, -30.625, Math.toRadians(180), false), // Red left backdrop, small
+        new Location(5, 62.875, -36.750, Math.toRadians(180), false), // Red middle backdrop, small
+        new Location(6, 62.875, -42.625, Math.toRadians(180), false), // Red right backdrop, small
+        new Location(7, -72, -43.0, 0, true),   // Red audience wall, large
+        new Location(8, -72, -37.5, 0, false),  // Red audience wall, small
+        new Location(9, -72, 37.5, 0, false),  // Blue audience wall, small
+        new Location(10, -72, 43.0, 0, true),   // Blue audience wall, large
     };
 
     // Structure defining the location of April Tags:
     static class Location {
         int id;
-        double x;
-        double y;
-        double theta; // Degrees
+        Point point;
+        double theta; // Radians
         boolean large;
 
         Location(int id, double x, double y, double theta, boolean large) {
-            this.id = id; this.x = x; this.y = y; this.theta = theta; this.large = large;
+            this.id = id; this.point = new Point(x, y); this.theta = theta; this.large = large;
         }
     }
 
@@ -804,16 +807,35 @@ class AprilTagLocalizer {
     }
 
     // Compute the robot's field-relative pose from the April-tag-relative pose.
-    private Pose2d computeRobotPose(AprilTagDetection detection, Location tag, CameraDescriptor descriptor) {
-        double dx = detection.ftcPose.x - descriptor.offset.x;
-        double dy = detection.ftcPose.y - descriptor.offset.y;
+    private Pose2d computeRobotPose(AprilTagPoseFtc ftcPose, Location tag, CameraDescriptor descriptor) {
+        {
+            // Compute the field-space angle from the tag to the camera:
+            double angleToRobot = tag.theta + ftcPose.yaw;
+
+            // Compute the camera's field-space location:
+            Point vectorToRobot = new Point(ftcPose.range, 0).rotate(angleToRobot);
+            Point cameraPoint = tag.point.add(vectorToRobot);
+
+            // Compute the robot's heading:
+            double robotHeading = Math.PI - angleToRobot + descriptor.theta;
+
+            // Compute the field-space offset from the origin to the camera:
+            Point cameraOffset = descriptor.goodOffset.rotate(robotHeading);
+            Point robotCenter = cameraPoint.subtract(cameraOffset);
+
+            Pose2d result = new Pose2d(robotCenter.vector2d(), robotHeading);
+            System.out.println(result); // @@@
+        }
+
+        double dx = ftcPose.x - descriptor.badOffset.x;
+        double dy = ftcPose.y - descriptor.badOffset.y;
         double distance = Math.sqrt(dx * dx + dy * dy);
 
-        double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + tag.theta);
-        double x = tag.x + Math.cos(gamma) * distance;
-        double y = tag.y + Math.sin(gamma) * distance;
+        double gamma = -(Math.atan(dx / dy) + Math.toRadians(ftcPose.yaw) + tag.theta);
+        double x = tag.point.x + Math.cos(gamma) * distance;
+        double y = tag.point.y + Math.sin(gamma) * distance;
 
-        double theta = Math.toRadians(detection.ftcPose.yaw) + tag.theta + descriptor.theta;
+        double theta = Math.toRadians(ftcPose.yaw) + tag.theta + descriptor.theta;
         return new Pose2d(new Vector2d(x, y), Math.PI - theta);
     }
 
@@ -847,9 +869,7 @@ class AprilTagLocalizer {
             // Determine the camera with the closest view of a tag:
             double minDistance = Double.MAX_VALUE;
             for (Location location: TAG_LOCATIONS) {
-                Vector2d vectorToTag = new Vector2d(
-                        location.x - pose.position.x,
-                        location.y - pose.position.y);
+                Vector2d vectorToTag = location.point.vector2d().minus(pose.position);
                 double tagAngle = Math.atan2(vectorToTag.y, vectorToTag.x); // Rise over run
                 for (int i = 0; i < cameras.length; i++) {
                     CameraState camera = cameras[i];
@@ -925,7 +945,7 @@ class AprilTagLocalizer {
             if (detection.metadata != null) {
                 Location tag = getTag(detection);
                 if (tag != null) {
-                    Pose2d visionPose = computeRobotPose(detection, tag, camera.descriptor);
+                    Pose2d visionPose = computeRobotPose(detection.ftcPose, tag, camera.descriptor);
                     double residual = Math.hypot(
                             currentPose.position.x - visionPose.position.x,
                             currentPose.position.y - visionPose.position.y);
@@ -1362,7 +1382,7 @@ public class Poser {
         if (aprilTagLocalizer.activeCamera != -1) {
             AprilTagLocalizer.CameraDescriptor descriptor = AprilTagLocalizer.CAMERA_DESCRIPTORS[aprilTagLocalizer.activeCamera];
             double cameraAngle = robotPose.heading.log() + descriptor.theta;
-            Point cameraOffset = descriptor.offset.rotate(robotPose.heading.log() - Math.PI / 2); // Account for my (x, y) flip
+            Point cameraOffset = descriptor.goodOffset.rotate(robotPose.heading.log());
             Point cameraOrigin = new Point(robotPose.position.x + cameraOffset.x, robotPose.position.y + cameraOffset.y);
             double rayLength = 100;
             double halfFov = descriptor.fov / 2.0;
