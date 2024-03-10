@@ -807,35 +807,36 @@ class AprilTagLocalizer {
     }
 
     // Compute the robot's field-relative pose from the April-tag-relative pose.
-    private Pose2d computeRobotPose(AprilTagPoseFtc ftcPose, Location tag, CameraDescriptor descriptor) {
+    private Pose2d computeRobotPose(AprilTagPoseFtc ftcPose, Location tag, CameraDescriptor camera) {
         {
             // Compute the field-space angle from the tag to the camera:
-            double angleToRobot = tag.theta + ftcPose.yaw;
+            double angleToRobot = tag.theta + Math.toRadians(ftcPose.yaw);
 
             // Compute the camera's field-space location:
             Point vectorToRobot = new Point(ftcPose.range, 0).rotate(angleToRobot);
             Point cameraPoint = tag.point.add(vectorToRobot);
 
-            // Compute the robot's heading:
-            double robotHeading = Math.PI - angleToRobot + descriptor.theta;
+            // Compute the robot's heading by mirroring the angle to the robot, and adding the
+            // camera's angle:
+            double robotHeading = Math.PI - angleToRobot + camera.theta;
 
             // Compute the field-space offset from the origin to the camera:
-            Point cameraOffset = descriptor.goodOffset.rotate(robotHeading);
+            Point cameraOffset = camera.goodOffset.rotate(robotHeading);
             Point robotCenter = cameraPoint.subtract(cameraOffset);
 
             Pose2d result = new Pose2d(robotCenter.vector2d(), robotHeading);
             System.out.println(result); // @@@
         }
 
-        double dx = ftcPose.x - descriptor.badOffset.x;
-        double dy = ftcPose.y - descriptor.badOffset.y;
+        double dx = ftcPose.x - camera.badOffset.x;
+        double dy = ftcPose.y - camera.badOffset.y;
         double distance = Math.sqrt(dx * dx + dy * dy);
 
         double gamma = -(Math.atan(dx / dy) + Math.toRadians(ftcPose.yaw) + tag.theta);
         double x = tag.point.x + Math.cos(gamma) * distance;
         double y = tag.point.y + Math.sin(gamma) * distance;
 
-        double theta = Math.toRadians(ftcPose.yaw) + tag.theta + descriptor.theta;
+        double theta = Math.toRadians(ftcPose.yaw) + tag.theta + camera.theta;
         return new Pose2d(new Vector2d(x, y), Math.PI - theta);
     }
 
