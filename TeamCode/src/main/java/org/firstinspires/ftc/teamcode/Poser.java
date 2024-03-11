@@ -150,7 +150,7 @@ class AprilTagFilter {
 
     // The residuals are maintained in newest-to-oldest order:
     public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
-    public LinkedList<Storage<Vector2d>> positionResiduals = new LinkedList<>();
+    public LinkedList<Storage<Point>> positionResiduals = new LinkedList<>();
 
     // Storage for filter data:
     static class Storage<T> {
@@ -166,6 +166,50 @@ class AprilTagFilter {
     // Specify true for isConfident if a starting pose was specified to Poser()
     AprilTagFilter(boolean isConfident) {
         this.isConfident = isConfident;
+    }
+
+    // Handy class to describe a circle:
+    static class Circle {
+        Point center;
+        double radius;
+
+        public Circle(Point center, double radius) {
+            this.center = center; this.radius = radius;
+        }
+    }
+
+    // Recursive Welzl's algorithm to find the minimal bounding circle, courtesy of CoPilot:
+    private static Circle welzl(List<Storage<Point>> points, List<Point> boundary, int size) {
+        if (size == 0 || boundary.size() == 3) {
+            if (boundary.size() == 0) {
+                return new Circle(new Point(0, 0), 0);
+            } else if (boundary.size() == 1) {
+                return new Circle(boundary.get(0), 0);
+            } else if (boundary.size() == 2) {
+                Point p1 = boundary.get(0);
+                Point p2 = boundary.get(1);
+                Point center = new Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+                double radius = p1.distance(p2) / 2;
+                return new Circle(center, radius);
+            }
+        }
+
+        Point p = points.get(size - 1).residual;
+        Circle result = welzl(points, boundary, size - 1);
+
+        if (result.center.distance(p) > result.radius) {
+            boundary.add(p);
+            result = welzl(points, boundary, size - 1);
+            boundary.remove(p);
+        }
+
+        return result;
+    }
+
+    // Calculate the tightest bounding circle for the residuals:
+    Circle getResidualsBoundingCircle() {
+        LinkedList<Point> boundary = new LinkedList<>(); // Initially empty boundary
+        return welzl(positionResiduals, boundary, positionResiduals.size());
     }
 
     // Filter the prediction and measurements and return a posterior:
@@ -202,7 +246,7 @@ class AprilTagFilter {
         // Add April Tag and distance sensor results to the position history:
         if (newAprilTagPose != null) {
             Vector2d positionResidual = newAprilTagPose.position.minus(currentCompositePose.position);
-            positionResiduals.addFirst(new Storage<>(positionResidual)); // Newest to oldest
+            positionResiduals.addFirst(new Storage<>(new Point(positionResidual))); // Newest to oldest
         }
 
         // Add confident April Tags to the headings history:
@@ -217,28 +261,28 @@ class AprilTagFilter {
         }
 
         // Compute the averages of all the residuals:
-        Vector2d aggregatePositionResidual = new Vector2d(0, 0);
+        Point aggregatePositionResidual = new Point(0, 0);
         double aggregateHeaderResidual = 0;
 
-        for (Storage<Vector2d> position: positionResiduals) {
-            aggregatePositionResidual = aggregatePositionResidual.plus(position.residual);
+        for (Storage<Point> position: positionResiduals) {
+            aggregatePositionResidual = aggregatePositionResidual.add(position.residual);
         }
         for (Storage<Double> heading: headingResiduals) {
             aggregateHeaderResidual = aggregateHeaderResidual + heading.residual;
         }
 
         if (positionResiduals.size() != 0)
-            aggregatePositionResidual = aggregatePositionResidual.div(positionResiduals.size());
+            aggregatePositionResidual = aggregatePositionResidual.scale(1.0 / positionResiduals.size());
         if (headingResiduals.size() != 0)
             aggregateHeaderResidual = aggregateHeaderResidual / headingResiduals.size();
 
         // Compute how much to correct the current position and heading:
-        Vector2d positionCorrection = new Vector2d(aggregatePositionResidual.x, aggregatePositionResidual.y);
+        Point positionCorrection = aggregatePositionResidual;
         double headingCorrection = aggregateHeaderResidual;
 
         // Negatively offset everything in the history to account for the offset we're adding:
-        for (Storage<Vector2d> position: positionResiduals) {
-            position.residual = position.residual.minus(positionCorrection);
+        for (Storage<Point> position: positionResiduals) {
+            position.residual = position.residual.subtract(positionCorrection);
         }
         for (Storage<Double> heading: headingResiduals) {
             heading.residual = heading.residual - headingCorrection;
@@ -246,7 +290,7 @@ class AprilTagFilter {
 
         // Correct the current pose to create the new pose:
         return new Pose2d(
-                currentCompositePose.position.plus(positionCorrection),
+                currentCompositePose.position.plus(positionCorrection.vector2d()),
                 currentCompositePose.heading.log() + headingCorrection);
     }
 
@@ -625,13 +669,13 @@ class AprilTagLocalizer {
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
             new CameraDescriptor("webcam2", new Point(-5.75, -6),
-                    new Point(6.0, -5.75), Math.PI, // @@@ Bad one here!
-                    new Size(1280, 720),
+                    new Point(6.0, -5.75), // @@@ Remove me!
+                    Math.PI, new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.190, Math.toRadians(75)),
             new CameraDescriptor("webcam1", new Point(7.0, -0.5),
-                    new Point(-0.5, -7.0), 0, // @@@ Bad one here!
-                    new Size(640, 480),
+                    new Point(-0.5, -7.0),  // @@@ Remove me!
+                    0, new Size(640, 480),
                     -1, -1, -1, -1, // Use default FTC calibration
                     0.190, Math.toRadians(70.4)),
     };
@@ -1259,12 +1303,8 @@ public class Poser {
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
-        try {
+        if (USE_OPTICAL_FLOW)
             opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap, imu);
-        } catch (IllegalArgumentException e) {
-            // FTC Fast Loads trigger this case:
-            opticalFlowLocalizer = null;
-        }
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
@@ -1286,7 +1326,7 @@ public class Poser {
     // Combine the various poses in a historical record:
     Pose2d historyRecordPose(HistoryRecord record) {
         Pose2d compositePose = record.posteriorPose;
-        if (USE_OPTICAL_FLOW)
+        if (record.opticalFlowTwist != null)
             compositePose = record.opticalFlowTwist.apply(compositePose);
         else
             compositePose = record.odometryTwist.apply(compositePose);
@@ -1440,9 +1480,11 @@ public class Poser {
                     }
 
                     if (record.aprilTag.pose != null) {
-                        // Draw confident April Tags in green, not so confident in yellow:
+                        // Draw confident April Tags as green crosses, not so confident in yellow:
+                        Vector2d position = record.aprilTag.pose.position;
                         c.setStroke(record.aprilTag.isConfident ? "#00ff00" : "#a0a000");
-                        MecanumDrive.drawRobot(Globals.canvas, record.aprilTag.pose, 3);
+                        c.strokeLine(position.x, position.y - 1.5, position.x, position.y + 1.5);
+                        c.strokeLine(position.x - 1.5, position.y, position.x + 1.5, position.y);
                     }
                 }
 
@@ -1451,6 +1493,15 @@ public class Poser {
                     break;
                 record = iterator.previous();
             }
+        }
+
+        // Draw the AprilTag pose residuals along with their bounding circle in white:
+        c.setStroke("#ffffff");
+        AprilTagFilter.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
+        if (circle.radius != 0)
+            c.strokeCircle(circle.center.x, circle.center.y, circle.radius);
+        for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {
+            c.fillRect(point.residual.x - 0.5, point.residual.y - 0.5, 1, 1);
         }
 
         // Draw the last distance measurement if it's new enough:
