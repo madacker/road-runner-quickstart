@@ -17,8 +17,8 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        Globals.initialize(telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
         waitForStart();
 

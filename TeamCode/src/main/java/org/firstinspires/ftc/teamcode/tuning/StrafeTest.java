@@ -6,6 +6,7 @@ import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 @TeleOp
@@ -28,8 +29,9 @@ public final class StrafeTest extends LinearOpMode {
         MecanumDrive.PARAMS.headingVelGain = 0;
         MecanumDrive.PARAMS.lateralGain = 0;
         MecanumDrive.PARAMS.lateralVelGain = 0;
-        
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
         waitForStart();
 

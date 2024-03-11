@@ -21,6 +21,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpModeManager;
 import com.qualcomm.robotcore.eventloop.opmode.OpModeRegistrar;
 
 import org.firstinspires.ftc.robotcore.internal.opmode.OpModeMeta;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.TankDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
@@ -53,7 +54,8 @@ public final class TuningOpModes {
         DriveViewFactory dvf;
         if (DRIVE_CLASS.equals(MecanumDrive.class)) {
             dvf = hardwareMap -> {
-                MecanumDrive md = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+                Globals globals = new Globals(hardwareMap, null);
+                MecanumDrive md = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
                 List<Encoder> leftEncs = new ArrayList<>(), rightEncs = new ArrayList<>();
                 List<Encoder> parEncs = new ArrayList<>(), perpEncs = new ArrayList<>();
@@ -95,8 +97,8 @@ public final class TuningOpModes {
                         rightEncs,
                         parEncs,
                         perpEncs,
-                        md.imu,
-                        md.voltageSensor,
+                        Globals.getImu(),
+                        Globals.getVoltageSensor(),
                         () -> new MotorFeedforward(MecanumDrive.PARAMS.kS,
                                 MecanumDrive.PARAMS.kV / MecanumDrive.PARAMS.inPerTick,
                                 MecanumDrive.PARAMS.kA / MecanumDrive.PARAMS.inPerTick)

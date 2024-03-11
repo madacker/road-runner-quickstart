@@ -42,6 +42,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -105,7 +106,8 @@ public class AprilTagTest extends LinearOpMode {
 
         initAprilTag();
 
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");

@@ -8,12 +8,14 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 public class LocalizationTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
         waitForStart();
 

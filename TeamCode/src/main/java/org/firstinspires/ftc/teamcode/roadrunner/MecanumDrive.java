@@ -35,14 +35,11 @@ import com.acmerobotics.roadrunner.ftc.OverflowEncoder;
 import com.acmerobotics.roadrunner.ftc.PositionVelocityPair;
 import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.hardware.lynx.LynxModule;
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.inspection.InspectionState;
 
@@ -152,8 +149,6 @@ public final class MecanumDrive {
             new ProfileAccelConstraint(PARAMS.minProfileAccel, PARAMS.maxProfileAccel);
 
     public final DcMotorEx leftFront, leftBack, rightBack, rightFront;
-    public final VoltageSensor voltageSensor;
-    public final IMU imu;
 
     public final Localizer localizer;
     public Pose2d pose;
@@ -179,7 +174,7 @@ public final class MecanumDrive {
             lastRightBackPos = rightBack.getPositionAndVelocity().position;
             lastRightFrontPos = rightFront.getPositionAndVelocity().position;
 
-            lastHeading = Rotation2d.exp(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS));
+            lastHeading = Rotation2d.exp(Globals.getYaw());
         }
 
         @Override
@@ -191,11 +186,8 @@ public final class MecanumDrive {
             PositionVelocityPair rightFrontPosVel = rightFront.getPositionAndVelocity();
             Stats.endTimer("io::getEncoders");
 
-            Stats.startTimer("io::getImu");
-            Rotation2d heading = Rotation2d.exp(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS));
-            Stats.endTimer("io::getImu");
+            Rotation2d heading = Rotation2d.exp(Globals.getYaw());
 
-            Stats.startTimer("io::encoder?");
             double headingDelta = heading.minus(lastHeading);
 
             Twist2dDual<Time> twist = kinematics.forward(new MecanumKinematics.WheelIncrements<>(
@@ -229,12 +221,12 @@ public final class MecanumDrive {
                     DualNum.cons(headingDelta, twist.angle.drop(1))
             );
 
-            Stats.endTimer("io::encoder?");
             return result;
         }
     }
 
-    public MecanumDrive(HardwareMap hardwareMap, Pose2d pose) {
+    // Require a Globals object merely to sure that it's already been instantiated:
+    public MecanumDrive(HardwareMap hardwareMap, Pose2d pose, Globals globals) {
         this.pose = pose;
 
         LynxFirmware.throwIfModulesAreOutdated(hardwareMap);
@@ -266,25 +258,10 @@ public final class MecanumDrive {
         rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        imu = hardwareMap.get(IMU.class, "imu");
-        IMU.Parameters parameters;
-        if (isDevBot) {
-            parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                    RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
-        } else {
-            parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.DOWN,
-                    RevHubOrientationOnRobot.UsbFacingDirection.BACKWARD));
-        }
-        imu.initialize(parameters);
-
-        voltageSensor = hardwareMap.voltageSensor.iterator().next();
-
         if (isDevBot) {
             localizer = new DriveLocalizer();
         } else {
-            localizer = new ThreeDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
+            localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);
             // localizer = new TwoDeadWheelLocalizer(hardwareMap, imu, PARAMS.inPerTick);
         }
 
@@ -378,10 +355,7 @@ public final class MecanumDrive {
 
         MecanumKinematics.WheelVelocities<Time> assistVels = kinematics.inverse(command);
 
-        Stats.startTimer("io::getVoltage");
-        double voltage = voltageSensor.getVoltage();
-        Stats.endTimer("io::getVoltage");
-
+        double voltage = Globals.getVoltage();
         final MotorFeedforward feedforward = new MotorFeedforward(
                 PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick);
 
@@ -463,7 +437,7 @@ public final class MecanumDrive {
                     .compute(txWorldTarget, pose, robotVelRobot);
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
-            double voltage = voltageSensor.getVoltage();
+            double voltage = Globals.getVoltage();
 
             final MotorFeedforward feedforward = new MotorFeedforward(PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick);
             leftFront.setPower(feedforward.compute(wheelVels.leftFront) / voltage);
@@ -539,7 +513,7 @@ public final class MecanumDrive {
                     .compute(txWorldTarget, pose, robotVelRobot);
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
-            double voltage = voltageSensor.getVoltage();
+            double voltage = Globals.getVoltage();
             final MotorFeedforward feedforward = new MotorFeedforward(PARAMS.kS, PARAMS.kV / PARAMS.inPerTick, PARAMS.kA / PARAMS.inPerTick);
             leftFront.setPower(feedforward.compute(wheelVels.leftFront) / voltage);
             leftBack.setPower(feedforward.compute(wheelVels.leftBack) / voltage);

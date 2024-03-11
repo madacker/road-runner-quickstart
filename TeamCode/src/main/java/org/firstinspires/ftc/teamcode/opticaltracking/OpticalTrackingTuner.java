@@ -8,7 +8,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Point;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
@@ -207,13 +206,13 @@ public class OpticalTrackingTuner extends LinearOpMode {
             tickDistance = 0;
 
             // Reset the two sensors:
-            drive.imu.resetYaw();
+            Globals.getImu().resetYaw();
             optical.getMotion();
 
-            double lastYaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+            double lastYaw = Globals.getYaw();
             while (opModeIsActive() && (rotationTotal < rotationTarget)) {
                 // Track the amount of rotation we've done:
-                double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                double yaw = Globals.getYaw();
                 double deltaYaw = Globals.normalizeAngle(yaw - lastYaw);
                 lastYaw = yaw;
 
@@ -288,8 +287,8 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
 
     @Override
     public void runOpMode() {
-        Globals.initialize(telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         TimeSplitter opticalInitialize = TimeSplitter.create("Optical Initialization");
 
         opticalInitialize.startSplit();
@@ -309,6 +308,7 @@ System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotation
             telemetry.addLine(String.format("\nFarthest-point to distance-traveled radius: %.2f", centerOfRotation.farthestPointRadius / centerOfRotation.traveledRadius));
         }
         telemetry.update();
+        //noinspection StatementWithEmptyBody
         while (opModeIsActive())
             ;
 

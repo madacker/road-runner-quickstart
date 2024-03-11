@@ -6,7 +6,6 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -16,8 +15,8 @@ public class OpticalTrackingTest extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        Globals.initialize(telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical2");
         Pose2d opticalPose = new Pose2d(0, 0, 0);
         TimeSplitter opticalTimer = TimeSplitter.create("Optical read");
@@ -38,9 +37,8 @@ public class OpticalTrackingTest extends LinearOpMode {
             OpticalTrackingPaa5100.Motion motion = optical.getMotion();
             opticalTimer.endSplit();
 
-
             // Update and draw the optical motion pose estimate:
-            double yaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+            double yaw = Globals.getYaw();
             Vector2d fieldTranslation = new Vector2d(
                 Math.cos(yaw) * motion.x - Math.sin(yaw) * motion.y,
                 Math.sin(yaw) * motion.x + Math.cos(yaw) * motion.y);

@@ -24,6 +24,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.ThreeDeadWheelLocalizer;
 import org.firstinspires.ftc.teamcode.roadrunner.TwoDeadWheelLocalizer;
@@ -95,6 +96,7 @@ class TickTracker {
         double maxTicks = maxTicks();
 
         if (maxTicks < 300) {
+            //noinspection ConstantValue
             passed &= report(telemetry, "Ticks so far", String.valueOf(maxTicks), "keep pushing");
         } else {
             if (mode == Mode.ROTATE) {
@@ -114,6 +116,7 @@ class TickTracker {
                 } else if (totalYaw < -5) {
                     error = "Yaw is negative, you're turning counterclockwise \uD83D\uDD04, right?";
                 }
+                //noinspection ConstantValue
                 passed &= report(telemetry, "<b>IMU</b>", String.format("%.1f°", totalYaw), error);
             }
 
@@ -183,7 +186,7 @@ class TickTracker {
         return passed;
     }
 
-    class Counter {
+    static class Counter {
         Encoder encoder;
         String name;
         Correlation correlation;
@@ -230,6 +233,7 @@ public class TuneRoadRunner extends LinearOpMode {
         boolean down() { return buttonPress(gamepad1.dpad_down, 3); }
 
         // Display the menu:
+        /** @noinspection SameParameterValue, StringConcatenationInLoop */
         int menu(String header, int current, boolean topmost, int numStrings, MenuStrings menuStrings) {
             while (opModeIsActive()) {
                 String output = "";
@@ -328,7 +332,7 @@ public class TuneRoadRunner extends LinearOpMode {
         if (ui.readyPrompt("Push the robot forward in a straight line for two or more tiles (24\")."
                 + "\n\nPress A to start, B when complete")) {
 
-            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.FORWARD);
+            TickTracker tracker = new TickTracker(Globals.getImu(), TickTracker.Mode.FORWARD);
             if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                 MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                 tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.FORWARD);
@@ -361,7 +365,7 @@ public class TuneRoadRunner extends LinearOpMode {
             if (ui.readyPrompt("Push the robot sideways to the left for two or more tiles (24\")."
                     + "\n\nPress A to start, B when complete")) {
 
-                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.LATERAL);
+                TickTracker tracker = new TickTracker(Globals.getImu(), TickTracker.Mode.LATERAL);
                 if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                     MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                     tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.NEGATIVE);
@@ -395,7 +399,7 @@ public class TuneRoadRunner extends LinearOpMode {
             if (ui.readyPrompt("Rotate the robot counterclockwise at least 90° \uD83D\uDD04 by pushing."
                     + "\n\nPress A to start, B when complete")) {
 
-                TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.ROTATE);
+                TickTracker tracker = new TickTracker(Globals.getImu(), TickTracker.Mode.ROTATE);
                 if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                     MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                     tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.REVERSE);
@@ -434,7 +438,7 @@ public class TuneRoadRunner extends LinearOpMode {
                 + "Measure distance and set inPerTick = <i>inches-traveled</i> / <i>average-ticks</i>."
                 + "\n\nPress A to start, B when complete")) {
 
-            TickTracker tracker = new TickTracker(drive.imu, TickTracker.Mode.FORWARD);
+            TickTracker tracker = new TickTracker(Globals.getImu(), TickTracker.Mode.FORWARD);
             if (drive.localizer instanceof MecanumDrive.DriveLocalizer) {
                 MecanumDrive.DriveLocalizer loc = (MecanumDrive.DriveLocalizer) drive.localizer;
                 tracker.register(loc.leftFront, "leftFront", TickTracker.Correlation.FORWARD);
@@ -574,7 +578,7 @@ public class TuneRoadRunner extends LinearOpMode {
                     MecanumDrive.PARAMS.kV / MecanumDrive.PARAMS.inPerTick,
                     MecanumDrive.PARAMS.kA / MecanumDrive.PARAMS.inPerTick);
 
-            double power = feedForward.compute(v) / drive.voltageSensor.getVoltage();
+            double power = feedForward.compute(v) / Globals.getVoltage();
             drive.setDrivePowers(new PoseVelocity2d(new Vector2d(power, 0.0), 0.0));
 
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
@@ -662,7 +666,7 @@ public class TuneRoadRunner extends LinearOpMode {
     interface TestMethod {
         void invoke();
     }
-    class Test {
+    static class Test {
         TestMethod method;
         String description;
         public Test(TestMethod method, String description) {
@@ -680,7 +684,8 @@ public class TuneRoadRunner extends LinearOpMode {
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         // Initialize member fields:
-        drive = new MecanumDrive(hardwareMap, defaultPose);
+        Globals globals = new Globals(hardwareMap, telemetry);
+        drive = new MecanumDrive(hardwareMap, defaultPose, globals);
         ui = new Ui();
 
         String configuration = "Mecanum drive, ";
@@ -696,16 +701,16 @@ public class TuneRoadRunner extends LinearOpMode {
 
         // Dynamically build the list of tests:
         ArrayList<Test> tests = new ArrayList<>();
-        tests.add(new Test(this::driveTest,                 "Drive test (motors)"));
-        tests.add(new Test(this::pushTest,                  "Push test (encoders and IMU)"));
-        tests.add(new Test(this::forwardEncoderTuner,       "Forward encoder tuner (inPerTick)"));
+        tests.add(new Test(this::driveTest, "Drive test (motors)"));
+        tests.add(new Test(this::pushTest, "Push test (encoders and IMU)"));
+        tests.add(new Test(this::forwardEncoderTuner, "Forward encoder tuner (inPerTick)"));
         // @@@ Call lateralEncoderTuner only if no dead wheels:
-        tests.add(new Test(this::lateralEncoderTuner,       "Lateral encoder tuner (lateralInPerTick)"));
-        tests.add(new Test(this::manualFeedforwardTuner,    "ManualFeedforwardTuner (kV and kA)"));
-        tests.add(new Test(this::manualFeedbackTunerAxial,  "ManualFeedbackTuner (axialGain)"));
-        tests.add(new Test(this::manualFeedbackTunerLateral,"ManualFeedbackTuner (lateralGain)"));
-        tests.add(new Test(this::manualFeedbackTunerHeading,"ManualFeedbackTuner (headingGain)"));
-        tests.add(new Test(this::completionTest,            "Completion test (overall verification)"));
+        tests.add(new Test(this::lateralEncoderTuner, "Lateral encoder tuner (lateralInPerTick)"));
+        tests.add(new Test(this::manualFeedforwardTuner, "ManualFeedforwardTuner (kV and kA)"));
+        tests.add(new Test(this::manualFeedbackTunerAxial, "ManualFeedbackTuner (axialGain)"));
+        tests.add(new Test(this::manualFeedbackTunerLateral, "ManualFeedbackTuner (lateralGain)"));
+        tests.add(new Test(this::manualFeedbackTunerHeading, "ManualFeedbackTuner (headingGain)"));
+        tests.add(new Test(this::completionTest, "Completion test (overall verification)"));
 
         telemetry.addLine("Press START to begin");
         waitForStart();

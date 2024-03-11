@@ -15,9 +15,11 @@ import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
+import org.jetbrains.annotations.NotNull;
 
 
 class Mechanisms {
+    /** @noinspection FieldCanBeLocal*/
     private DigitalChannel redLed;
     private DigitalChannel greenLed;
 
@@ -39,7 +41,7 @@ class Mechanisms {
             double startTime = -1;
 
             @Override
-            public boolean run(TelemetryPacket telemetry) {
+            public boolean run(@NotNull TelemetryPacket telemetry) {
                 double time = nanoTime() * 1e-9;
                 if (!isRunning) {
                     isRunning = true;
@@ -64,7 +66,8 @@ public class Auton extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         // The pose given here is a placeholder until we reset it below:
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(12, 63, Math.toRadians(-90)));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(12, 63, Math.toRadians(-90)), globals);
 
         waitForStart();
 
@@ -79,7 +82,7 @@ public class Auton extends LinearOpMode {
  * This contains all of the auton Road Runner logic and is shared with MeepMeepTest.
  */
 class AutonDriveFactory {
-    class AutonDriveInfo {
+    static class AutonDriveInfo {
         Pose2d startPose;
         Action action;
         AutonDriveInfo(Pose2d startPose, Action action) {
@@ -88,7 +91,7 @@ class AutonDriveFactory {
         }
     }
 
-    public enum PROP_POSITION { LEFT, MIDDLE, RIGHT };
+    public enum PROP_POSITION { LEFT, MIDDLE, RIGHT }
 
     static public double RED_NEAR_START_OFFSET = 48;
 
@@ -147,6 +150,7 @@ class AutonDriveFactory {
         return (position == PROP_POSITION.LEFT) ? PROP_POSITION.RIGHT : PROP_POSITION.LEFT;
     }
 
+    /** @noinspection SameParameterValue*/
     AutonDriveInfo get(boolean red, boolean far, PROP_POSITION position,
                        Action placePurplePixelAction, Action placeBackboardAction) {
 

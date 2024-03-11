@@ -13,6 +13,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -49,7 +50,8 @@ public class DistanceTest extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         TimeSplitter timer = TimeSplitter.create("getDistance");
 

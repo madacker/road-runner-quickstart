@@ -15,7 +15,6 @@ import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.IMU;
 
 import android.annotation.SuppressLint;
 import android.util.Size;
@@ -24,7 +23,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
@@ -856,8 +854,11 @@ class AprilTagLocalizer {
         Pose2d goodResult;
         Pose2d badResult;
         {
-            // Compute the field-space angle from the tag to the camera:
-            double angleToRobot = tag.theta + Math.toRadians(ftcPose.bearing - ftcPose.yaw);
+            // Compute the field-space angle from the tag to the camera. The triangle formed
+            // between the April Tag's plane, the ray going straight out from the camera,
+            // and the ray from the April Tag to the camera has three component
+            // angles: 1) bearing, 2) 90 degrees - yaw, 3) angle-to-the-robot:
+            double angleToRobot = tag.theta + Math.PI/2 + Math.toRadians(ftcPose.yaw - ftcPose.bearing);
 
             // Compute the camera's field-space location:
             Point vectorToRobot = new Point(ftcPose.range, 0).rotate(angleToRobot);
@@ -1106,7 +1107,6 @@ class OpticalFlowLocalizer {
     }
 
     OpticalTrackingPaa5100 device; // SDK device object
-    IMU imu; // IMU reference
     double previousYaw; // Yaw from the previous call to update()
     Pose2d sensorPose; // Pose for the sensor where it's on the robot (not pose for the robot center)
     Pose2d inferiorSensorPose; // Inferior pose as determined by the sensor
@@ -1114,13 +1114,11 @@ class OpticalFlowLocalizer {
     boolean visualizeInferiorPose; // Setting for whether to show the inferior pose or not
     OpticalFlowDescriptor descriptor; // Describes the parameters of the sensor
 
-    OpticalFlowLocalizer(HardwareMap hardwareMap, IMU imu) {
-        this.imu = imu;
-
+    OpticalFlowLocalizer(HardwareMap hardwareMap) {
         descriptor = OPTICAL_DESCRIPTORS[0];
         device = hardwareMap.get(OpticalTrackingPaa5100.class, descriptor.name);
         device.getMotion(); // Zero the movement
-        previousYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        previousYaw = Globals.getYaw();
         setPose(new Pose2d(0, 0, 0));
 
         Settings.registerToggleOption("Toggle optical inferior pose", true, enable -> visualizeInferiorPose = enable );
@@ -1164,9 +1162,7 @@ class OpticalFlowLocalizer {
         OpticalTrackingPaa5100.Motion motion = device.getMotion();
         Stats.endTimer("io::getMotion");
 
-        Stats.startTimer("io::getImu2");
-        double currentYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-        Stats.endTimer("io::getImu2");
+        double currentYaw = Globals.getYaw();
 
         // Query the quality:
         Stats.addData("Optical tracker quality", device.getQuality());
@@ -1243,7 +1239,6 @@ public class Poser {
     double previousTime; // Time of last call to update();
 
     // Component localizers:
-    private IMU imu;
     private Localizer odometryLocalizer;
     private OpticalFlowLocalizer opticalFlowLocalizer;
     private DistanceLocalizer distanceLocalizer;
@@ -1299,20 +1294,19 @@ public class Poser {
         previousTime = Globals.time();
         drive.poseOwnedByPoser = true; // Let MecanumDrive know we own pose estimation
 
-        imu = drive.imu;
         odometryLocalizer = drive.localizer;
         distanceLocalizer = new DistanceLocalizer(hardwareMap);
         aprilTagLocalizer = new AprilTagLocalizer(hardwareMap);
         if (USE_OPTICAL_FLOW)
-            opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap, imu);
+            opticalFlowLocalizer = new OpticalFlowLocalizer(hardwareMap);
         aprilTagFilter = new AprilTagFilter(initialPose != null);
 
         // Add a menu option to reset the IMU yaw:
         Settings.registerActivationOption("", reset -> {
             if (reset)
-                originalYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+                originalYaw = Globals.getYaw();
             return String.format("Reset IMU yaw (%.2f°)",
-                Math.toDegrees(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw));
+                Math.toDegrees(Globals.getYaw() - originalYaw));
         });
     }
 
@@ -1626,7 +1620,7 @@ public class Poser {
         visualize(bestPose);
         aprilTagFilter.telemetry();
 
-        Stats.imuYaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - originalYaw;
+        Stats.imuYaw = Globals.getYaw() - originalYaw;
         Stats.yawCorrection = posteriorPose.heading.log() - Stats.imuYaw;
     }
 

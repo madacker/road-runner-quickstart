@@ -14,13 +14,12 @@ import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.IMU;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.Globals;
 
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
-    public enum MiddleEncoder { FRONT, BACK, LEFT };
+    public enum MiddleEncoder { FRONT, BACK, LEFT }
     static final public MiddleEncoder MIDDLE_ENCODER = MiddleEncoder.LEFT;
     static final public boolean USE_IMU = true;
 
@@ -60,11 +59,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
     private Rotation2d lastHeading;
     private double lastRawHeadingVel, headingVelOffset;
 
-    IMU imu;
-
-    public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, IMU imu, double inPerTick) {
-        this.imu = imu;
-
+    public ThreeDeadWheelLocalizer(HardwareMap hardwareMap, double inPerTick) {
         switch (MIDDLE_ENCODER) {
             default:
             case FRONT:
@@ -92,7 +87,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
         lastPar0Pos = par0.getPositionAndVelocity().position;
         lastPar1Pos = par1.getPositionAndVelocity().position;
         lastPerpPos = perp.getPositionAndVelocity().position;
-        lastHeading = Rotation2d.exp(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS));
+        lastHeading = Rotation2d.exp(Globals.getYaw());
 
         this.inPerTick = inPerTick;
 
@@ -101,7 +96,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
 
     // see https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/617
     private double getHeadingVelocity() {
-        double rawHeadingVel = imu.getRobotAngularVelocity(AngleUnit.RADIANS).zRotationRate;
+        double rawHeadingVel = Globals.getRotationRate();
         if (Math.abs(rawHeadingVel - lastRawHeadingVel) > Math.PI) {
             headingVelOffset -= Math.signum(rawHeadingVel) * 2 * Math.PI;
         }
@@ -149,7 +144,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
 
         if (USE_IMU) {
             // Use the IMU for orientation:
-            Rotation2d heading = Rotation2d.exp(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS));
+            Rotation2d heading = Rotation2d.exp(Globals.getYaw());
             double headingDelta = heading.minus(lastHeading);
             double headingVel = getHeadingVelocity();
             lastHeading = heading;
