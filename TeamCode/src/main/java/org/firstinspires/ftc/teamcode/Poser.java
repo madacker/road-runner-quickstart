@@ -806,11 +806,14 @@ class AprilTagLocalizer {
         return null;
     }
 
-    // Compute the robot's field-relative pose from the April-tag-relative pose.
+    // Compute the robot's field-relative pose from the April-tag-relative pose. See
+    // https://ftc-docs.firstinspires.org/en/latest/apriltag/understanding_apriltag_detection_values/understanding-apriltag-detection-values.html.
     private Pose2d computeRobotPose(AprilTagPoseFtc ftcPose, Location tag, CameraDescriptor camera) {
+        Pose2d goodResult;
+        Pose2d badResult;
         {
             // Compute the field-space angle from the tag to the camera:
-            double angleToRobot = tag.theta + Math.toRadians(ftcPose.yaw);
+            double angleToRobot = tag.theta + Math.toRadians(ftcPose.bearing - ftcPose.yaw);
 
             // Compute the camera's field-space location:
             Point vectorToRobot = new Point(ftcPose.range, 0).rotate(angleToRobot);
@@ -818,14 +821,13 @@ class AprilTagLocalizer {
 
             // Compute the robot's heading by mirroring the angle to the robot, and adding the
             // camera's angle:
-            double robotHeading = Math.PI - angleToRobot + camera.theta;
+            double robotHeading = Math.PI - tag.theta + Math.toRadians(ftcPose.yaw) + camera.theta;
 
             // Compute the field-space offset from the origin to the camera:
             Point cameraOffset = camera.goodOffset.rotate(robotHeading);
             Point robotCenter = cameraPoint.subtract(cameraOffset);
 
-            Pose2d result = new Pose2d(robotCenter.vector2d(), robotHeading);
-            System.out.println(result); // @@@
+            goodResult = new Pose2d(robotCenter.vector2d(), robotHeading);
         }
 
         double dx = ftcPose.x - camera.badOffset.x;
@@ -837,7 +839,11 @@ class AprilTagLocalizer {
         double y = tag.point.y + Math.sin(gamma) * distance;
 
         double theta = Math.toRadians(ftcPose.yaw) + tag.theta + camera.theta;
-        return new Pose2d(new Vector2d(x, y), Math.PI - theta);
+        badResult = new Pose2d(new Vector2d(x, y), Math.PI - theta);
+
+        // System.out.println(String.format("Bad: %s, Good: %s", badResult.toString(), goodResult.toString()));
+
+        return badResult;
     }
 
     // Interim data structure used to track poses determined by the AprilTags:

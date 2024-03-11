@@ -192,6 +192,6 @@ public class Stats {
     // Add stats data for our own telemetry and for graphing in FTC Dashboard:
     static public void addData(String caption, Object datum) {
         Globals.packet.put(caption, datum);
-        data.put(caption, datum.toString());
+        data.put(caption, datum.toString() + "\n");
     }
 }

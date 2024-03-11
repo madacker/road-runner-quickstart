@@ -113,6 +113,7 @@ public class Settings {
 
     // Update loop for Settings. If true is returned, the caller should not use gamepad input
     // because the Settings UI is active:
+    /** @noinspection StringConcatenationInsideStringBufferAppend*/
     Gamepad update() {
         menuEnabled = (menuEnabled && !start()) || (!menuEnabled && start());
         if (!menuEnabled) {
@@ -162,8 +163,8 @@ public class Settings {
 
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
-            if (i == menu.current)
-                output.append("<span style='background: #78184a'>" + menu.options.get(i).string() + "</span>\n");
+            if (i == menu.current) // Draw the highlight:
+                output.append("<span style='background: #88285a'>" + menu.options.get(i).string() + "</span>\n");
             else
                 output.append(menu.options.get(i).string() + "\n");
         }
