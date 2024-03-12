@@ -6,6 +6,12 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
+import android.annotation.SuppressLint;
+import android.util.Size;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -15,12 +21,6 @@ import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-
-import android.annotation.SuppressLint;
-import android.util.Size;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -166,48 +166,13 @@ class AprilTagFilter {
         this.isConfident = isConfident;
     }
 
-    // Handy class to describe a circle:
-    static class Circle {
-        Point center;
-        double radius;
-
-        public Circle(Point center, double radius) {
-            this.center = center; this.radius = radius;
-        }
-    }
-
-    // Recursive Welzl's algorithm to find the minimal bounding circle, courtesy of CoPilot:
-    private static Circle welzl(List<Storage<Point>> points, List<Point> boundary, int size) {
-        if (size == 0 || boundary.size() == 3) {
-            if (boundary.size() == 0) {
-                return new Circle(new Point(0, 0), 0);
-            } else if (boundary.size() == 1) {
-                return new Circle(boundary.get(0), 0);
-            } else if (boundary.size() == 2) {
-                Point p1 = boundary.get(0);
-                Point p2 = boundary.get(1);
-                Point center = new Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-                double radius = p1.distance(p2) / 2;
-                return new Circle(center, radius);
-            }
-        }
-
-        Point p = points.get(size - 1).residual;
-        Circle result = welzl(points, boundary, size - 1);
-
-        if (result.center.distance(p) > result.radius) {
-            boundary.add(p);
-            result = welzl(points, boundary, size - 1);
-            boundary.remove(p);
-        }
-
-        return result;
-    }
-
     // Calculate the tightest bounding circle for the residuals:
-    Circle getResidualsBoundingCircle() {
-        LinkedList<Point> boundary = new LinkedList<>(); // Initially empty boundary
-        return welzl(positionResiduals, boundary, positionResiduals.size());
+    MinimumEnclosingCircle.Circle getResidualsBoundingCircle() {
+        ArrayList<Point> points = new ArrayList<>();
+        for (int i = 0; i < positionResiduals.size(); i++) {
+            points.add(positionResiduals.get(i).residual);
+        }
+        return MinimumEnclosingCircle.welzl(points);
     }
 
     // Filter the prediction and measurements and return a posterior:
@@ -1489,9 +1454,9 @@ public class Poser {
             }
         }
 
-        // Draw the AprilTag pose residuals along with their bounding circle in white:
-        c.setStroke("#ffffff");
-        AprilTagFilter.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
+        // Draw the AprilTag pose residuals along with their bounding circle in black:
+        c.setStroke("#000000");
+        MinimumEnclosingCircle.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
         if (circle.radius != 0)
             c.strokeCircle(circle.center.x, circle.center.y, circle.radius);
         for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {

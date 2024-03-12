@@ -73,9 +73,6 @@ public class Globals {
         Globals.telemetry = null;
         Globals.packet = null;
         Globals.canvas = null;
-
-        // Read the cached states:
-        this.updateCachedState();
     }
 
     static private double getRawYaw() {
