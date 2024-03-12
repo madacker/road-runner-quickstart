@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
+import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
@@ -78,17 +79,23 @@ class Led {
     }
 }
 
+@Config
 class AutoParker {
-    Poser poser;                     // Get the pose and pose velocity
-    MecanumDrive drive;              // Used to set the motors
-    Pose2d target;                   // Target pose
-    double facingOrientation;        // Orientation of robot to point to goal when far from goal
-    double turningDistance;          // Distance at which to start turning to final orientation
-    double previousTime;             // Previous time in seconds
-    Vector2d tangentVector;          // Normalized version of original tangent vector
-    double radialSpeed;              // Inches/s, can be negative
-    double tangentSpeed;             // Inches/s, can be negative
-    double angularSpeed;             // Radians/s, can be negative
+    Poser poser;                    // Get the pose and pose velocity
+    MecanumDrive drive;             // Used to set the motors
+    Pose2d target;                  // Target pose
+    double facingOrientation;       // Orientation of robot to point to goal when far from goal
+    Vector2d originalRadialVector;  // Original radial vector
+    double turningDistance;         // Distance at which to start turning to final orientation
+    double previousTime;            // Previous time in seconds
+    Vector2d originalTangentVector; // Normalized version of original tangent vector
+    double radialSpeed;             // Inches/s, can be negative
+    double tangentSpeed;            // Inches/s, can be negative
+    double angularSpeed;            // Radians/s, can be negative
+    boolean isPidEngaged;           // True if close to the target and the PID is engaged
+    double previousRadialLength;    // Previous radial length to feed into the PID
+    public static double kp = 0;    // PID proportional constant
+    public static double kd = 0;    // PID derivative constant
 
     double normalizeAngle(double angle) {
         while (angle > Math.PI)
@@ -111,16 +118,16 @@ class AutoParker {
         // Position --------------------------------------------------------------------------------
 
         // Radial vector towards the target:
-        Vector2d radialVector = target.position.minus(poser.bestPose.position);
+        originalRadialVector = target.position.minus(poser.bestPose.position);
 
         // Tangent vector -90 degrees from radial:
         // noinspection SuspiciousNameCombination
-        tangentVector = new Vector2d(radialVector.y, -radialVector.x);
+        originalTangentVector = new Vector2d(originalRadialVector.y, -originalRadialVector.x);
 
         // Normalize the tangent, being careful to protect against divide-by-zero:
-        double tangentLength = tangentVector.norm();
+        double tangentLength = originalTangentVector.norm();
         if (tangentLength != 0)
-            tangentVector = tangentVector.div(tangentLength);
+            originalTangentVector = originalTangentVector.div(tangentLength);
 
         // Convert the velocity to field-relative coordinates:
         PoseVelocity2d velocity = poser.bestPose.times(poser.velocity);
@@ -129,7 +136,7 @@ class AutoParker {
         double speed = Math.hypot(velocity.linearVel.x, velocity.linearVel.y);
 
         // Compute the angle from the robot's current direction to the target:
-        double theta = Math.atan2(radialVector.y, radialVector.x)
+        double theta = Math.atan2(originalRadialVector.y, originalRadialVector.x)
                      - Math.atan2(velocity.linearVel.y, velocity.linearVel.x);
 
         // Compute the component speeds:
@@ -175,24 +182,33 @@ class AutoParker {
         // Convert to the signed tangent speed:
         tangentSpeed = Math.signum(tangentSpeed) * tangentMagnitude;
 
-        // Increase the speed towards the target:
-        double increasingRadialSpeed = radialSpeed + MecanumDrive.PARAMS.maxProfileAccel * deltaT;
+        // If we've passed the target, engage the PID:
+        if (originalRadialVector.dot(radialVector) < 0)
+            isPidEngaged = true;
 
-        // Compute the maximum possible speed towards the target, accounting for the speed along
-        // the tangent:
-        double maxRadialSpeed = Math.hypot(tangentSpeed, MecanumDrive.PARAMS.maxWheelVel);
+        if (isPidEngaged) {
+            // Use the PD controller:
+            radialSpeed = kp * radialLength + kd * (radialLength - previousRadialLength);
+        } else {
+            // Increase the speed towards the target:
+            double increasingRadialSpeed = radialSpeed + MecanumDrive.PARAMS.maxProfileAccel * deltaT;
 
-        // Calculate the maximum speed directly towards the target assuming constant
-        // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
-        // current velocity, u is the initial velocity, a is the acceleration, s is distance
-        // traveled. We apply it in reverse:
-        double radialApproach = Math.sqrt(2 * Math.abs(MecanumDrive.PARAMS.minProfileAccel) * radialLength);
+            // Compute the maximum possible speed towards the target, accounting for the speed along
+            // the tangent:
+            double maxRadialSpeed = Math.hypot(tangentSpeed, MecanumDrive.PARAMS.maxWheelVel);
 
-        // Set the new radial speed as the minimum of the three:
-        radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), radialApproach);
+            // Calculate the maximum speed directly towards the target assuming constant
+            // deceleration. We use the kinematic equation "v^2 = u^2 + 2as" where v is the
+            // current velocity, u is the initial velocity, a is the acceleration, s is distance
+            // traveled. We apply it in reverse:
+            double radialApproach = Math.sqrt(2 * Math.abs(MecanumDrive.PARAMS.minProfileAccel) * radialLength);
+
+            // Set the new radial speed as the minimum of the three:
+            radialSpeed = Math.min(Math.min(increasingRadialSpeed, maxRadialSpeed), radialApproach);
+        }
 
         Vector2d radialVelocity = radialVector.div(radialLength).times(radialSpeed);
-        Vector2d tangentVelocity = tangentVector.times(tangentSpeed);
+        Vector2d tangentVelocity = originalTangentVector.times(tangentSpeed);
 
         // Heading ---------------------------------------------------------------------------------
 
@@ -217,6 +233,7 @@ class AutoParker {
 
         // Remember stuff for the next iteration:
         previousTime = now;
+        previousRadialLength = radialLength;
 
 //        Canvas canvas = packet.fieldOverlay();
 //
