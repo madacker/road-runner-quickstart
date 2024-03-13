@@ -1370,6 +1370,13 @@ public class Poser {
         }
     }
 
+    // Draw cross-hairs at the specified point:
+    private void drawCrossHairs(Vector2d position) {
+        final double radius = 3;
+        Globals.canvas.strokeLine(position.x, position.y - radius, position.x, position.y + radius);
+        Globals.canvas.strokeLine(position.x - radius, position.y, position.x + radius, position.y);
+    }
+
     // Draw the history visualizations for FTC Dashboard:
     private void visualize(Pose2d robotPose) {
         Canvas c = Globals.canvas;
@@ -1434,16 +1441,14 @@ public class Poser {
                         }
                         if (distance > 6) {
                             c.setStroke("#ff0000");
-                            MecanumDrive.drawRobot(Globals.canvas, rejectPose, 3);
+                            drawCrossHairs(rejectPose.position);
                         }
                     }
 
                     if (record.aprilTag.pose != null) {
                         // Draw confident April Tags as green crosses, not so confident in yellow:
-                        Vector2d position = record.aprilTag.pose.position;
                         c.setStroke(record.aprilTag.isConfident ? "#00ff00" : "#a0a000");
-                        c.strokeLine(position.x, position.y - 1.5, position.x, position.y + 1.5);
-                        c.strokeLine(position.x - 1.5, position.y, position.x + 1.5, position.y);
+                        drawCrossHairs(record.aprilTag.pose.position);
                     }
                 }
 
@@ -1458,9 +1463,11 @@ public class Poser {
         c.setStroke("#000000");
         Welzl.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
         if (circle.r != 0)
-            c.strokeCircle(circle.x, circle.y, circle.r);
+            c.strokeCircle(robotPose.position.x + circle.x, robotPose.position.y + circle.y, circle.r);
+        c.setStroke("#808080");
         for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {
-            c.fillRect(point.residual.x - 0.5, point.residual.y - 0.5, 1, 1);
+            c.fillRect(robotPose.position.x + point.residual.x - 0.5,
+                       robotPose.position.y + point.residual.y - 0.5, 1, 1);
         }
 
         // Draw the last distance measurement if it's new enough:
