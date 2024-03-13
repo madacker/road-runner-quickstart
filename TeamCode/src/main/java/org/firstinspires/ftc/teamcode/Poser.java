@@ -172,7 +172,8 @@ class AprilTagFilter {
         for (int i = 0; i < positionResiduals.size(); i++) {
             points.add(positionResiduals.get(i).residual);
         }
-        return MinimumEnclosingCircle.welzl(points);
+        // return MinimumEnclosingCircle.welzl(points);
+        return new MinimumEnclosingCircle.Circle(new Point(0, 0), 0);
     }
 
     // Filter the prediction and measurements and return a posterior:
@@ -379,7 +380,7 @@ class DistanceLocalizer {
             SensorState state = new SensorState(i, hardwareMap.get(DistanceSensor.class, descriptor.name), descriptor);
             sensorStates[i] = state;
             Settings.registerToggleOption(String.format("Enable %s", descriptor.name),
-                    true, enable -> state.enabled = enable );
+                    false, enable -> state.enabled = enable );
         }
     }
 
@@ -720,7 +721,7 @@ class AprilTagLocalizer {
             cameras[i] = initializeCamera(i, hardwareMap, containerIds[i]);
             final int lambdaIndex = i;
             Settings.registerToggleOption(String.format("Enable %s", cameras[i].descriptor.name),
-                    true, enable -> cameras[lambdaIndex].enabled = enable );
+                    false, enable -> cameras[lambdaIndex].enabled = enable );
         }
         Settings.registerToggleOption("Enable screen preview", false, this::enableLiveView);
     }
@@ -1086,7 +1087,7 @@ class OpticalFlowLocalizer {
         previousYaw = Globals.getYaw();
         setPose(new Pose2d(0, 0, 0));
 
-        Settings.registerToggleOption("Toggle optical inferior pose", true, enable -> visualizeInferiorPose = enable );
+        Settings.registerToggleOption("Toggle optical inferior pose", false, enable -> visualizeInferiorPose = enable );
     }
 
     // Set the pose once it's locked in:
@@ -1196,7 +1197,7 @@ public class Poser {
 
     // True if using optical flow for our master predictions, false if using odometry:
     /** @noinspection FieldCanBeLocal*/
-    private final boolean USE_OPTICAL_FLOW = false;
+    private final boolean USE_OPTICAL_FLOW = true;
 
     // The historic record:
     private LinkedList<HistoryRecord> history = new LinkedList<>(); // Newest first
