@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.ControlSystem;
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynch;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
+import com.qualcomm.robotcore.hardware.I2cWaitControl;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 import com.qualcomm.robotcore.util.RobotLog;
@@ -141,7 +142,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         //      <read-data>
 
         // Use 0xff as the data placeholder on the write operation:
-        this.deviceClient.write(new byte[] { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff });
+        this.deviceClient.write(new byte[] { SLAVE_SELECT_MASK, (byte) addr, (byte) 0xff },  I2cWaitControl.WRITTEN);
         byte[] reads = this.deviceClient.read(2); // address placeholder, datum
         return TypeConversion.unsignedByteToInt(reads[1]); // Skip the address placeholder
     }
@@ -438,7 +439,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         for (int i = 2; i < command.length; i++)
             command[i] = (byte) 0xff; // Filler
 
-        this.deviceClient.write(command);
+        this.deviceClient.write(command, I2cWaitControl.WRITTEN);
 
         // As an optimization, read only as many bytes from the burst as we look at (i.e.,
         // skip the raw max/min and shutter):

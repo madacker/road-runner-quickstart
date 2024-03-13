@@ -1100,8 +1100,8 @@ class OpticalFlowLocalizer {
         robotPose = pose;
     }
 
-    // Convert the robot-relative change-in-pose to field-relative change-in-position.
-    // Apply the conversion via Forward Euler integration courtesy of Theorem 10.2.1
+    // Convert the robot-relative change-in-position to field-relative change-in-pose.
+    // Apply the conversion via pose exponentials courtesy of Theorem 10.2.1
     // https://file.tavsys.net/control/controls-engineering-in-frc.pdf#page=194&zoom=100,57,447:
     static Point deltaFieldPosition(double theta, double deltaX, double deltaY, double deltaTheta) {
         double cosTheta = Math.cos(theta);
