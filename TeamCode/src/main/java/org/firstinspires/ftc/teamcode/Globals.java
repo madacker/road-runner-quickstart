@@ -41,9 +41,13 @@ public class Globals {
 
     // Helper to get the robot name:
     private static String getBotName() {
-        InspectionState inspection=new InspectionState();
-        inspection.initializeLocal();
-        return inspection.deviceName;
+        try {
+            InspectionState inspection = new InspectionState();
+            inspection.initializeLocal();
+            return inspection.deviceName;
+        } catch (ExceptionInInitializerError|NoClassDefFoundError e) {
+            return "Emulator";
+        }
     }
 
     // Initialize all of our static state just in case we previously crashed:
@@ -166,5 +170,17 @@ public class Globals {
     }
     static public VoltageSensor getVoltageSensor() {
         return global.voltageSensor;
+    }
+
+    // Assert the Android way:
+    static public void assertion(boolean correct, String description) {
+        if (!correct) {
+            // Congratulations, you've hit one of your own breakpoints! Use the
+            // stacktrace to see the context of the culprit!
+            throw new AssertionError(description);
+        }
+    }
+    static public void assertion(boolean correct) {
+        assertion(correct, "Code assertion");
     }
 }

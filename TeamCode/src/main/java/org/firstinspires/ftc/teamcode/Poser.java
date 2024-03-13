@@ -84,7 +84,7 @@ class DistanceFilter {
 
     // Filter the result:
     double filter(double time, double measuredDistance, double estimatedDistance) {
-        assert(Math.abs(estimatedDistance - measuredDistance) < DistanceLocalizer.CORRECTNESS_THRESHOLD);
+        Globals.assertion(Math.abs(estimatedDistance - measuredDistance) < DistanceLocalizer.CORRECTNESS_THRESHOLD);
 
         // We might have gone back in time so remove any newer results:
         while ((residuals.size() > 0) && (residuals.getFirst().time >= time))
@@ -167,13 +167,12 @@ class AprilTagFilter {
     }
 
     // Calculate the tightest bounding circle for the residuals:
-    MinimumEnclosingCircle.Circle getResidualsBoundingCircle() {
+    Welzl.Circle getResidualsBoundingCircle() {
         ArrayList<Point> points = new ArrayList<>();
         for (int i = 0; i < positionResiduals.size(); i++) {
             points.add(positionResiduals.get(i).residual);
         }
-        // return MinimumEnclosingCircle.welzl(points);
-        return new MinimumEnclosingCircle.Circle(new Point(0, 0), 0);
+        return Welzl.welzl(points);
     }
 
     // Filter the prediction and measurements and return a posterior:
@@ -215,7 +214,7 @@ class AprilTagFilter {
 
         // Add confident April Tags to the headings history:
         if (confidentAprilTag) {
-            assert(newAprilTagPose != null);
+            Globals.assertion(newAprilTagPose != null);
             double headingResidual = Globals.normalizeAngle(newAprilTagPose.heading.log() - currentCompositePose.heading.log());
             headingResiduals.addFirst(new Storage<>(headingResidual)); // Newest to oldest
 
@@ -561,7 +560,7 @@ class DistanceLocalizer {
             Ray sensorRay = new Ray(sensorPoint, sensorDirection);
 
             Point hitPoint = raySegmentIntersection(sensorRay, wallSegment);
-            assert(hitPoint != null);
+            Globals.assertion(hitPoint != null);
 
             // Note that this hitVector points from the hit-point to the sensor point:
             Point hitVector = sensorPoint.subtract(hitPoint);
@@ -1325,7 +1324,7 @@ public class Poser {
             AprilTagLocalizer.Result newAprilTag,
             DistanceLocalizer.Result newDistance) {
 
-        assert(history.size() > 0);
+        Globals.assertion(history.size() > 0);
 
         // Find the first record older than the target:
         ListIterator<HistoryRecord> iterator = history.listIterator();
@@ -1339,8 +1338,8 @@ public class Poser {
             double nextTime = iteratorRecord.time;
             iteratorRecord = iterator.previous();
             double currentTime = iteratorRecord.time;
-            assert(nextTime > time);
-            assert(time <= currentTime);
+            Globals.assertion(nextTime > time);
+            Globals.assertion(time <= currentTime);
             if (nextTime - time  < time - currentTime) {
                 iteratorRecord = iterator.next();
             }
@@ -1348,13 +1347,13 @@ public class Poser {
 
         // Add the distance record:
         if (newDistance != null) {
-            assert(iteratorRecord.distance == null);
+            Globals.assertion(iteratorRecord.distance == null);
             if (iteratorRecord.distance == null)
                 iteratorRecord.distance = newDistance;
         }
 
         if (newAprilTag != null) {
-            assert(iteratorRecord.aprilTag == null);
+            Globals.assertion(iteratorRecord.aprilTag == null);
             if (iteratorRecord.aprilTag == null)
                 iteratorRecord.aprilTag = newAprilTag;
         }
@@ -1457,9 +1456,9 @@ public class Poser {
 
         // Draw the AprilTag pose residuals along with their bounding circle in black:
         c.setStroke("#000000");
-        MinimumEnclosingCircle.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
-        if (circle.radius != 0)
-            c.strokeCircle(circle.center.x, circle.center.y, circle.radius);
+        Welzl.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
+        if (circle.r != 0)
+            c.strokeCircle(circle.x, circle.y, circle.r);
         for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {
             c.fillRect(point.residual.x - 0.5, point.residual.y - 0.5, 1, 1);
         }
