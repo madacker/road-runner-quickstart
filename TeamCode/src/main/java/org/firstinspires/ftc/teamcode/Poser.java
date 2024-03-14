@@ -644,6 +644,9 @@ class AprilTagLocalizer {
     private CameraState[] cameras = new CameraState[CAMERA_DESCRIPTORS.length];
     int activeCamera = -1; // Currently active camera, -1 if none is
 
+    ArrayList<PoseVisualization> visualizations = new ArrayList<>(); // Most recent April Tags
+    double visualizationsTime; // Time of the last visualizations update
+
     // Camera state:
     static class CameraState {
         boolean enabled; // Enabled by settings
@@ -713,16 +716,25 @@ class AprilTagLocalizer {
         }
     }
 
+    // Structure for visualizing poses:
+    static class PoseVisualization {
+        enum Quality { LOW, MEDIUM, HIGH }
+        Pose2d pose;
+        Quality quality;
+        public PoseVisualization(Pose2d pose, Quality quality) {
+            this.pose = pose; this.quality = quality;
+        }
+    }
+
     // Structure for returning April Tag results from update():
     static class Result {
         Pose2d pose; // If non-null, the resulting pose
         boolean isConfident; // Confidence in this pose
         int cameraIndex; // CAMERA_DESCRIPTORS index
         double latency; // Latency, in seconds
-        ArrayList<Pose2d> rejectList; // Rejected April Tag poses for telemetry purposes
 
-        public Result(Pose2d pose, boolean isConfident, int cameraIndex, double latency, ArrayList<Pose2d> rejectList) {
-            this.pose = pose; this.isConfident = isConfident; this.cameraIndex = cameraIndex; this.latency = latency; this.rejectList = rejectList;
+        public Result(Pose2d pose, boolean isConfident, int cameraIndex, double latency) {
+            this.pose = pose; this.isConfident = isConfident; this.cameraIndex = cameraIndex; this.latency = latency;
         }
     }
 
@@ -1066,14 +1078,19 @@ class AprilTagLocalizer {
         }
 
         Pose2d resultPose = (visionPose != null) ? visionPose.pose : null;
-        ArrayList<Pose2d> rejectList = new ArrayList<>();
-        for (VisionPose rejectPose : visionPoses) {
-            if (rejectPose != visionPose) {
-                rejectList.add(rejectPose.pose);
+
+        // Update visualizations:
+        visualizationsTime = Globals.time();
+        visualizations = new ArrayList<>();
+        for (VisionPose pose: visionPoses) {
+            PoseVisualization.Quality quality = PoseVisualization.Quality.LOW;
+            if (pose == visionPose) {
+                quality = (isExcellentPose) ? PoseVisualization.Quality.HIGH : PoseVisualization.Quality.MEDIUM;
             }
+            visualizations.add(new PoseVisualization(pose.pose, quality));
         }
 
-        return new Result(resultPose, isExcellentPose, activeCamera, camera.descriptor.latency, rejectList);
+        return new Result(resultPose, isExcellentPose, activeCamera, camera.descriptor.latency);
     }
 }
 
@@ -1456,28 +1473,6 @@ public class Poser {
                     lastDistance = record;
                 }
 
-                // Draw April Tag poses, if present:
-                if (record.aprilTag != null) {
-                    // Draw any distant rejected poses in red:
-                    for (Pose2d rejectPose : record.aprilTag.rejectList) {
-                        double distance = Float.MAX_VALUE;
-                        if (record.aprilTag.pose != null) {
-                            Vector2d difference = rejectPose.position.minus(record.aprilTag.pose.position);
-                            distance = Math.hypot(difference.x, difference.y);
-                        }
-                        if (distance > 6) {
-                            c.setStroke("#ff0000");
-                            drawCrossHairs(rejectPose.position);
-                        }
-                    }
-
-                    if (record.aprilTag.pose != null) {
-                        // Draw confident April Tags as green crosses, not so confident in yellow:
-                        c.setStroke(record.aprilTag.isConfident ? "#00ff00" : "#a0a000");
-                        drawCrossHairs(record.aprilTag.pose.position);
-                    }
-                }
-
                 // Go to the next newest record:
                 if (!iterator.hasPrevious())
                     break;
@@ -1485,15 +1480,28 @@ public class Poser {
             }
         }
 
-        // Draw the AprilTag pose residuals along with their bounding circle in black:
-        c.setStroke("#000000");
-        CircleFitter.Circle circle = aprilTagFilter.boundingCircle;
-        if (circle.r != 0)
-            c.strokeCircle(robotPose.position.x + circle.x, robotPose.position.y + circle.y, circle.r);
-        c.setStroke("#808080");
-        for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {
-            c.fillRect(robotPose.position.x + point.residual.x - 0.5,
-                       robotPose.position.y + point.residual.y - 0.5, 1, 1);
+        // Draw current April Tag poses:
+        if (Globals.time() - aprilTagLocalizer.visualizationsTime < 0.5) {
+            for (AprilTagLocalizer.PoseVisualization visualization : aprilTagLocalizer.visualizations) {
+                if (visualization.quality == AprilTagLocalizer.PoseVisualization.Quality.LOW)
+                    c.setStroke("#ff0000"); // Red
+                else if (visualization.quality == AprilTagLocalizer.PoseVisualization.Quality.MEDIUM)
+                    c.setStroke("a0a000"); // Yellow
+                else
+                    c.setStroke("00ff00"); // Green
+                drawCrossHairs(visualization.pose.position);
+            }
+
+            // Draw the AprilTag filter residuals along with their bounding circle in black:
+            c.setStroke("#000000");
+            CircleFitter.Circle circle = aprilTagFilter.boundingCircle;
+            if (circle.r != 0)
+                c.strokeCircle(robotPose.position.x + circle.x, robotPose.position.y + circle.y, circle.r);
+            c.setStroke("#808080");
+            for (AprilTagFilter.Storage<Point> point : aprilTagFilter.positionResiduals) {
+                c.fillRect(robotPose.position.x + point.residual.x - 0.5,
+                        robotPose.position.y + point.residual.y - 0.5, 1, 1);
+            }
         }
 
         // Draw the last distance measurement if it's new enough:
