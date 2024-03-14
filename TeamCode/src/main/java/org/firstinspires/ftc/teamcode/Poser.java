@@ -136,6 +136,8 @@ class DistanceFilter {
  * to the odometry poses.
  */
 class AprilTagFilter {
+    static final int POSITION_FILTER_COUNT = 8;
+
     static final double HEADING_WINDOW_DURATION = 20.0; // Seconds
     static final double POSITION_WINDOW_DURATION = 0.500; // Seconds
     static final double WATCHDOG_WINDOW_FRACTION = 0.5; // Fraction of the window duration
@@ -144,11 +146,13 @@ class AprilTagFilter {
     static final double MAX_HEADING_CHANGE_RATE = Math.toRadians(1); // Degrees per second
 
     private double confidentAprilTagCount = 0; // Active count of trusted headings so far
-    private boolean isConfident; // True if we're now confident in the results coming out
+    private boolean isConfidentFilter; // True if we're now confident in the results coming out
 
     // The residuals are maintained in newest-to-oldest order:
     public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
-    public LinkedList<Storage<Point>> positionResiduals = new LinkedList<>();
+    public LinkedList<Storage<Point>> oldPositionResiduals = new LinkedList<>();
+
+    public LinkedList<Point> positionResiduals = new LinkedList<>();
 
     // Storage for filter data:
     static class Storage<T> {
@@ -162,38 +166,75 @@ class AprilTagFilter {
     }
 
     // Specify true for isConfident if a starting pose was specified to Poser()
-    AprilTagFilter(boolean isConfident) {
-        this.isConfident = isConfident;
+    AprilTagFilter(boolean isConfidentFilter) {
+        this.isConfidentFilter = isConfidentFilter;
     }
 
     // Calculate the tightest bounding circle for the residuals:
-    Welzl.Circle getResidualsBoundingCircle() {
+    CircleFitter.Circle getResidualsBoundingCircle() {
         ArrayList<Point> points = new ArrayList<>();
-        for (int i = 0; i < positionResiduals.size(); i++) {
-            points.add(positionResiduals.get(i).residual);
+        for (int i = 0; i < oldPositionResiduals.size(); i++) {
+            points.add(oldPositionResiduals.get(i).residual);
         }
-        return Welzl.welzl(points);
+        return CircleFitter.welzl(points);
+    }
+
+    Point filterPosition(
+            @NonNull Point currentPosition,
+            @NonNull Point aprilTagPosition,
+            boolean confidentAprilTag) {
+
+        // Whilst calibrating, ignore non-confident April Tags:
+        if ((!isConfidentFilter) && (!confidentAprilTag))
+            return currentPosition;
+
+        Point residual = aprilTagPosition.subtract(currentPosition);
+        positionResiduals.addFirst(residual); // Newest to oldest
+        if (positionResiduals.size() > POSITION_FILTER_COUNT) {
+            positionResiduals.removeLast();
+        }
+
+        CircleFitter.Circle boundingCircle = CircleFitter.welzl(positionResiduals);
+        if (positionResiduals.size() != POSITION_FILTER_COUNT)
+            return currentPosition;
+
+        // @@@ Always return center when calibrating
+        // @@@ Move to radius only if outside of radius
+        // @@@ Shift everything once done
+        // @@@ Don't worry about going back in time
+        // @@@ Remember green vs. yellow residuals for the visualization
+        // @@@ Draw the crosshairs for all current April Tags, remove rejects from history
+        // @@@ Green bounding circle when correcting the pose, yellow when not
+
+        // Vector from the circle center to our current position:
+        Point center = new Point(boundingCircle.x, boundingCircle.y);
+        Point vector = currentPosition.subtract(center);
+        double vectorLength = vector.length();
+        if (vectorLength != 0)
+            vector = vector.divide(vectorLength); // Unit vector
+        vector = vector.scale(boundingCircle.r); // Vector from center to point on circle closest to current
+        return center.add(vector);
     }
 
     // Filter the prediction and measurements and return a posterior:
-    @NonNull Pose2d filter(
+    @NonNull Pose2d boogaFilter(
             double time, // Globals.time() for when the filtering should be done
             @NonNull Pose2d currentCompositePose, // Current composite pose
             @Nullable Pose2d newAprilTagPose, // Incoming April-Tag pose
             boolean confidentAprilTag) { // True if confident in the April-tag
 
         // We might have gone back in time so remove any newer results:
-        while ((positionResiduals.size() > 0) && (positionResiduals.getFirst().time >= time))
-            positionResiduals.removeFirst();
+        while ((oldPositionResiduals.size() > 0) && (oldPositionResiduals.getFirst().time >= time))
+            oldPositionResiduals.removeFirst();
         while ((headingResiduals.size() > 0) && (headingResiduals.getFirst().time >= time))
             headingResiduals.removeFirst();
 
-        // If the newest residuals are too stale (meany it's been a long time since we got a
+        // If the newest residuals are too stale (meaning it's been a long time since we got a
         // new one), toss them all. We don't want to age them out one at a time because that
         // simply biases everything to the most recent one:
-        if ((positionResiduals.size() > 0) &&
-                (time - positionResiduals.getFirst().time > POSITION_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
-            positionResiduals.clear();
+        if ((oldPositionResiduals.size() > 0) &&
+                (time - oldPositionResiduals.getFirst().time > POSITION_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
+            oldPositionResiduals.clear();
         }
         if ((headingResiduals.size() > 0) &&
                 (time - headingResiduals.getFirst().time > HEADING_WINDOW_DURATION * WATCHDOG_WINDOW_FRACTION)) {
@@ -201,15 +242,15 @@ class AprilTagFilter {
         }
 
         // Remove all residuals that are too old:
-        while ((positionResiduals.size() > 0) && (time - positionResiduals.getLast().time > POSITION_WINDOW_DURATION))
-            positionResiduals.removeLast(); // Newest to oldest
+        while ((oldPositionResiduals.size() > 0) && (time - oldPositionResiduals.getLast().time > POSITION_WINDOW_DURATION))
+            oldPositionResiduals.removeLast(); // Newest to oldest
         while ((headingResiduals.size() > 0) && (time - headingResiduals.getLast().time > HEADING_WINDOW_DURATION))
             headingResiduals.removeLast(); // Newest to oldest
 
         // Add April Tag and distance sensor results to the position history:
         if (newAprilTagPose != null) {
             Vector2d positionResidual = newAprilTagPose.position.minus(currentCompositePose.position);
-            positionResiduals.addFirst(new Storage<>(new Point(positionResidual))); // Newest to oldest
+            oldPositionResiduals.addFirst(new Storage<>(new Point(positionResidual))); // Newest to oldest
         }
 
         // Add confident April Tags to the headings history:
@@ -220,22 +261,22 @@ class AprilTagFilter {
 
             confidentAprilTagCount++;
             if (confidentAprilTagCount > CONFIDENCE_THRESHOLD_COUNT)
-                isConfident = true;
+                isConfidentFilter = true;
         }
 
         // Compute the averages of all the residuals:
         Point aggregatePositionResidual = new Point(0, 0);
         double aggregateHeaderResidual = 0;
 
-        for (Storage<Point> position: positionResiduals) {
+        for (Storage<Point> position: oldPositionResiduals) {
             aggregatePositionResidual = aggregatePositionResidual.add(position.residual);
         }
         for (Storage<Double> heading: headingResiduals) {
             aggregateHeaderResidual = aggregateHeaderResidual + heading.residual;
         }
 
-        if (positionResiduals.size() != 0)
-            aggregatePositionResidual = aggregatePositionResidual.scale(1.0 / positionResiduals.size());
+        if (oldPositionResiduals.size() != 0)
+            aggregatePositionResidual = aggregatePositionResidual.scale(1.0 / oldPositionResiduals.size());
         if (headingResiduals.size() != 0)
             aggregateHeaderResidual = aggregateHeaderResidual / headingResiduals.size();
 
@@ -244,7 +285,7 @@ class AprilTagFilter {
         double headingCorrection = aggregateHeaderResidual;
 
         // Negatively offset everything in the history to account for the offset we're adding:
-        for (Storage<Point> position: positionResiduals) {
+        for (Storage<Point> position: oldPositionResiduals) {
             position.residual = position.residual.subtract(positionCorrection);
         }
         for (Storage<Double> heading: headingResiduals) {
@@ -258,14 +299,14 @@ class AprilTagFilter {
     }
 
     // True if we have high confidence in the results:
-    boolean isConfident() {
-        return isConfident;
+    boolean isConfidentFilter() {
+        return isConfidentFilter;
     }
 
     // Output telemetry:
     void telemetry() { // @@@ Remove this
         Globals.telemetry.addLine(String.format("Position residuals: %d, heading residuals: %d",
-                positionResiduals.size(), headingResiduals.size()));
+                oldPositionResiduals.size(), headingResiduals.size()));
     }
 }
 
@@ -1310,7 +1351,7 @@ public class Poser {
                     }
                 }
             }
-            compositePose = aprilTagFilter.filter(record.time, compositePose, aprilTagPose, record.aprilTag.isConfident);
+            compositePose = aprilTagFilter.boogaFilter(record.time, compositePose, aprilTagPose, record.aprilTag.isConfident);
         }
         return compositePose;
     }
@@ -1461,11 +1502,11 @@ public class Poser {
 
         // Draw the AprilTag pose residuals along with their bounding circle in black:
         c.setStroke("#000000");
-        Welzl.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
+        CircleFitter.Circle circle = aprilTagFilter.getResidualsBoundingCircle();
         if (circle.r != 0)
             c.strokeCircle(robotPose.position.x + circle.x, robotPose.position.y + circle.y, circle.r);
         c.setStroke("#808080");
-        for (AprilTagFilter.Storage<Point> point: aprilTagFilter.positionResiduals) {
+        for (AprilTagFilter.Storage<Point> point: aprilTagFilter.oldPositionResiduals) {
             c.fillRect(robotPose.position.x + point.residual.x - 0.5,
                        robotPose.position.y + point.residual.y - 0.5, 1, 1);
         }
@@ -1522,7 +1563,7 @@ public class Poser {
 
         // Check to see if we're no locked on and if so, broadcast to all interested
         // pose estimators:
-        if ((!isLockedOn) && aprilTagFilter.isConfident()) {
+        if ((!isLockedOn) && aprilTagFilter.isConfidentFilter()) {
             isLockedOn = true;
             if (opticalFlowLocalizer != null)
                 opticalFlowLocalizer.setPose(posteriorPose);
@@ -1551,7 +1592,7 @@ public class Poser {
         }
 
         // Process April Tags:
-        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(posteriorPose, aprilTagFilter.isConfident());
+        AprilTagLocalizer.Result aprilTag = aprilTagLocalizer.update(posteriorPose, aprilTagFilter.isConfidentFilter());
         if (aprilTag != null) {
             posteriorPose = reviseHistory(time - aprilTag.latency, aprilTag, null);
         }
@@ -1559,13 +1600,13 @@ public class Poser {
         // Process the distance sensor. Only act on it if the current pose estimate is
         // reliable enough, otherwise chaos will ensue:
         DistanceLocalizer.Result distance = distanceLocalizer.update(posteriorPose, record);
-        if ((aprilTagFilter.isConfident()) && (distance != null)) {
+        if ((aprilTagFilter.isConfidentFilter()) && (distance != null)) {
             posteriorPose = reviseHistory(time - distance.latency, null, distance);
         }
 
         if (distanceLocalizer.currentSensor != null)
             Stats.addData("distanceFilter size", distanceLocalizer.currentSensor.filter.residuals.size());
-        Stats.addData("aprilTagFilter position size", aprilTagFilter.positionResiduals.size());
+        Stats.addData("aprilTagFilter position size", aprilTagFilter.oldPositionResiduals.size());
         Stats.addData("aprilTagFilter heading size", aprilTagFilter.headingResiduals.size()); // @@@
 
         // Once we're locked in, clamp the rate of any changes of 'posteriorPose' to become

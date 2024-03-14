@@ -8,16 +8,16 @@ import java.util.Random;
  * Welzl's algorithm to find the tighest bounding circle, courtesy of
  * <a href="https://github.com/DustinMorri/Welzl/blob/master/algorithms/Welzl.java">...</a>.
  */
-public class Welzl {
-    static class Circle {
-        double x,y,r;
-        Circle(double x,double y,double r){
+public class CircleFitter {
+    public static class Circle {
+        public double x,y,r;
+        public Circle(double x,double y,double r){
             this.x=x;
             this.y=y;
             this.r=r;
         }
     }
-    static Random r = new Random();
+    private static Random r = new Random();
     public static Circle welzl(List<Point> points) {
         ArrayList<Point> pList = new ArrayList<>(points);
         ArrayList<Point> rList = new ArrayList<>();
@@ -78,7 +78,7 @@ public class Welzl {
             return true;
         }
     }
-    static Circle makeNewCircle(ArrayList<Point> R){
+    private static Circle makeNewCircle(ArrayList<Point> R){
         if(R.size()==2){
             double x1 = R.get(0).x;//3
             double y1 = R.get(0).y;//5
@@ -120,14 +120,14 @@ public class Welzl {
             return new Circle(x,y,r);
         }
     }
-    static double s(double n){
+    private static double s(double n){
         return Math.pow(n,2);
     }
-    static boolean isIn(Point p,Circle D){
+    private static boolean isIn(Point p,Circle D){
         double distanceFromCenter = distance(p.x,p.y,D.x,D.y);
         return distanceFromCenter <= D.r;
     }
-    static double distance(double x1,double y1,double x2,double y2){
+    private static double distance(double x1,double y1,double x2,double y2){
         return Math.sqrt(Math.pow(Math.abs(x1-x2),2)+Math.pow(Math.abs(y1-y2),2));
     }
 }

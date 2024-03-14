@@ -4,7 +4,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
-public class WelzlTest {
+public class CircleFitterTest {
     @Test
     public void testBoundingCircle() {
         Point[] points = {
@@ -16,7 +16,7 @@ public class WelzlTest {
 
         System.out.println("\n\n\n\n");
         for (int i = 0; i < 10; i++) {
-            Welzl.Circle circle = Welzl.welzl(Arrays.asList(points));
+            CircleFitter.Circle circle = CircleFitter.welzl(Arrays.asList(points));
             System.out.println(String.format("*** My result: (%f, %f), radius %f", circle.x, circle.y, circle.r));
         }
         System.out.println("\n\n\n\n");

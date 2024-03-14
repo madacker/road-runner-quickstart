@@ -128,7 +128,7 @@ public class Stats {
         for (Timer timer: ioTimers) {
             double ms = timer.resultTime * 1000.0;
             if ((ms > 0.01) && (!timer.descriptor.startsWith("io::")) && !timer.descriptor.equals(LOOP_TIMER)) {
-                builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
+                builder.append(String.format("&emsp;%.2f ms - %s\n", ms, timer.descriptor));
                 sumMs += ms;
             }
         }
