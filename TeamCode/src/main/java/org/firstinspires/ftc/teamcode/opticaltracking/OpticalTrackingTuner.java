@@ -224,10 +224,10 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
                 tickDistance += Math.hypot(motion.x, motion.y);
 
-System.out.println(String.format("rotationTotal: %f, tickDistance: %f", rotationTotal, tickDistance));
+System.out.printf("rotationTotal: %f, tickDistance: %f%n", rotationTotal, tickDistance);
 
                 Point motionVector
-                        = new Point(motion.x, motion.y).scale(calibration.inchesPerTick).rotate(calibration.correctionAngle);
+                        = new Point(motion.x, motion.y).multiply(calibration.inchesPerTick).rotate(calibration.correctionAngle);
                 Point deltaPosition = deltaFieldPosition(yaw, motionVector.x, motionVector.y, deltaYaw);
                 currentPoint = currentPoint.add(deltaPosition);
                 points.add(currentPoint);

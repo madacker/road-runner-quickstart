@@ -27,7 +27,7 @@ public class Point { // Can't derive from vector2d because it's marked as final 
                 Math.sin(theta) * x + Math.cos(theta) * y);
     }
     public Point negate() { return new Point(-x, -y); }
-    public Point scale(double scalar) { return new Point(x * scalar, y * scalar); }
+    public Point multiply(double scalar) { return new Point(x * scalar, y * scalar); }
     public Point divide(double scalar) { return new Point(x / scalar, y / scalar); }
     public double dot(Point other) {
         return this.x * other.x + this.y * other.y;
