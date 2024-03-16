@@ -154,6 +154,8 @@ class AprilTagFilter {
     // Circle that bounds all position residuals:
     public CircleFitter.Circle boundingCircle = new CircleFitter.Circle(0, 0, 0);
 
+    boolean enablePositionCorrection; // Enable the position to be corrected
+
     // Storage for filter data:
     static class Storage<T> {
         T residual;
@@ -168,6 +170,7 @@ class AprilTagFilter {
     // Specify true for isConfident if a starting pose was specified to Poser()
     AprilTagFilter(boolean isConfidentFilter) {
         this.isConfidentFilter = isConfidentFilter;
+        Settings.registerToggleOption("Enable position correction", false, enable -> enablePositionCorrection = enable );
     }
 
     // Update the bounding circle given the current set of residuals:
@@ -199,10 +202,14 @@ class AprilTagFilter {
         if ((isConfidentFilter) && (positionResiduals.size() < POSITION_FILTER_COUNT))
             return currentPosition; // ====>
 
-        // Calculate the bounding circle along with corresponding vectors and length:
+        // Calculate the bounding circle along with corresponding vectors and length. Don't
+        // forget that the origin is centered on our current position so we're dealing here
+        // entirely with offsets from the current position:
         boundingCircle = getResidualBoundingCircle();
-        Point center = new Point(boundingCircle.x, boundingCircle.y);
-        Point vectorToCenter = center.subtract(currentPosition);
+        if (!enablePositionCorrection)
+            return currentPosition; // ====>
+
+        Point vectorToCenter = new Point(boundingCircle.x, boundingCircle.y);
         double distanceToCenter = vectorToCenter.length();
         double correctionDistance = distanceToCenter - boundingCircle.r;
 
@@ -214,21 +221,17 @@ class AprilTagFilter {
         if ((correctionDistance <= 0) || (distanceToCenter == 0))
             return currentPosition; // ====>
 
-return currentPosition; // ====>
+        // Okay, we're going to pull the current position towards the center of the circle.
+        // Calculate the correction:
+        Point correctionVector = vectorToCenter.multiply(correctionDistance / distanceToCenter);
 
-//        // Okay, we're going to pull the current position towards the center of the circle.
-//        // Calculate the correction:
-//        Point correctionVector = vectorToCenter.multiply(correctionDistance / distanceToCenter);
-//
-//        // Negatively offset all of the sample points to account for the offset we're about
-//        // to add to the current position:
-//        for (Storage<Point> residual: positionResiduals) {
-//            residual.residual = residual.residual.subtract(correctionVector);
-//        }
-//
-//        return center.add(correctionVector);
+        // Negatively offset all of the sample points to account for the offset we're about
+        // to add to the current position:
+        for (Storage<Point> residual: positionResiduals) {
+            residual.residual = residual.residual.subtract(correctionVector);
+        }
 
-        // @@@ Green bounding circle when correcting the pose, yellow when not
+        return currentPosition.add(correctionVector);
     }
 
     double filterHeading(double currentHeading, double aprilTagHeading, boolean confidentAprilTag) {
