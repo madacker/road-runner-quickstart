@@ -151,7 +151,8 @@ class AprilTagFilter {
     public LinkedList<Storage<Double>> headingResiduals = new LinkedList<>();
     public LinkedList<Storage<Point>> positionResiduals = new LinkedList<>();
 
-    public CircleFitter.Circle boundingCircle; // Circle that bounds all position residuals
+    // Circle that bounds all position residuals:
+    public CircleFitter.Circle boundingCircle = new CircleFitter.Circle(0, 0, 0);
 
     // Storage for filter data:
     static class Storage<T> {
@@ -213,21 +214,20 @@ class AprilTagFilter {
         if ((correctionDistance <= 0) || (distanceToCenter == 0))
             return currentPosition; // ====>
 
-        // Okay, we're going to pull the current position towards the center of the circle.
-        // Calculate the correction:
-        Point correctionVector = vectorToCenter.multiply(correctionDistance / distanceToCenter);
+return currentPosition; // ====>
 
-        // Negatively offset all of the sample points to account for the offset we're about
-        // to add to the current position:
-        for (Storage<Point> residual: positionResiduals) {
-            residual.residual = residual.residual.subtract(correctionVector);
-        }
+//        // Okay, we're going to pull the current position towards the center of the circle.
+//        // Calculate the correction:
+//        Point correctionVector = vectorToCenter.multiply(correctionDistance / distanceToCenter);
+//
+//        // Negatively offset all of the sample points to account for the offset we're about
+//        // to add to the current position:
+//        for (Storage<Point> residual: positionResiduals) {
+//            residual.residual = residual.residual.subtract(correctionVector);
+//        }
+//
+//        return center.add(correctionVector);
 
-        return center.add(correctionVector);
-
-        // @@@ Don't worry about going back in time
-        // @@@ Remember green vs. yellow residuals for the visualization
-        // @@@ Draw the crosshairs for all current April Tags, remove rejects from history
         // @@@ Green bounding circle when correcting the pose, yellow when not
     }
 
@@ -661,12 +661,12 @@ class AprilTagLocalizer {
 
     // Descriptions of attached cameras:
     static final CameraDescriptor[] CAMERA_DESCRIPTORS = {
-            new CameraDescriptor("webcam2", new Point(-5.75, -6),
+            new CameraDescriptor("webcamback", new Point(-5.75, -6),
                     new Point(6.0, -5.75), // @@@ Remove me!
                     Math.PI, new Size(1280, 720),
                     906.940247073, 906.940247073, 670.833056673, 355.34234068,
                     0.190, Math.toRadians(75)),
-            new CameraDescriptor("webcam1", new Point(7.0, -0.5),
+            new CameraDescriptor("webcamfront", new Point(7.0, -0.5),
                     new Point(-0.5, -7.0),  // @@@ Remove me!
                     0, new Size(640, 480),
                     -1, -1, -1, -1, // Use default FTC calibration
@@ -1013,7 +1013,7 @@ class AprilTagLocalizer {
         }
 
         // This will be the vision pose that we recommend to update the current pose:
-        VisionPose visionPose = null;
+        VisionPose chosenVisionPose = null;
         int poseCount = visionPoses.size();
 
         // We love it when there are 3 accurate poses reasonably when reasonably close to
@@ -1042,15 +1042,15 @@ class AprilTagLocalizer {
                 for (int i = 0; i < 3; i++) {
                     if (interDistances[i] == min) {
                         isExcellentPose = true;
-                        visionPose = visionPoses.get(i);
+                        chosenVisionPose = visionPoses.get(i);
                         Stats.poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
                     }
                 }
             }
         }
 
-        // If visionPose is null, we didn't find a perfect pose, so lower our standards a little:
-        if (visionPose == null)  {
+        // If chosenVisionPose is null, we didn't find a perfect pose, so lower our standards a little:
+        if (chosenVisionPose == null)  {
             // Set a default status:
             if (poseCount == 0) {
                 Stats.poseStatus = "No vision pose found";
@@ -1064,30 +1064,30 @@ class AprilTagLocalizer {
                 // If only a single tag is in view, adopt its pose only if it's relatively close
                 // to our current pose estimate:
                 Stats.poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
-                visionPose = visionPoses.get(0);
+                chosenVisionPose = visionPoses.get(0);
             } else if ((poseCount > 1) && (minResidual < COARSE_EPSILON)) {
                 // If multiple tags are in view, choose the closest one to our current pose
                 // (reasoning that it's unlikely that *both* are wildly bogus).
                 for (VisionPose candidatePose : visionPoses) {
                     if ((candidatePose.residual == minResidual) && (candidatePose.range < RELIABLE_RANGE)) {
-                        visionPose = candidatePose;
+                        chosenVisionPose = candidatePose;
                         Stats.poseStatus = String.format("Good one in %d vision pose, %.2f residual", visionPoses.size(), candidatePose.residual);
                     }
                 }
             }
         }
 
-        Pose2d resultPose = (visionPose != null) ? visionPose.pose : null;
+        Pose2d resultPose = (chosenVisionPose != null) ? chosenVisionPose.pose : null;
 
         // Update visualizations:
         visualizationsTime = Globals.time();
         visualizations = new ArrayList<>();
-        for (VisionPose pose: visionPoses) {
+        for (VisionPose visionPose: visionPoses) {
             PoseVisualization.Quality quality = PoseVisualization.Quality.LOW;
-            if (pose == visionPose) {
+            if (visionPose == chosenVisionPose) {
                 quality = (isExcellentPose) ? PoseVisualization.Quality.HIGH : PoseVisualization.Quality.MEDIUM;
             }
-            visualizations.add(new PoseVisualization(pose.pose, quality));
+            visualizations.add(new PoseVisualization(visionPose.pose, quality));
         }
 
         return new Result(resultPose, isExcellentPose, activeCamera, camera.descriptor.latency);
@@ -1414,10 +1414,22 @@ public class Poser {
     }
 
     // Draw cross-hairs at the specified point:
-    private void drawCrossHairs(Vector2d position) {
-        final double radius = 3;
-        Globals.canvas.strokeLine(position.x, position.y - radius, position.x, position.y + radius);
-        Globals.canvas.strokeLine(position.x - radius, position.y, position.x + radius, position.y);
+    private void drawCrossHairs(AprilTagLocalizer.PoseVisualization.Quality quality) {
+        if (quality == AprilTagLocalizer.PoseVisualization.Quality.LOW)
+            Globals.canvas.setStroke("#ff0000"); // Red
+        else if (quality == AprilTagLocalizer.PoseVisualization.Quality.MEDIUM)
+            Globals.canvas.setStroke("#a0a000"); // Yellow
+        else
+            Globals.canvas.setStroke("#00ff00"); // Green
+
+        for (AprilTagLocalizer.PoseVisualization visualization : aprilTagLocalizer.visualizations) {
+            if (visualization.quality == quality) {
+                final double radius = 3;
+                Vector2d position = visualization.pose.position;
+                Globals.canvas.strokeLine(position.x, position.y - radius, position.x, position.y + radius);
+                Globals.canvas.strokeLine(position.x - radius, position.y, position.x + radius, position.y);
+            }
+        }
     }
 
     // Draw the history visualizations for FTC Dashboard:
@@ -1482,15 +1494,9 @@ public class Poser {
 
         // Draw current April Tag poses:
         if (Globals.time() - aprilTagLocalizer.visualizationsTime < 0.5) {
-            for (AprilTagLocalizer.PoseVisualization visualization : aprilTagLocalizer.visualizations) {
-                if (visualization.quality == AprilTagLocalizer.PoseVisualization.Quality.LOW)
-                    c.setStroke("#ff0000"); // Red
-                else if (visualization.quality == AprilTagLocalizer.PoseVisualization.Quality.MEDIUM)
-                    c.setStroke("a0a000"); // Yellow
-                else
-                    c.setStroke("00ff00"); // Green
-                drawCrossHairs(visualization.pose.position);
-            }
+            drawCrossHairs(AprilTagLocalizer.PoseVisualization.Quality.LOW);
+            drawCrossHairs(AprilTagLocalizer.PoseVisualization.Quality.MEDIUM);
+            drawCrossHairs(AprilTagLocalizer.PoseVisualization.Quality.HIGH);
 
             // Draw the AprilTag filter residuals along with their bounding circle in black:
             c.setStroke("#000000");

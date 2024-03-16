@@ -8,7 +8,6 @@ import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.outoftheboxrobotics.photoncore.Photon;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
@@ -322,7 +321,7 @@ class Wall {
     }
 }
 
-@Photon
+// @Photon
 @TeleOp(name="Driver", group="Aardvark")
 public class Driver extends LinearOpMode {
     // Shape the stick input for more precision at slow speeds:
