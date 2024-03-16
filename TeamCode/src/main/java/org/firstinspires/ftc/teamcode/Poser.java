@@ -840,12 +840,6 @@ class AprilTagLocalizer {
         return new CameraState(aprilTagProcessor, visionPortal, descriptor);
     }
 
-    // Close when shutting down:
-    void close() {
-        for (CameraState camera: cameras)
-            camera.visionPortal.close();
-    }
-
     // Find the tag associated with this detection:
     private Location getTag(AprilTagDetection detection) {
         for (Location t : TAG_LOCATIONS) {
@@ -973,13 +967,19 @@ class AprilTagLocalizer {
                 cameras[resultIndex].visionPortal.resumeLiveView();
             }
 
-            Stats.poseStatus = "";
-            Stats.cameraFps = 0;
-            Stats.pipelineLatency = 0;
+            Stats.stats.poseStatus = "";
+            Stats.stats.cameraFps = 0;
+            Stats.stats.pipelineLatency = 0;
             activeCamera = resultIndex;
         }
 
         return (activeCamera == -1) ? null : cameras[activeCamera];
+    }
+
+    // Close when shutting down:
+    void close() {
+        for (CameraState camera: cameras)
+            camera.visionPortal.close();
     }
 
     // Update loop for April Tags:
@@ -998,9 +998,9 @@ class AprilTagLocalizer {
         if (tagDetections == null)
             return null; // ====>
 
-        Stats.cameraFps = camera.visionPortal.getFps();
+        Stats.stats.cameraFps = camera.visionPortal.getFps();
         for (AprilTagDetection detection : tagDetections) {
-            Stats.pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-9;
+            Stats.stats.pipelineLatency = (nanoTime() - tagDetections.get(0).frameAcquisitionNanoTime) * 1e-9;
             if (detection.metadata != null) {
                 Location tag = getTag(detection);
                 if (tag != null) {
@@ -1046,7 +1046,7 @@ class AprilTagLocalizer {
                     if (interDistances[i] == min) {
                         isExcellentPose = true;
                         chosenVisionPose = visionPoses.get(i);
-                        Stats.poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
+                        Stats.stats.poseStatus = String.format("Excellent vision 3-pose, min %.2f, max %.2f", min, maxNeighborDistance);
                     }
                 }
             }
@@ -1056,17 +1056,17 @@ class AprilTagLocalizer {
         if (chosenVisionPose == null)  {
             // Set a default status:
             if (poseCount == 0) {
-                Stats.poseStatus = "No vision pose found";
+                Stats.stats.poseStatus = "No vision pose found";
             } else if (poseCount == 1) {
-                Stats.poseStatus = "One inadequate vision pose";
+                Stats.stats.poseStatus = "One inadequate vision pose";
             } else {
-                Stats.poseStatus = String.format("%d inadequate vision poses", poseCount);
+                Stats.stats.poseStatus = String.format("%d inadequate vision poses", poseCount);
             }
             if ((poseCount == 1) && (minResidual < FINE_EPSILON) && (visionPoses.get(0).range < RELIABLE_RANGE)) {
                 // TODO: Check the returned size?
                 // If only a single tag is in view, adopt its pose only if it's relatively close
                 // to our current pose estimate:
-                Stats.poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
+                Stats.stats.poseStatus = String.format("Good single vision pose, %.2f", visionPoses.get(0).residual);
                 chosenVisionPose = visionPoses.get(0);
             } else if ((poseCount > 1) && (minResidual < COARSE_EPSILON)) {
                 // If multiple tags are in view, choose the closest one to our current pose
@@ -1074,7 +1074,7 @@ class AprilTagLocalizer {
                 for (VisionPose candidatePose : visionPoses) {
                     if ((candidatePose.residual == minResidual) && (candidatePose.range < RELIABLE_RANGE)) {
                         chosenVisionPose = candidatePose;
-                        Stats.poseStatus = String.format("Good one in %d vision pose, %.2f residual", visionPoses.size(), candidatePose.residual);
+                        Stats.stats.poseStatus = String.format("Good one in %d vision pose, %.2f residual", visionPoses.size(), candidatePose.residual);
                     }
                 }
             }
@@ -1209,13 +1209,13 @@ class OpticalFlowLocalizer {
         Pose2d inferiorRobotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
 
         // Draw the poses:
-        if (visualizeInferiorPose) {
-            Globals.canvas.setStroke("#ff0000"); // Red
-            MecanumDrive.drawRobot(Globals.canvas, inferiorRobotPose);
-        }
-
-        Globals.canvas.setStroke("#E9967A"); // Olive
-        MecanumDrive.drawRobot(Globals.canvas, robotPose);
+//        if (visualizeInferiorPose) {
+//            Globals.canvas.setStroke("#ff0000"); // Red
+//            MecanumDrive.drawRobot(Globals.canvas, inferiorRobotPose);
+//        }
+//
+//        Globals.canvas.setStroke("#E9967A"); // Olive
+//        MecanumDrive.drawRobot(Globals.canvas, robotPose);
 
         return twist;
     }
@@ -1635,8 +1635,8 @@ public class Poser {
         visualize(bestPose);
         aprilTagFilter.telemetry();
 
-        Stats.imuYaw = Globals.getYaw() - originalYaw;
-        Stats.yawCorrection = posteriorPose.heading.log() - Stats.imuYaw;
+        Stats.stats.imuYaw = Globals.getYaw() - originalYaw;
+        Stats.stats.yawCorrection = posteriorPose.heading.log() - Stats.stats.imuYaw;
     }
 
     // Close when done running our OpMode:

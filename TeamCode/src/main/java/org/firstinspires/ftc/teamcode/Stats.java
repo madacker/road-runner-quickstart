@@ -7,32 +7,34 @@ import java.util.Comparator;
 import java.util.HashMap;
 
 public class Stats {
-    private static HashMap<String, Timer> timers = new HashMap<>(); // All internal timers
-    private static ArrayList<Timer> ioTimers = new ArrayList<>(); // I/O timers
-    private static double windowStartTime = Globals.time(); // Start of the timing window
-    private static int windowLoopCount = 0; // Count of sensor loops during this window
-    private static HashMap<String, String> data = new HashMap<>(); // For 'addData()'
+    public static Stats stats; // Point to the global Stats object
 
-    private final static String LOOP_TIMER = "Total loop time"; // Key
+    private HashMap<String, Timer> timers = new HashMap<>(); // All internal timers
+    private ArrayList<Timer> ioTimers = new ArrayList<>(); // I/O timers
+    private double windowStartTime = Globals.time(); // Start of the timing window
+    private int windowLoopCount = 0; // Count of sensor loops during this window
+    private HashMap<String, String> data = new HashMap<>(); // For 'addData()'
+
+    private static final String LOOP_TIMER = "Total loop time"; // Key
     /** @noinspection FieldCanBeLocal*/
-    private final double WINDOW_DURATION = 5.0; // Sliding window duration, in seconds
+    private static final double WINDOW_DURATION = 5.0; // Sliding window duration, in seconds
 
-    public static double cameraFps; // Camera frame-rate
-    public static double pipelineLatency; // Pipeline latency for the camera, in seconds
-    public static String poseStatus = ""; // String describing the last April Tags pose result
-    public static double yawCorrection; // How far off Poser() is from the IMU
-    public static double imuYaw; // Current yaw as read from the IMU
+    public double cameraFps; // Camera frame-rate
+    public double pipelineLatency; // Pipeline latency for the camera, in seconds
+    public String poseStatus = ""; // String describing the last April Tags pose result
+    public double yawCorrection; // How far off Poser() is from the IMU
+    public double imuYaw; // Current yaw as read from the IMU
 
     // Velocity statistics:
-    public static double maxLinearAcceleration = 0;
-    public static double minLinearDeceleration = 0;
-    public static double maxLinearSpeed = 0;
-    public static double previousLinearSpeed = 0;
-    public static double maxAngularAcceleration = 0;
-    public static double minAngularDeceleration = 0;
-    public static double maxAngularSpeed = 0;
-    public static double previousAngularSpeed = 0;
-    public static double fullAxialSpeed = 0;
+    public double maxLinearAcceleration = 0;
+    public double minLinearDeceleration = 0;
+    public double maxLinearSpeed = 0;
+    public double previousLinearSpeed = 0;
+    public double maxAngularAcceleration = 0;
+    public double minAngularDeceleration = 0;
+    public double maxAngularSpeed = 0;
+    public double previousAngularSpeed = 0;
+    public double fullAxialSpeed = 0;
 
     // Class for tracking internal timing:
     static class Timer {
@@ -47,6 +49,8 @@ public class Stats {
     }
 
     Stats() {
+        stats = this;
+        
         Settings.registerStats("I/O", Stats::getIoSummary);
         Settings.registerStats("Performance", Stats::getPerformanceSummary);
         Settings.registerStats("Telemetry", Stats::getTelemetry);
@@ -56,12 +60,12 @@ public class Stats {
 
     // Call this update every loop iteration:
     public void update() {
-        Stats.endTimer(LOOP_TIMER);
+        endTimer(LOOP_TIMER);
         double windowDuration = Globals.time() - windowStartTime;
 
         windowLoopCount++;
         if (windowDuration > WINDOW_DURATION) {
-            for (Timer timer: Stats.timers.values()) {
+            for (Timer timer: timers.values()) {
                 // Compute the per-sensor-loop average, not the per-timer-invocation average:
                 timer.resultTime = timer.currentSum / windowLoopCount;
                 timer.resultCount = timer.currentCount;
@@ -71,16 +75,17 @@ public class Stats {
             windowStartTime = Globals.time();
             windowLoopCount = 0;
         }
-        Stats.startTimer(LOOP_TIMER);
+        startTimer(LOOP_TIMER);
     }
 
     // Start a timer:
     static public void startTimer(String descriptor) {
-        Timer timer = timers.get(descriptor);
+        Stats stats = Stats.stats;
+        Timer timer = stats.timers.get(descriptor);
         if (timer == null) {
             timer = new Timer(descriptor);
-            timers.put(descriptor, timer);
-            ioTimers.add(timer);
+            stats.timers.put(descriptor, timer);
+            stats.ioTimers.add(timer);
         }
         assert(timer.startTime == 0);
         timer.startTime = Globals.time();
@@ -88,7 +93,7 @@ public class Stats {
 
     // End a timer:
     static public void endTimer(String descriptor) {
-        Timer timer = timers.get(descriptor);
+        Timer timer = Stats.stats.timers.get(descriptor);
         assert(timer != null);
         assert(timer.startTime != 0);
         timer.currentCount++;
@@ -98,22 +103,24 @@ public class Stats {
 
     // Always show this header at the top of the screen:
     static public String getHeader() {
+        Stats stats = Stats.stats;
         //noinspection DataFlowIssue
         return String.format("<h6>Loop: %.1fms, Camera FPS: %.1f, Latency: %.1f</h6>",
-                timers.get(LOOP_TIMER).resultTime * 1000.0, cameraFps, pipelineLatency * 1000.0);
+                stats.timers.get(LOOP_TIMER).resultTime * 1000.0, stats.cameraFps, stats.pipelineLatency * 1000.0);
     }
 
     // Get a summary of the I/O times:
     static public String getIoSummary() {
+        Stats stats = Stats.stats;
         double sumMs = 0;
         //noinspection DataFlowIssue
-        double loopMs = timers.get(LOOP_TIMER).resultTime * 1000.0;
+        double loopMs = stats.timers.get(LOOP_TIMER).resultTime * 1000.0;
 
         // Sort in decreasing order:
-        ioTimers.sort(Comparator.comparingDouble(x -> loopMs - x.resultTime));
+        stats.ioTimers.sort(Comparator.comparingDouble(x -> loopMs - x.resultTime));
 
         StringBuilder builder = new StringBuilder();
-        for (Timer timer: ioTimers) {
+        for (Timer timer: stats.ioTimers) {
             double ms = timer.resultTime * 1000.0;
             if ((ms > 0.01) && (timer.descriptor.startsWith("io::"))) {
                 builder.append(String.format("&emsp;%.1f ms - %s\n", ms, timer.descriptor));
@@ -125,7 +132,7 @@ public class Stats {
         builder.append(String.format("&emsp;%.1f ms - Total loop time\n", loopMs));
 
         builder.append("\n");
-        for (Timer timer: ioTimers) {
+        for (Timer timer: stats.ioTimers) {
             double ms = timer.resultTime * 1000.0;
             if ((ms > 0.01) && (!timer.descriptor.startsWith("io::")) && !timer.descriptor.equals(LOOP_TIMER)) {
                 builder.append(String.format("&emsp;%.2f ms - %s\n", ms, timer.descriptor));
@@ -137,19 +144,20 @@ public class Stats {
 
     // Summarize all of the statistics into a nice string:
     static public String getPerformanceSummary() {
-        String result = poseStatus + "\n";
+        Stats stats = Stats.stats;
+        String result = stats.poseStatus + "\n";
 
-        double degreesCorrection = Math.toDegrees(yawCorrection);
+        double degreesCorrection = Math.toDegrees(stats.yawCorrection);
         while (degreesCorrection <= -45)
             degreesCorrection += 90;
         while (degreesCorrection > 45)
             degreesCorrection -= 90;
-        result += String.format("Yaw correction: %.2f°, IMU yaw: %.2f°\n", degreesCorrection, Math.toDegrees(imuYaw));
+        result += String.format("Yaw correction: %.2f°, IMU yaw: %.2f°\n", degreesCorrection, Math.toDegrees(stats.imuYaw));
 
         result += String.format("Linear: top-speed: %.1f, theoretical: %.1f\n    accel: %.1f, decel: %.1f\n",
-                maxLinearSpeed, fullAxialSpeed, maxLinearAcceleration, minLinearDeceleration);
+                stats.maxLinearSpeed, stats.fullAxialSpeed, stats.maxLinearAcceleration, stats.minLinearDeceleration);
         result += String.format("Angular: top-speed: %.2f\n    accel: %.2f, decel: %.2f\n",
-                maxAngularSpeed, maxAngularAcceleration, minAngularDeceleration);
+                stats.maxAngularSpeed, stats.maxAngularAcceleration, stats.minAngularDeceleration);
 
         return result;
     }
@@ -157,42 +165,43 @@ public class Stats {
     // Get telemetry:
     static public String getTelemetry() {
         StringBuilder builder = new StringBuilder();
-        for (String key: data.keySet()) {
+        for (String key: Stats.stats.data.keySet()) {
             //noinspection StringConcatenationInsideStringBufferAppend
-            builder.append(key + ": " + data.get(key));
+            builder.append(key + ": " + Stats.stats.data.get(key));
         }
         return builder.toString();
     }
 
     // Log interesting velocity data:
     static public void updateVelocity(PoseVelocity2d poseVelocity, double fullAxialSpeed) {
-        Stats.fullAxialSpeed = fullAxialSpeed;
+        Stats stats = Stats.stats;
+        stats.fullAxialSpeed = fullAxialSpeed;
 
         double linearSpeed = Math.hypot(poseVelocity.linearVel.x, poseVelocity.linearVel.y);
-        double linearSpeedDelta = linearSpeed - previousLinearSpeed;
+        double linearSpeedDelta = linearSpeed - stats.previousLinearSpeed;
         if (linearSpeedDelta > 0) {
-            maxLinearAcceleration = Math.max(linearSpeedDelta, maxLinearAcceleration);
+            stats.maxLinearAcceleration = Math.max(linearSpeedDelta, stats.maxLinearAcceleration);
         } else {
-            minLinearDeceleration = Math.min(linearSpeedDelta, minLinearDeceleration);
+            stats.minLinearDeceleration = Math.min(linearSpeedDelta, stats.minLinearDeceleration);
         }
-        previousLinearSpeed = linearSpeed;
-        maxLinearSpeed = Math.max(linearSpeed, maxLinearSpeed);
+        stats.previousLinearSpeed = linearSpeed;
+        stats.maxLinearSpeed = Math.max(linearSpeed, stats.maxLinearSpeed);
 
         double angularSpeed = Math.abs(poseVelocity.angVel);
-        double angularSpeedDelta = angularSpeed - previousAngularSpeed;
+        double angularSpeedDelta = angularSpeed - stats.previousAngularSpeed;
         if (angularSpeedDelta > 0) {
-            maxAngularAcceleration = Math.max(angularSpeedDelta, maxAngularAcceleration);
+            stats.maxAngularAcceleration = Math.max(angularSpeedDelta, stats.maxAngularAcceleration);
         } else {
-            minAngularDeceleration = Math.min(angularSpeedDelta, minAngularDeceleration);
+            stats.minAngularDeceleration = Math.min(angularSpeedDelta, stats.minAngularDeceleration);
         }
-        previousAngularSpeed = angularSpeed;
-        maxAngularSpeed = Math.max(angularSpeed, maxAngularSpeed);
+        stats.previousAngularSpeed = angularSpeed;
+        stats.maxAngularSpeed = Math.max(angularSpeed, stats.maxAngularSpeed);
     }
 
     // Add stats data for our own telemetry and for graphing in FTC Dashboard:
     static public void addData(String caption, Object datum) {
         if (Globals.packet != null) // Allow addData() calls during initialization
             Globals.packet.put(caption, datum);
-        data.put(caption, datum.toString() + "\n");
+        Stats.stats.data.put(caption, datum.toString() + "\n");
     }
 }

@@ -356,10 +356,11 @@ public class Driver extends LinearOpMode {
     /** @noinspection ConstantValue*/
     @Override
     public void runOpMode() throws InterruptedException {
-        Globals globals = new Globals(hardwareMap, telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         Settings settings = new Settings(telemetry, gamepad1);
         Stats stats = new Stats();
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
+
         Poser poser = new Poser(hardwareMap, drive, null);
         Led led = new Led(hardwareMap);
         Wall wall = new Wall(poser, drive, new Vector2d(-72, -36), new Vector2d(24, -24));
