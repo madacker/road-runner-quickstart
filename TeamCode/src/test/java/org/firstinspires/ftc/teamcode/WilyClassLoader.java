@@ -2,12 +2,14 @@ package org.firstinspires.ftc.teamcode;
 
 import com.sun.tools.javac.resources.javac;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
 
 /**
  * Our custom implementation of the ClassLoader.
@@ -42,26 +44,58 @@ public class WilyClassLoader extends ClassLoader {
      *
      * @param name Full class name
      */
-    private Class<?> getClass(String name)
-            throws ClassNotFoundException {
+    private Class<?> getClass(String name) {
         // We are getting a name that looks like
         // javablogging.package.ClassToLoad
-        // and we have to convert it into the .class file name
+        // and we have to convert it into the .class classAsPath name
         // like javablogging/package/ClassToLoad.class
-        String file = name.replace('.', File.separatorChar)
-                + ".class";
-        byte[] b = null;
-        try {
-            // This loads the byte code data from the file
-            b = loadClassData(file);
-            // defineClass is inherited from the ClassLoader class
-            // and converts the byte array into a Class
-            Class<?> c = defineClass(name, b, 0, b.length);
+
+        if (true) {
+            // Get the system loader to load the class:
+            Class<?> klass;
+            try {
+                klass = getParent().loadClass(name);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            String className = klass.getName();
+            String classAsPath = className.replace('.', '/') + ".class";
+            InputStream stream = klass.getClassLoader().getResourceAsStream(classAsPath);
+
+            // Read the stream into a byte array:
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int nRead;
+            byte[] data = new byte[16384];
+            try {
+                while ((nRead = stream.read(data, 0, data.length)) != -1) {
+                    buffer.write(data, 0, nRead);
+                }
+            } catch (IOException e) {
+                return null; // ====>
+            }
+
+            // Convert back to a class:
+            byte[] bytes = buffer.toByteArray();
+            Class<?> c = defineClass(name, bytes, 0, bytes.length);
             resolveClass(c);
             return c;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+        } else {
+            String classAsPath = name.replace('.', File.separatorChar)
+                    + ".class";
+
+            byte[] b = null;
+            try {
+                // This loads the byte code data from the classAsPath
+                b = loadClassData(classAsPath);
+                // defineClass is inherited from the ClassLoader class
+                // and converts the byte array into a Class
+                Class<?> c = defineClass(name, b, 0, b.length);
+                resolveClass(c);
+                return c;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
     }
 
