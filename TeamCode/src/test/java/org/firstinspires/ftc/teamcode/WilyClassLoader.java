@@ -1,9 +1,13 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.sun.tools.javac.resources.javac;
+
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 
 /**
  * Our custom implementation of the ClassLoader.
@@ -27,6 +31,7 @@ public class WilyClassLoader extends ClassLoader {
      */
     public WilyClassLoader(ClassLoader parent) {
         super(parent);
+        System.out.println("\n\n\n*********************** Called!\n\n\n\n");
     }
 
     /**
@@ -93,7 +98,10 @@ public class WilyClassLoader extends ClassLoader {
      */
     private byte[] loadClassData(String name) throws IOException {
         // Opening the file
-        InputStream stream = this.getClass().getClassLoader().getResourceAsStream(name);
+        String classPath = "C:\\Source\\Quick10\\TeamCode\\build\\intermediates\\javac\\debug\\classes\\";
+        String fullPath = classPath + name;
+        InputStream stream = new FileInputStream(new File(fullPath));
+//        InputStream stream = this.getClass().getClassLoader().getResourceAsStream(fullPath);
 //        InputStream stream = getClass().getClassLoader().getResourceAsStream(name);
 
         int size = stream.available();
