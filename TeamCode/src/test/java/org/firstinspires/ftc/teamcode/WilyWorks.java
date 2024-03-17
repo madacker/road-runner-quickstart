@@ -3,17 +3,19 @@ package org.firstinspires.ftc.teamcode;
 import org.firstinspires.ftc.teamcode.explorations.DistanceTest;
 import org.junit.Test;
 
-class WilyClassLoader extends ClassLoader {
-    public Class<?> loadClass(String name) throws ClassNotFoundException {
-        System.out.printf("*** Loading class name: %s\n", name);
-        return super.loadClass(name);
-    }
-}
-
 public class WilyWorks {
     @Test
+    public void Simple() {
+        Integer i = new Integer(5);
+        String string = "Simple test: ";
+        System.out.printf("%s: %d\n", string, i);
+        System.out.print("This is my ClassLoader: "
+                + WilyWorks.class.getClassLoader());
+    }
+
+    @Test
     public void beWily() {
-        WilyClassLoader loader = new WilyClassLoader();
+        WilyClassLoader loader = new WilyClassLoader(WilyWorks.class.getClassLoader());
         Class clazz;
         DistanceTest distanceTest;
 
