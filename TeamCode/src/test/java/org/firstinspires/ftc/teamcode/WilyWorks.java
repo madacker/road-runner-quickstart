@@ -54,6 +54,14 @@ public class WilyWorks {
         Class clazz;
         Object instance;
 
+        // Preload stuff:
+//        try {
+//            loader.loadClass("com.qualcomm.robotcore.eventloop.opmode.OpModeInternal");
+//            loader.loadClass("org.firstinspires.ftc.robotcore.external.Telemetry");
+//        } catch (ClassNotFoundException e) {
+//            throw new RuntimeException(e);
+//        }
+
         // Load the OpMode:
         try {
             clazz = loader.loadClass("org.firstinspires.ftc.teamcode.explorations.DistanceTest");

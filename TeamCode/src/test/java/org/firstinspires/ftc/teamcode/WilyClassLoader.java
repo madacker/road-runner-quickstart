@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode;
 
 import com.sun.tools.javac.resources.javac;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -33,7 +35,7 @@ public class WilyClassLoader extends ClassLoader {
      */
     public WilyClassLoader(ClassLoader parent) {
         super(parent);
-        System.out.println("\n\n\n*********************** Called!\n\n\n\n");
+        System.out.println("\n\n\n*********************** WilyClassLoader initialized!\n\n\n\n");
     }
 
     /**
@@ -50,11 +52,18 @@ public class WilyClassLoader extends ClassLoader {
         // and we have to convert it into the .class classAsPath name
         // like javablogging/package/ClassToLoad.class
 
+        // @@@  https://frankkieviet.blogspot.com/2009/03/javalanglinkageerror-loader-constraint.html says this:
+        // In fact, it's a requirement to delegate all class load requests to the parent classloader for all classes that are in java.* and javax.*.
+
+        String referenceName = name;
+        if (name.equals("org.firstinspires.ftc.robotcore.internal.opmode.TelemetryImpl"))
+            referenceName = "org.firstinspires.ftc.teamcode.WilyTelemetryImpl";
+
         if (true) {
             // Get the system loader to load the class:
             Class<?> klass;
             try {
-                klass = getParent().loadClass(name);
+                klass = getParent().loadClass(referenceName);
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
@@ -113,12 +122,18 @@ public class WilyClassLoader extends ClassLoader {
     @Override
     public Class<?> loadClass(String name)
             throws ClassNotFoundException {
-        System.out.println("loading class '" + name + "'");
-        if (name.startsWith("org.firstinspires.ftc.")) {
+        if (name.startsWith("org.firstinspires.ftc.") || name.startsWith("com.qualcomm")) {
+            System.out.println("loading class '" + name + "'");
             return getClass(name);
         }
+        System.out.println("ignoring class '" + name + "'");
         return super.loadClass(name);
     }
+
+//    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+//        System.out.println("*** Messing up class '" + name + "'" + resolve);
+//        return super.loadClass(name, resolve);
+//    }
 
     /**
      * Loads a given file (presumably .class) into a byte array.
