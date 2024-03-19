@@ -71,7 +71,8 @@ public class WilyWorks {
 
         // Apply some fixups:
         Field telemetryField = findField(klass, "telemetry");
-        telemetryField.set(instance, null); // new WilyTelemetry());
+        Class<?> wilyClass = loader.loadClass("org.firstinspires.ftc.teamcode.wilyworks.WilyTelemetry");
+        telemetryField.set(instance, wilyClass.newInstance());
 
         klass.getMethod("runOpMode").invoke(instance);
     }

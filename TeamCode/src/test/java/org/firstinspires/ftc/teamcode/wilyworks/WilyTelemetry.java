@@ -7,6 +7,8 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
  * This is the Wily Works implementation of the FTC Telemetry object.
  */
 public class WilyTelemetry implements Telemetry {
+    int weird = 1; // @@@
+
     @Override
     public Item addData(String caption, String format, Object... args) {
         return null;
@@ -34,7 +36,7 @@ public class WilyTelemetry implements Telemetry {
 
     @Override
     public void clear() {
-
+        System.out.println("Hi!"); // @@@
     }
 
     @Override
