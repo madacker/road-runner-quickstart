@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.wilyworks;
 
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.IMU;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -11,7 +12,7 @@ import java.lang.reflect.InvocationTargetException;
 /**
  * Class loader to catch problematic classes in unit tests and suggest fixes.
  */
-class WilyClassLoader extends ClassLoader {
+class TestClassLoader extends ClassLoader {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         if (true) return super.loadClass(name); // @@@
@@ -49,7 +50,7 @@ class WilyClassLoader extends ClassLoader {
 /**
  * Master Wily Works class.
  */
-public class WilyWorks {
+public class TestWorks {
     // Look for a field in the class and all of its superclasses:
     public static Field findField(Class<?> klass, String fieldName) throws NoSuchFieldException {
         while (true) {
@@ -69,18 +70,18 @@ public class WilyWorks {
         // @@@ Test with not-an-opmode
         // Create our own Class Loader to watch class loads:
 
-        WilyClassLoader loader = new WilyClassLoader();
+        TestClassLoader loader = new TestClassLoader();
         Class<?> klass = loader.loadClass(opModeClassName);
         Object instance = klass.newInstance();
 
         // Apply some fixups:
         Field telemetryField = findField(klass, "telemetry");
-        Class<?> wilyTelemetry = loader.loadClass(WilyTelemetry.class.getName());
-        telemetryField.set(instance, wilyTelemetry.newInstance());
+        Class<?> wilyTelemetryClass = loader.loadClass(WilyTelemetry.class.getName());
+        telemetryField.set(instance, wilyTelemetryClass.newInstance());
 
         Field hardwareMapField = findField(klass, "hardwareMap");
-        Class<?> hardwareMap = loader.loadClass(HardwareMap.class.getName()); // @@@ loader.loadClass("com.qualcomm.robotcore.hardware.HardwareMap");
-        hardwareMapField.set(instance, new HardwareMap(null, null));
+        Class<?> hardwareMapClass = loader.loadClass(HardwareMap.class.getName()); // @@@ loader.loadClass("com.qualcomm.robotcore.hardware.HardwareMap");
+        hardwareMapField.set(instance, new TestHardwareMap());
 
         klass.getMethod("runOpMode").invoke(instance);
     }
