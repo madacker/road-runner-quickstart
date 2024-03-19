@@ -7,30 +7,11 @@ import java.lang.reflect.InvocationTargetException;
 public class WilyWorksTest {
 
     @Test
-    public void beWily() {
+    public void beWily() throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         WilyClassLoader loader = new WilyClassLoader();
-        Class<?> clazz;
-        Object instance;
 
-        // Load the OpMode:
-        try {
-            clazz = loader.loadClass("org.firstinspires.ftc.teamcode.explorations.DistanceTest");
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-
-        // Create an instance of the OpMode:
-        try {
-            instance = clazz.newInstance();
-        } catch (IllegalAccessException|InstantiationException e) {
-            throw new RuntimeException(e);
-        }
-
-        // Run the OpMode:
-        try {
-            clazz.getMethod("runOpMode").invoke(instance);
-        } catch (InvocationTargetException | IllegalAccessException | NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        }
+        // Load the OpMode and invoke an instance:
+        Class<?> clazz = loader.loadClass("org.firstinspires.ftc.teamcode.explorations.DistanceTest");
+        clazz.getMethod("runOpMode").invoke(clazz.newInstance());
     }
 }
