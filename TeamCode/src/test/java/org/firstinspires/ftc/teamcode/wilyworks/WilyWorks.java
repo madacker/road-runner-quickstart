@@ -1,13 +1,14 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.wilyworks;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Class loader to catch problematic classes in unit tests and suggest fixes.
  */
-public class WilyClassLoader extends ClassLoader {
+class WilyClassLoader extends ClassLoader {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         // Don't bother scanning system classes:
@@ -37,5 +38,24 @@ public class WilyClassLoader extends ClassLoader {
         klass = defineClass(name, bytes, 0, bytes.length);
         resolveClass(klass);
         return klass;
+    }
+}
+
+/**
+ * Master Wily Works class.
+ */
+public class WilyWorks {
+    public void runOpMode(String opModeClassName) {
+        // Create our own Class Loader to watch class loads:
+        WilyClassLoader loader = new WilyClassLoader();
+
+        // Invoke the specified opMode:
+        try {
+            Class<?> clazz = loader.loadClass(opModeClassName);
+            clazz.getMethod("runOpMode").invoke(clazz.newInstance());
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException |
+                 InstantiationException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
