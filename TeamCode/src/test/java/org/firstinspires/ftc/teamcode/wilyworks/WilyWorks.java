@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.wilyworks;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 
 /**
@@ -45,16 +46,41 @@ class WilyClassLoader extends ClassLoader {
  * Master Wily Works class.
  */
 public class WilyWorks {
-    public void runOpMode(String opModeClassName) {
-        // Create our own Class Loader to watch class loads:
-        WilyClassLoader loader = new WilyClassLoader();
+    // Look for a field in the class and all of its superclasses:
+    public static Field findField(Class<?> klass, String fieldName) throws NoSuchFieldException {
+        while (true) {
+            try {
+                Field field = klass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field; // ===>
+            } catch(NoSuchFieldException e) {
+                klass = klass.getSuperclass();
+                if (klass == null)
+                    throw new NoSuchFieldException();
+            }
+        }
+    }
 
-        // Invoke the specified opMode:
+    private void fixup(String opModeClassName) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchFieldException {
+        // @@@ Test with not-an-opmode
+        // Create our own Class Loader to watch class loads:
+
+        WilyClassLoader loader = new WilyClassLoader();
+        Class<?> klass = loader.loadClass(opModeClassName);
+        Object instance = klass.newInstance();
+
+        // Apply some fixups:
+        Field telemetryField = findField(klass, "telemetry");
+        telemetryField.set(instance, null); // new WilyTelemetry());
+
+        klass.getMethod("runOpMode").invoke(instance);
+    }
+
+    public void runOpMode(String opModeClassName) {
         try {
-            Class<?> clazz = loader.loadClass(opModeClassName);
-            clazz.getMethod("runOpMode").invoke(clazz.newInstance());
-        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException |
-                 InstantiationException | ClassNotFoundException e) {
+            fixup(opModeClassName);
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException |
+                 InstantiationException | InvocationTargetException | NoSuchFieldException e) {
             throw new RuntimeException(e);
         }
     }
