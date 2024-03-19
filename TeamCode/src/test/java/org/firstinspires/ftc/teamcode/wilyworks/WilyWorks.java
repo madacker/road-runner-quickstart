@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.wilyworks;
 
+import com.qualcomm.robotcore.hardware.HardwareMap;
+
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +14,8 @@ import java.lang.reflect.InvocationTargetException;
 class WilyClassLoader extends ClassLoader {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
+        if (true) return super.loadClass(name); // @@@
+
         // Don't bother scanning system classes:
         if (name.startsWith("java.") || name.startsWith("android.")) {
             return super.loadClass(name);
@@ -71,8 +75,12 @@ public class WilyWorks {
 
         // Apply some fixups:
         Field telemetryField = findField(klass, "telemetry");
-        Class<?> wilyClass = loader.loadClass("org.firstinspires.ftc.teamcode.wilyworks.WilyTelemetry");
-        telemetryField.set(instance, wilyClass.newInstance());
+        Class<?> wilyTelemetry = loader.loadClass(WilyTelemetry.class.getName());
+        telemetryField.set(instance, wilyTelemetry.newInstance());
+
+        Field hardwareMapField = findField(klass, "hardwareMap");
+        Class<?> hardwareMap = loader.loadClass(HardwareMap.class.getName()); // @@@ loader.loadClass("com.qualcomm.robotcore.hardware.HardwareMap");
+        hardwareMapField.set(instance, new HardwareMap(null, null));
 
         klass.getMethod("runOpMode").invoke(instance);
     }
