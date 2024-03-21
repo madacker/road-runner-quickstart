@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
-import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
@@ -79,7 +78,6 @@ class Led {
     }
 }
 
-@Config
 class AutoParker {
     Poser poser;                    // Get the pose and pose velocity
     MecanumDrive drive;             // Used to set the motors

@@ -9,13 +9,27 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', '../TeamCode/src/main/java']
+        }
+    }
+}
+
+
 repositories {
     jcenter()
     maven { url = 'https://maven.brott.dev/' }
 }
 
 dependencies {
+    annotationProcessor files('lib/OpModeAnnotationProcessor.jar')
+
     implementation "com.acmerobotics.roadrunner:core:1.0.0-beta6"
     implementation "com.acmerobotics.roadrunner:actions:1.0.0-beta6"
+//    implementation "com.acmerobotics.roadrunner:ftc:0.1.9"
+//    implementation "com.acmerobotics.dashboard:dashboard:0.4.14"
+
     implementation "uk.co.electronstudio.sdl2gdx:sdl2gdx:1.0.+"
 }

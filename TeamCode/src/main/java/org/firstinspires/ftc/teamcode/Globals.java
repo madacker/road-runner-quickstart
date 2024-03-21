@@ -27,7 +27,8 @@ public class Globals {
     public static TelemetryPacket packet; // FTC Dashboard telemetry
     public static Canvas canvas; // FTC Dashboard drawing
     public static String botName = getBotName(); // Current robot name
-    public static boolean isDevBot = getBotName().equals("DevBot"); // Is dev-bot
+    public static boolean isDevBot = getBotName().equals("DevBot");
+    public static boolean isEmulator = getBotName().equals("Emulator");
 
     // Internal state:
     private int loopCount = 0; // Count of times 'startLoop' has been called
@@ -41,13 +42,9 @@ public class Globals {
 
     // Helper to get the robot name:
     private static String getBotName() {
-        try {
-            InspectionState inspection = new InspectionState();
-            inspection.initializeLocal();
-            return inspection.deviceName;
-        } catch (ExceptionInInitializerError|NoClassDefFoundError e) {
-            return "Emulator";
-        }
+        InspectionState inspection = new InspectionState();
+        inspection.initializeLocal();
+        return inspection.deviceName;
     }
 
     // Initialize all of our static state just in case we previously crashed:

@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.explorations;
 
-import android.graphics.PointF;
-
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
@@ -14,6 +12,7 @@ import com.qualcomm.robotcore.hardware.DistanceSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.Globals;
+import org.firstinspires.ftc.teamcode.Point;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -22,7 +21,7 @@ import java.util.LinkedList;
 @TeleOp(name="DistanceTest",group="Explore")
 public class DistanceTest extends LinearOpMode {
 
-    private final LinkedList<PointF> distanceHistory = new LinkedList<>();
+    private final LinkedList<Point> distanceHistory = new LinkedList<>();
 
     public void drawDistances(Canvas c, Pose2d pose, double distance) {
         final double DISTANCE_SENSOR_OFFSET = 1; // Offset from sensor to center of robot
@@ -34,7 +33,7 @@ public class DistanceTest extends LinearOpMode {
             double x = pose.position.x + distance * Math.cos(theta);
             double y = pose.position.y + distance * Math.sin(theta);
 
-            distanceHistory.add(new PointF((float) x, (float) y));
+            distanceHistory.add(new Point((float) x, (float) y));
             if (distanceHistory.size() > 100) {
                 distanceHistory.removeFirst();
             }
@@ -42,7 +41,7 @@ public class DistanceTest extends LinearOpMode {
 
         c.setStrokeWidth(1);
         c.setFill("#808080");
-        for (PointF point: distanceHistory) {
+        for (Point point: distanceHistory) {
             c.fillRect(point.x - 1, point.y - 1, 3, 3);
         }
     }

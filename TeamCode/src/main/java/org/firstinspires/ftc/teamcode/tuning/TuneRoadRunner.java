@@ -81,7 +81,7 @@ class TickTracker {
             error = ", " + error;
             passed = false;
         }
-        String icon = error.equals("") ? "✅" : "❌";
+        String icon = error.equals("") ? "x" : "o"; // @@@
         telemetry.addLine(String.format("%s <b>%s</b>: %s%s", icon, name, value, error));
         return passed;
     }

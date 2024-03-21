@@ -5,6 +5,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.example.kinematictesting.framework.DashboardCanvas;
 import com.example.kinematictesting.framework.DashboardWindow;
+import com.qualcomm.robotcore.external.Telemetry;
 
 import java.awt.Color;
 import java.awt.Dimension;

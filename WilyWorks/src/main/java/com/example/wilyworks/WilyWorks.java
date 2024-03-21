@@ -4,10 +4,10 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.example.wilyworks.framework.Canvas;
 import com.example.wilyworks.framework.FtcDashboard;
-import com.example.wilyworks.framework.Gamepad;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.example.wilyworks.framework.MecanumDrive;
 import com.example.wilyworks.framework.Simulation;
-import com.example.wilyworks.framework.Telemetry;
+import com.qualcomm.robotcore.external.Telemetry;
 import com.example.wilyworks.framework.TelemetryPacket;
 
 public class WilyWorks {
