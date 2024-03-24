@@ -6,6 +6,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.example.kinematictesting.framework.DashboardCanvas;
 import com.example.kinematictesting.framework.DashboardWindow;
+import com.qualcomm.robotcore.external.Telemetry;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -205,7 +206,7 @@ public class Simulation {
         double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
         double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
 
-        WilyTelemetry.telemetry.addData("requestedVelocity", requestedVelocity); // @@@
+        com.qualcomm.robotcore.external.WilyTelemetry.telemetry.addData("requestedVelocity", requestedVelocity); // @@@
 
         // If the requested velocity is close to zero then its angle is rather undetermined.
         // Use the current angle in that case:

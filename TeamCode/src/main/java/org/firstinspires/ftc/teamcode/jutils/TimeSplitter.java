@@ -81,12 +81,10 @@ public class TimeSplitter {
      */
     @SuppressWarnings("deprecation")
     public static void startAllocCounting() {
-        Debug.startAllocCounting();
+        // Debug.startAllocCounting();
     }
     @SuppressWarnings("deprecation")
-    public static int getThreadGcInvocationCount() {
-        return Debug.getThreadGcInvocationCount();
-    }
+    public static int getThreadGcInvocationCount() { return 0; } // return Debug.getThreadGcInvocationCount();
     /**
      * Start measuring a split time.
      */
