@@ -4,7 +4,7 @@ import org.firstinspires.ftc.robotcore.external.Func;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /**
- * This is the Wily Works implementation of the FTC Telemetry object.
+ * This is the Wily Works implementation of the standard FTC Telemetry object.
  */
 public class WilyTelemetry implements Telemetry {
     int weird = 1; // @@@

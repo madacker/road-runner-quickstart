@@ -243,6 +243,7 @@ class Translate extends CanvasOp {
     }
 }
 
+// Canvas for FTC Dashboard in Wily Works:
 public class Canvas {
     private ArrayList<CanvasOp> ops;
     AffineTransform defaultTransform;

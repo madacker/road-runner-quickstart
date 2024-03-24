@@ -1,4 +1,4 @@
-package com.qualcomm.robotcore.external;
+package com.example.wilyworks.framework;
 
 import com.example.kinematictesting.framework.TelemetryWindow;
 
@@ -37,7 +37,7 @@ public class WilyTelemetry implements Telemetry {
     final int HEIGHT_IN_LINES = 18;
 
     // Global state:
-    public static WilyTelemetry telemetry;
+    public static WilyTelemetry instance;
 
     // Class state:
     TelemetryWindow telemetryWindow;
@@ -71,7 +71,7 @@ public class WilyTelemetry implements Telemetry {
 
     // PC constructor for a Telemetry object:
     public WilyTelemetry() {
-        telemetry = this;
+        instance = this;
 
         telemetryWindow = new TelemetryWindow("Telemetry", 400);
         telemetryWindow.setVisible(true);

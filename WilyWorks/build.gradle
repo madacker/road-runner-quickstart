@@ -12,7 +12,7 @@ java {
 sourceSets {
     main {
         java {
-            srcDirs = ['src/main/java', '../TeamCode/src/main/java']
+            srcDirs = ['src/main/java'] // @@@ , '../TeamCode/src/main/java']
         }
     }
 }
