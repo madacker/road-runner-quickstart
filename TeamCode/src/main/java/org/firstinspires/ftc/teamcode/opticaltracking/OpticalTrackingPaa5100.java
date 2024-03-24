@@ -9,7 +9,6 @@ import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
 import com.qualcomm.robotcore.hardware.I2cWaitControl;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
-import com.qualcomm.robotcore.util.RobotLog;
 import com.qualcomm.robotcore.util.TypeConversion;
 
 import java.util.ArrayList;
@@ -125,7 +124,6 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         int order = 0;
 
         int configuration = (order << 5) | (mode << 2) | (clockRate << 0);
-        RobotLog.dd(MYTAG, String.format("SPI configuration: 0x%x", configuration));
         this.deviceClient.write8(Register.I2C_CONFIGURE_SPI_INTERFACE.bVal, configuration);
     }
 
@@ -394,7 +392,7 @@ public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch>
         // send register writes to any random I2C devices:
         int chipId = readRegister(Register.SPI_ID.bVal);
         if (chipId != 0x49) {
-            RobotLog.dd(MYTAG, String.format("Bad chip ID (should be 0x49): %x", chipId));
+            // ### RobotLog.dd(MYTAG, String.format("Bad chip ID (should be 0x49): %x", chipId));
             return false;
         }
 

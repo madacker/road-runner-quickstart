@@ -1,14 +1,14 @@
 package com.example.wilyworks;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.example.wilyworks.framework.Canvas;
-import com.example.wilyworks.framework.FtcDashboard;
-import com.example.wilyworks.framework.Gamepad;
-import com.example.wilyworks.framework.MecanumDrive;
+import com.acmerobotics.dashboard.canvas.Canvas;
+import com.example.wilyworks.framework.WilyMecanumDrive;
 import com.example.wilyworks.framework.Simulation;
-import com.example.wilyworks.framework.Telemetry;
-import com.example.wilyworks.framework.TelemetryPacket;
+import com.example.wilyworks.framework.WilyTelemetry;
+import com.qualcomm.robotcore.hardware.Gamepad;
 
 public class WilyWorks {
     static final double DELTA_T = 0.100; // 100ms
@@ -20,9 +20,9 @@ public class WilyWorks {
     public static void main(String[] args)
     {
         Simulation simulation = new Simulation();
-        MecanumDrive mecanumDrive = new MecanumDrive(simulation);
+        WilyMecanumDrive mecanumDrive = new WilyMecanumDrive(simulation);
         Gamepad gamepad = new Gamepad();
-        Telemetry telemetry = new Telemetry();
+        WilyTelemetry telemetry = new WilyTelemetry();
         Navigation loop = new Navigation(mecanumDrive, gamepad, telemetry);
 
         while (true) {
@@ -41,11 +41,11 @@ public class WilyWorks {
 
 // Replace this class with your own.
 class Navigation {
-    MecanumDrive drive;
+    WilyMecanumDrive drive;
     Gamepad gamepad1;
-    Telemetry telemetry;
+    WilyTelemetry telemetry;
 
-    Navigation(MecanumDrive drive, Gamepad gamepad1, Telemetry telemetry) {
+    Navigation(WilyMecanumDrive drive, Gamepad gamepad1, WilyTelemetry telemetry) {
         this.drive = drive;
         this.gamepad1 = gamepad1;
         this.telemetry = telemetry;
@@ -70,7 +70,7 @@ class Navigation {
         TelemetryPacket p = new TelemetryPacket();
         Canvas c = p.fieldOverlay();
         c.setStroke("#3F51B5");
-        MecanumDrive.drawRobot(c, drive.pose);
+        WilyMecanumDrive.drawRobot(c, drive.pose);
         FtcDashboard.getInstance().sendTelemetryPacket(p);
     }
 }

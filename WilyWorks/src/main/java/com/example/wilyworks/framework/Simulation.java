@@ -1,5 +1,6 @@
 package com.example.wilyworks.framework;
 
+import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
@@ -151,7 +152,7 @@ public class Simulation {
     public DashboardCanvas canvas; // Canvas for the entire window frame
 
     private Field field;
-    private MecanumDrive.Params kinematics; // Kinematic parameters for the simulation
+    private WilyMecanumDrive.Params kinematics; // Kinematic parameters for the simulation
     private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
 
     public Simulation() {
@@ -162,7 +163,7 @@ public class Simulation {
     }
 
     // Set the kinematics for the simulation to use:
-    public void setKinematics(MecanumDrive.Params kinematics) {
+    public void setKinematics(WilyMecanumDrive.Params kinematics) {
         this.kinematics = kinematics;
     }
 
@@ -204,7 +205,7 @@ public class Simulation {
         double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
         double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
 
-        Telemetry.telemetry.addData("requestedVelocity", requestedVelocity); // @@@
+        WilyTelemetry.telemetry.addData("requestedVelocity", requestedVelocity); // @@@
 
         // If the requested velocity is close to zero then its angle is rather undetermined.
         // Use the current angle in that case:

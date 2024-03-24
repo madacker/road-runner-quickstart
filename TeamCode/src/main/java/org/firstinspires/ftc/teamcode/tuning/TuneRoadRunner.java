@@ -81,7 +81,8 @@ class TickTracker {
             error = ", " + error;
             passed = false;
         }
-        String icon = error.equals("") ? "✅" : "❌";
+
+        String icon = error.equals("") ? "\u2705" : "\u274C"; // Green box checkmark, red X
         telemetry.addLine(String.format("%s <b>%s</b>: %s%s", icon, name, value, error));
         return passed;
     }

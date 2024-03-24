@@ -50,9 +50,7 @@ public class Settings {
             super(descriptor); this.value = value; this.callback = callback;
         }
         public String string() {
-            // From https://www.alt-codes.net/circle-symbols // "✅" : "❌";
-            // return (value ? "●" : "○") + " " + description;
-            return (value ? "☒" : "☐") + " " + description;
+            return (value ? "\u2612" : "\u2610") + " " + description; // checked-box, empty box
         }
     }
     private static class ListOption extends Option {
@@ -63,7 +61,7 @@ public class Settings {
             super(descriptor); this.index = index; this.list = list; this.callback = callback;
         }
         public String string() {
-            return "↔️ <b>" + list[index] + "</b>: " + description; // "↔⬌ "
+            return "\u2194\uFE0F <b>" + list[index] + "</b>: " + description; // blue left/right arrow
         }
     }
     private static class ActivationOption extends Option {
@@ -72,7 +70,7 @@ public class Settings {
             super(descriptor); this.callback = callback;
         }
         public String string() {
-            return "❗ " + callback.apply(false); // ⚡
+            return "\u2757 " + callback.apply(false); // red exclamation mark
         }
     }
     private static class StatsOption extends Option {
