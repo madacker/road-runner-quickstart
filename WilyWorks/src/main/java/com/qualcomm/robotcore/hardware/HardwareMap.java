@@ -3,6 +3,7 @@ package com.qualcomm.robotcore.hardware;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.qualcomm.robotcore.util.RobotLog;
 import com.qualcomm.robotcore.util.SerialNumber;
 
 import java.util.ArrayList;
@@ -13,8 +14,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
-public class HardwareMap {
+public class HardwareMap implements Iterable<HardwareDevice> {
 
     protected final Object lock = new Object();
 
@@ -182,7 +185,10 @@ public class HardwareMap {
 
     public <T> T get(Class<? extends T> classOrInterface, String deviceName) {
         return null;
-    }
+    } // @@@
+
+    public HardwareDevice get(String deviceName) { return null; } // @@@
+
 
     private void initializeDeviceIfNecessary(HardwareDevice device) {
     }
@@ -191,5 +197,15 @@ public class HardwareMap {
         for (HardwareDevice device: devices) {
             initializeDeviceIfNecessary(device);
         }
+    }
+
+    public SortedSet<String> getAllNames(Class<? extends HardwareDevice> classOrInterface) {
+        SortedSet<String> result = new TreeSet<>();
+        return result;
+    }
+
+    @Override
+    public @NonNull Iterator<HardwareDevice> iterator() {
+        return new ArrayList<HardwareDevice>().iterator();
     }
 }
