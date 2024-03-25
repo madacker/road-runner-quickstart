@@ -11,5 +11,4 @@ public class LynxModule {
 
     public void setBulkCachingMode(BulkCachingMode mode) {
     }
-
 }

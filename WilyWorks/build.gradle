@@ -13,13 +13,8 @@ java {
 sourceSets {
     main {
         java {
-            // srcDirs = ['src/main/java']
-            // srcDirs = ['src/main/java', '../TeamCode/src/main/java']
-            // srcDirs = ['src/main/java', System.getenv('SRC_ROOT')]
-            srcDirs = ['src/main/java', {System.getenv('SRC_ROOT')}]
-
-            println "Setting java root..."
-            println srcDirs
+            srcDirs = ['src/main/java', '../TeamCode/src/main/java']
+//            srcDirs = ['src/main/java', {System.getenv('SRC_ROOT')}]
         }
     }
     // main.java.srcDirs += System.getenv('SRC_ROOT')

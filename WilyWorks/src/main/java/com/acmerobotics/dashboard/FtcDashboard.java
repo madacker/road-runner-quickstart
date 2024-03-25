@@ -26,4 +26,7 @@ public class FtcDashboard {
         log = telemetryPacket.log;
         fieldOverlay = telemetryPacket.fieldOverlay();
     }
+
+    public void withConfigRoot(CustomVariableConsumer function) {
+    }
 }
