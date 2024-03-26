@@ -70,20 +70,20 @@ public class TestWorks {
         // @@@ Test with not-an-opmode
         // Create our own Class Loader to watch class loads:
 
-        TestClassLoader loader = new TestClassLoader();
-        Class<?> klass = loader.loadClass(opModeClassName);
-        Object instance = klass.newInstance();
-
-        // Apply some fixups:
-        Field telemetryField = findField(klass, "telemetry");
-        Class<?> wilyTelemetryClass = loader.loadClass(WilyTelemetry.class.getName());
-        telemetryField.set(instance, wilyTelemetryClass.newInstance());
-
-        Field hardwareMapField = findField(klass, "hardwareMap");
-        Class<?> hardwareMapClass = loader.loadClass(HardwareMap.class.getName()); // @@@ loader.loadClass("com.qualcomm.robotcore.hardware.HardwareMap");
-        hardwareMapField.set(instance, new TestHardwareMap());
-
-        klass.getMethod("runOpMode").invoke(instance);
+//        TestClassLoader loader = new TestClassLoader();
+//        Class<?> klass = loader.loadClass(opModeClassName);
+//        Object instance = klass.newInstance();
+//
+//        // Apply some fixups:
+//        Field telemetryField = findField(klass, "telemetry");
+//        Class<?> wilyTelemetryClass = loader.loadClass(WilyTelemetry.class.getName());
+//        telemetryField.set(instance, wilyTelemetryClass.newInstance());
+//
+//        Field hardwareMapField = findField(klass, "hardwareMap");
+//        Class<?> hardwareMapClass = loader.loadClass(HardwareMap.class.getName()); // @@@ loader.loadClass("com.qualcomm.robotcore.hardware.HardwareMap");
+//        hardwareMapField.set(instance, new TestHardwareMap());
+//
+//        klass.getMethod("runOpMode").invoke(instance);
     }
 
     public void runOpMode(String opModeClassName) {

@@ -1,4 +1,4 @@
-package com.example.wilyworks.framework;
+package com.wilyworks.simulator.framework;
 
 import com.acmerobotics.dashboard.canvas.Canvas;
 

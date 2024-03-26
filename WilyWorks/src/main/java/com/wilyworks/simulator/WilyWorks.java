@@ -1,13 +1,13 @@
-package com.example.wilyworks;
+package com.wilyworks.simulator;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
-import com.example.wilyworks.framework.WilyMecanumDrive;
-import com.example.wilyworks.framework.Simulation;
-import com.example.wilyworks.framework.WilyTelemetry;
+import com.wilyworks.simulator.framework.WilyMecanumDrive;
+import com.wilyworks.simulator.framework.Simulation;
+import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 public class WilyWorks {

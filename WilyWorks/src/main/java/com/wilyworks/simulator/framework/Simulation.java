@@ -1,4 +1,4 @@
-package com.example.wilyworks.framework;
+package com.wilyworks.simulator.framework;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.roadrunner.Pose2d;

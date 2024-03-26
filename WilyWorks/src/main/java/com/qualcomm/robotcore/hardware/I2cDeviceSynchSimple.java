@@ -24,5 +24,5 @@ public interface I2cDeviceSynchSimple extends HardwareDevice, I2cAddrConfig
     boolean getLogging();
     void setLoggingTag(String loggingTag);
     String getLoggingTag();
-    void engage(); // @@@ Shouldn't be here!
+    void engage(); // ### Shouldn't be here but couldn't find where it goes
 }
