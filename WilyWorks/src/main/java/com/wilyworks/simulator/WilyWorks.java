@@ -5,6 +5,9 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.wilyworks.simulator.framework.WilyMecanumDrive;
 import com.wilyworks.simulator.framework.Simulation;
@@ -13,7 +16,10 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.reflections.Reflections;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class WilyWorks {
@@ -23,16 +29,65 @@ public class WilyWorks {
         return System.currentTimeMillis() / 1000.0;
     }
 
-    static void enumerateClasses() {
-        Reflections reflections = new Reflections("org.firstinspires.ftc");
-        Set<Class<?>> configClasses = new HashSet<>();
-        configClasses.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
+    // Structure for representing the choices of opmode:
+    static class OpModeChoice {
+        Class<?> klass;
+        String name;
+
+        public OpModeChoice(Class<?> klass, String name) {
+            this.klass = klass; this.name = name;
+        }
     }
 
-    public static void main(String[] args)
-    {
-        enumerateClasses();
 
+    /**
+     * Enumerate all potential OpModes to be run:
+     */
+    static List<OpModeChoice> enumerateOpModeChoices() {
+        // Use the Reflections library to enumerate all classes in this package that have the
+        // @Autonomous and @TeleOp annotations:
+        Reflections reflections = new Reflections("org.firstinspires.ftc");
+        Set<Class<?>> allOps = new HashSet<>();
+        allOps.addAll(reflections.getTypesAnnotatedWith(Autonomous.class));
+        allOps.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
+        ArrayList<OpModeChoice> choices = new ArrayList<>();
+
+        // Build a list of the eligible opmodes with their friendly names:
+        for (Class klass: allOps) {
+            if ((OpMode.class.isAssignableFrom(klass)) &&
+                (!klass.isAnnotationPresent(Disabled.class))) {
+
+                // getName() returns a fully qualified name ("org.firstinspires.ftc.teamcode.MyOp").
+                // Use only the last portion ("MyOp" in this example):
+                String name = klass.getName();
+                name = name.substring(name.lastIndexOf(".") + 1); // Skip the dot itself
+
+                // Override the name if an annotation exists:
+                TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
+                if (teleOpAnnotation != null) {
+                    if (!teleOpAnnotation.name().equals("")) {
+                        name = teleOpAnnotation.name();
+                    }
+                    if (!teleOpAnnotation.group().equals("")) {
+                        name = teleOpAnnotation.group() + ": " + name;
+                    }
+                }
+                Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
+                if (autonomousAnnotation != null) {
+                    if (!autonomousAnnotation.name().equals("")) {
+                        name = autonomousAnnotation.name();
+                    }
+                    if (!autonomousAnnotation.group().equals("")) {
+                        name = autonomousAnnotation.group() + ": " + name;
+                    }
+                }
+                choices.add(new OpModeChoice(klass, name));
+            }
+        }
+        return choices;
+    }
+
+    static void oldTest() {
         Simulation simulation = new Simulation();
         WilyMecanumDrive mecanumDrive = new WilyMecanumDrive(simulation);
         Gamepad gamepad = new Gamepad();
@@ -49,6 +104,42 @@ public class WilyWorks {
             // Busy-loop to consume any remaining time:
             while (time() - time < DELTA_T)
                 ;
+        }
+    }
+
+    static void runOpMode() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+        List<OpModeChoice> choices = enumerateOpModeChoices();
+        Class<?> klass = null;
+        for (OpModeChoice choice: choices) {
+            if (choice.name.equals("Explore: DistanceTest")) {
+                klass = choice.klass;
+                break;
+            }
+        }
+        if (klass == null) {
+            oldTest();
+            return; // ====>
+        }
+
+        Object instance = klass.newInstance();
+        klass.getMethod("runOpMode").invoke(instance);
+    }
+
+    /**
+     * Entry point for Wily Works!
+     */
+    public static void main(String[] args)
+    {
+        try {
+            runOpMode();
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(e);
         }
     }
 }

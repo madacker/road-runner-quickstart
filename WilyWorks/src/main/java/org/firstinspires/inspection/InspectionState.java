@@ -18,15 +18,15 @@ public class InspectionState
 
     //The serialized names save several hundred bytes in the QR code
 
-    public String manufacturer;
-    public String model;
-    public String deviceCodename; // For scoring system to auto-select
-    public String osVersion; // Android version (e.g. 7.1.1)
-    public String controlHubOsVersion; // Control Hub OS version (e.g. 1.1.1)
-    public String driverHubOsVersion;
+    public String manufacturer = "";
+    public String model = "";
+    public String deviceCodename = ""; // For scoring system to auto-select
+    public String osVersion = ""; // Android version (e.g. 7.1.1)
+    public String controlHubOsVersion = ""; // Control Hub OS version (e.g. 1.1.1)
+    public String driverHubOsVersion = "";
     public int controlHubOsVersionNum;
     public int driverHubOsVersionNum;
-    public String firmwareVersion; // TODO(Noah): The next time we bump Robocol, send a list of firmware versions instead
+    public String firmwareVersion = ""; // TODO(Noah): The next time we bump Robocol, send a list of firmware versions instead
     public int sdkInt;
     public boolean airplaneModeOn;
     public boolean bluetoothOn;
@@ -36,14 +36,14 @@ public class InspectionState
     public boolean wifiDirectConnected;
     public int wifiChannel;
     public boolean locationEnabled;
-    public String deviceName;
+    public String deviceName = "";
     public double batteryFraction;
     public boolean robotControllerInstalled;
     public boolean driverStationInstalled;
     public int majorSdkVersion;
     public int minorSdkVersion;
     public int pointSdkVersion;
-    public String appBuildTime;
+    public String appBuildTime = "";
     public long    rxDataCount;
     public long    txDataCount;
     public long    bytesPerSecond;
