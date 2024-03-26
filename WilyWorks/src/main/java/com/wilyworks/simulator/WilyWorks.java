@@ -5,10 +5,16 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.wilyworks.simulator.framework.WilyMecanumDrive;
 import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
+
+import org.reflections.Reflections;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class WilyWorks {
     static final double DELTA_T = 0.100; // 100ms
@@ -17,8 +23,16 @@ public class WilyWorks {
         return System.currentTimeMillis() / 1000.0;
     }
 
+    static void enumerateClasses() {
+        Reflections reflections = new Reflections("org.firstinspires.ftc");
+        Set<Class<?>> configClasses = new HashSet<>();
+        configClasses.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
+    }
+
     public static void main(String[] args)
     {
+        enumerateClasses();
+
         Simulation simulation = new Simulation();
         WilyMecanumDrive mecanumDrive = new WilyMecanumDrive(simulation);
         Gamepad gamepad = new Gamepad();
