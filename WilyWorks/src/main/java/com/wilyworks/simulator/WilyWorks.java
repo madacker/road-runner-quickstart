@@ -7,6 +7,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.wilyworks.simulator.framework.WilyMecanumDrive;
@@ -87,6 +88,29 @@ public class WilyWorks {
         return choices;
     }
 
+    static void runOpMode() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, InterruptedException {
+        List<OpModeChoice> choices = enumerateOpModeChoices();
+        Class<?> klass = null;
+        for (OpModeChoice choice: choices) {
+            if (choice.name.equals("Explore: DistanceTest")) {
+                klass = choice.klass;
+                break;
+            }
+        }
+        if (klass == null) {
+            oldTest();
+            return; // ====>
+        }
+
+        Object instance = klass.newInstance();
+        if (LinearOpMode.class.isAssignableFrom(klass)) {
+            LinearOpMode linearOpMode = (LinearOpMode) instance;
+            linearOpMode.runOpMode();
+        } else {
+            // @@@
+        }
+    }
+
     static void oldTest() {
         Simulation simulation = new Simulation();
         WilyMecanumDrive mecanumDrive = new WilyMecanumDrive(simulation);
@@ -107,24 +131,6 @@ public class WilyWorks {
         }
     }
 
-    static void runOpMode() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        List<OpModeChoice> choices = enumerateOpModeChoices();
-        Class<?> klass = null;
-        for (OpModeChoice choice: choices) {
-            if (choice.name.equals("Explore: DistanceTest")) {
-                klass = choice.klass;
-                break;
-            }
-        }
-        if (klass == null) {
-            oldTest();
-            return; // ====>
-        }
-
-        Object instance = klass.newInstance();
-        klass.getMethod("runOpMode").invoke(instance);
-    }
-
     /**
      * Entry point for Wily Works!
      */
@@ -132,13 +138,9 @@ public class WilyWorks {
     {
         try {
             runOpMode();
-        } catch (InstantiationException e) {
+        } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException e) {
             throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        } catch (InvocationTargetException e) {
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
