@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.wilyworks.simulator.framework.WilyMecanumDrive;
 import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
@@ -106,9 +107,13 @@ public class WilyCore {
             return; // ====>
         }
 
-        Object instance = klass.newInstance();
+        OpMode opMode = (OpMode) klass.newInstance();
+        opMode.hardwareMap = new HardwareMap();
+        opMode.gamepad1 = new Gamepad();
+        opMode.telemetry = new WilyTelemetry();
+
         if (LinearOpMode.class.isAssignableFrom(klass)) {
-            LinearOpMode linearOpMode = (LinearOpMode) instance;
+            LinearOpMode linearOpMode = (LinearOpMode) opMode;
             linearOpMode.runOpMode();
         } else {
             // @@@

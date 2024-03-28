@@ -40,6 +40,6 @@ import org.firstinspires.ftc.teamcode.wilyworks.WilyTelemetry;
 abstract class OpModeInternal {
     public volatile Gamepad gamepad1 = null;
     public volatile Gamepad gamepad2 = null;
-    public Telemetry telemetry = new WilyTelemetry();
+    public Telemetry telemetry = null;
     public volatile HardwareMap hardwareMap = null; // will be set in OpModeManager.runActiveOpMode
 }

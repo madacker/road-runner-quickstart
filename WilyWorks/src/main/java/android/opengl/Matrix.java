@@ -41,7 +41,7 @@ public class Matrix {
     }
 
     public static void setIdentityM(float[] sm, int smOffset) {
-        throw new RuntimeException("Stub!");
+        // ### throw new RuntimeException("Stub!");
     }
 
     public static void scaleM(float[] sm, int smOffset, float[] m, int mOffset, float x, float y, float z) {
