@@ -5,6 +5,7 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
+import com.badlogic.gdx.Application;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -23,7 +24,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class WilyWorks {
+/**
+ * Core class for Wily Works. This provides the entry point to the simulator and is the
+ * interface with the guest application.
+ */
+public class WilyCore {
     static final double DELTA_T = 0.100; // 100ms
 
     static double time() {
@@ -41,9 +46,7 @@ public class WilyWorks {
     }
 
 
-    /**
-     * Enumerate all potential OpModes to be run:
-     */
+    // Enumerate all potential OpModes to be run:
     static List<OpModeChoice> enumerateOpModeChoices() {
         // Use the Reflections library to enumerate all classes in this package that have the
         // @Autonomous and @TeleOp annotations:
@@ -88,6 +91,7 @@ public class WilyWorks {
         return choices;
     }
 
+    // Invoke the user's "runOpMode" method:
     static void runOpMode() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, InterruptedException {
         List<OpModeChoice> choices = enumerateOpModeChoices();
         Class<?> klass = null;
@@ -131,22 +135,45 @@ public class WilyWorks {
         }
     }
 
-    /**
-     * Entry point for Wily Works!
-     */
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // Callbacks provided to the guest. These are all called via reflection.
+
+    // The guest calls this when they initialize:
+    public void initialize(String autoOpMode, int robotWidth, int robotLength) {
+
+    }
+
+    // Guest call to set the pose:
+    public void setPose(double x, double y, double heading,
+                        double xVelocity, double yVelocity, double headingVelocity) {
+
+    }
+
+    // Guest call to set the drive powers:
+    public void setDrivePowers(
+            double stickVelocityX, double stickVelocityY, double stickVelocityAngular,
+            double assistVelocityX, double assistVelocityY, double assistVelocityAngular) {
+
+    }
+
+    // Guest call to get the localized position:
+    public double[] getLocalization() {
+        return null;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // Application entry point for Wily Works!
     public static void main(String[] args)
     {
         try {
             runOpMode();
-        } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
+        } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException|InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 }
 
-// Replace this class with your own.
+// Replace this class with your own. // @@@ Remove
 class Navigation {
     WilyMecanumDrive drive;
     Gamepad gamepad1;
