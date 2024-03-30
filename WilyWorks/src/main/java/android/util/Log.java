@@ -10,6 +10,8 @@ import android.annotation.Nullable;
 import androidx.annotation.RecentlyNonNull;
 import androidx.annotation.RecentlyNullable;
 
+import java.util.Map;
+
 public final class Log {
     public static final int ASSERT = 7;
     public static final int DEBUG = 3;
@@ -23,69 +25,71 @@ public final class Log {
     }
 
     public static int v(@RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        return println(VERBOSE, tag, msg);
     }
 
     public static int v(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(VERBOSE, tag, msg);
     }
 
     public static int d(@RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, msg);
     }
 
     public static int d(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, msg);
     }
 
     public static int i(@RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        return println(INFO, tag, msg);
     }
 
     public static int i(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(INFO, tag, msg);
     }
 
     public static int w(@RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        return println(WARN, tag, msg);
     }
 
     public static int w(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(WARN, tag, msg);
     }
 
     public static native boolean isLoggable(@RecentlyNullable String var0, int var1);
 
     public static int w(@RecentlyNullable String tag, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, tr.toString());
     }
 
     public static int e(@RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        return println(ERROR, tag, msg);
     }
 
     public static int e(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(ERROR, tag, msg);
     }
 
     public static int wtf(@RecentlyNullable String tag, @RecentlyNullable String msg) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, msg);
     }
 
     public static int wtf(@RecentlyNullable String tag, @RecentlyNonNull Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, tr.toString());
     }
 
     public static int wtf(@RecentlyNullable String tag, @RecentlyNullable String msg, @RecentlyNullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return println(DEBUG, tag, msg);
     }
 
     @NonNull
     public static String getStackTraceString(@Nullable Throwable tr) {
-        throw new RuntimeException("Stub!");
+        return "";
     }
 
     public static int println(int priority, @RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        throw new RuntimeException("Stub!");
+        Map<Integer, String> map = Map.of(ASSERT, "ASSERT", DEBUG, "DEBUG", ERROR, "ERROR", INFO, "INFO", VERBOSE, "VERBOSE", WARN, "WARN");
+        System.out.printf("%s: %s, %s\n", map.get(priority), tag, msg);
+        return 0;
     }
 }
