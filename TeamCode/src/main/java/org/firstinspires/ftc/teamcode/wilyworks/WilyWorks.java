@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.wilyworks;
 
+import static java.lang.ClassLoader.getSystemClassLoader;
+
 import com.acmerobotics.roadrunner.DualNum;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -38,8 +40,8 @@ public class WilyWorks {
 
     // Initialize the link to WilyWorks without worrying about messy exceptions:
     static Class initializeWilyLink() throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        Class klass = WilyWorks.class.getClassLoader().loadClass("com.wilyworks.simulator.WilyCore");
-        klass.getMethod("initialize").invoke(null, autoOpMode, robotWidth, robotLength);
+        Class klass = getSystemClassLoader().loadClass("com.wilyworks.simulator.WilyCore");
+        // @@@ klass.getMethod("initialize").invoke(null, autoOpMode, robotWidth, robotLength);
         return klass;
     }
 

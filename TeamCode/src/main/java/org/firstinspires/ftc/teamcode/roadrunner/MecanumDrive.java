@@ -41,6 +41,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Stats;
+import org.firstinspires.ftc.teamcode.wilyworks.WilyWorks;
 import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
@@ -258,7 +259,7 @@ public final class MecanumDrive {
         rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        if (isDevBot) {
+        if ((isDevBot) || (WilyWorks.isSimulating)) {
             localizer = new DriveLocalizer();
         } else {
             localizer = new ThreeDeadWheelLocalizer(hardwareMap, PARAMS.inPerTick);

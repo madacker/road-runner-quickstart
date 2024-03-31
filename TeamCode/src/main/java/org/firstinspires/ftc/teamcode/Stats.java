@@ -48,7 +48,7 @@ public class Stats {
         Timer(String descriptor) { this.descriptor = descriptor; }
     }
 
-    Stats() {
+    public Stats() {
         stats = this;
         
         Settings.registerStats("I/O", Stats::getIoSummary);

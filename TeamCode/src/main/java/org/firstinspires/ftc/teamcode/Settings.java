@@ -99,7 +99,7 @@ public class Settings {
     boolean start() { return buttonPress(gamepad.start, 6); }
 
     // Constructor:
-    Settings(Telemetry telemetry, Gamepad gamepad) {
+    public Settings(Telemetry telemetry, Gamepad gamepad) {
         Settings.settings = this;
 
         this.telemetry = telemetry;

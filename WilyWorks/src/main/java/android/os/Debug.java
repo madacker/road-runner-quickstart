@@ -5,6 +5,8 @@
 
 package android.os;
 
+import static java.lang.System.nanoTime;
+
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.Map;
@@ -76,7 +78,7 @@ public final class Debug {
     }
 
     public static long threadCpuTimeNanos() {
-        throw new RuntimeException("Stub!");
+        return nanoTime();
     }
 
     /** @deprecated */

@@ -13,6 +13,8 @@ import com.qualcomm.robotcore.hardware.DistanceSensor;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Point;
+import org.firstinspires.ftc.teamcode.Settings;
+import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -49,6 +51,8 @@ public class DistanceTest extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
+        Settings settings = new Settings(telemetry, gamepad1);
+        Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");

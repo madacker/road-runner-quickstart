@@ -33,6 +33,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.firstinspires.ftc.robotcore.external.navigation;
 
 import java.util.Locale;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
 /**
  * A simplified view of a robot's orientation, according to the Robot Coordinate System, relative to
@@ -82,7 +83,7 @@ public class YawPitchRollAngles {
     /**
      * See the top-level class Javadoc for the format that these angles need to be in.
      */
-    public YawPitchRollAngles(org.firstinspires.ftc.robotcore.external.navigation.AngleUnit angleUnit, double yaw, double pitch, double roll, long acquisitionTime) {
+    public YawPitchRollAngles(AngleUnit angleUnit, double yaw, double pitch, double roll, long acquisitionTime) {
         this.yawDegrees = angleUnit.toDegrees(yaw);
         this.pitchDegrees = angleUnit.toDegrees(pitch);
         this.rollDegrees = angleUnit.toDegrees(roll);
@@ -94,7 +95,7 @@ public class YawPitchRollAngles {
      * @return The side-to-side lateral rotation of the robot (rotation around the Z axis),
      *         normalized to the range of [-180,+180) degrees.
      */
-    public double getYaw(org.firstinspires.ftc.robotcore.external.navigation.AngleUnit angleUnit) {
+    public double getYaw(AngleUnit angleUnit) {
         return angleUnit.fromDegrees(yawDegrees);
     }
 
@@ -103,7 +104,7 @@ public class YawPitchRollAngles {
      * @return The front-to-back rotation of the robot (rotation around the X axis), normalized to
      *         the range of [-180,+180) degrees
      */
-    public double getPitch(org.firstinspires.ftc.robotcore.external.navigation.AngleUnit angleUnit) {
+    public double getPitch(AngleUnit angleUnit) {
         return angleUnit.fromDegrees(pitchDegrees);
     }
 
@@ -112,7 +113,7 @@ public class YawPitchRollAngles {
      * @return The side-to-side tilt of the robot (rotation around the Y axis), normalized to
      *         the range of [-180,+180) degrees
      */
-    public double getRoll(org.firstinspires.ftc.robotcore.external.navigation.AngleUnit angleUnit) {
+    public double getRoll(AngleUnit angleUnit) {
         return angleUnit.fromDegrees(rollDegrees);
     }
 

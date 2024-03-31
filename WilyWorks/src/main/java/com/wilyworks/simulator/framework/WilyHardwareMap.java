@@ -5,6 +5,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorController;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareDevice;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -14,6 +17,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.robotcore.external.navigation.Quaternion;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
@@ -30,7 +35,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
- * Wily Works device subclass.
+ * Wily Works device subclass implementation.
  */
 class WilyHardwareDevice implements HardwareDevice {
     @Override
@@ -65,7 +70,7 @@ class WilyHardwareDevice implements HardwareDevice {
 }
 
 /**
- * Wily Works simulated IMU.
+ * Wily Works simulated IMU implementation.
  */
 class WilyIMU extends WilyHardwareDevice implements IMU {
     @Override
@@ -80,30 +85,198 @@ class WilyIMU extends WilyHardwareDevice implements IMU {
 
     @Override
     public YawPitchRollAngles getRobotYawPitchRollAngles() {
-        return null;
+        return new YawPitchRollAngles(AngleUnit.RADIANS, 0, 0, 0, 0);
     }
 
     @Override
     public Orientation getRobotOrientation(AxesReference reference, AxesOrder order, AngleUnit angleUnit) {
-        return null;
+        return new Orientation();
     }
 
     @Override
     public Quaternion getRobotOrientationAsQuaternion() {
-        return null;
+        return new Quaternion();
     }
 
     @Override
     public AngularVelocity getRobotAngularVelocity(AngleUnit angleUnit) {
-        return null;
+        return new AngularVelocity();
     }
 }
 
+/**
+ * Wily Works voltage sensor implementation.
+ */
 class WilyVoltageSensor extends WilyHardwareDevice implements VoltageSensor {
-
     @Override
     public double getVoltage() {
         return 13.0;
+    }
+}
+
+/**
+ * Wily Works distance sensor implementation.
+ */
+class WilyDistanceSensor extends WilyHardwareDevice implements DistanceSensor {
+    @Override
+    public double getDistance(DistanceUnit unit) {
+        return 0;
+    }
+}
+
+/**
+ * Wily Works DcMotorEx implementation.
+ */
+class WilyDcMotorEx extends WilyHardwareDevice implements DcMotorEx {
+
+    @Override
+    public DcMotorController getController() {
+        return null;
+    }
+
+    @Override
+    public int getPortNumber() {
+        return 0;
+    }
+
+    @Override
+    public void setZeroPowerBehavior(ZeroPowerBehavior zeroPowerBehavior) {
+
+    }
+
+    @Override
+    public ZeroPowerBehavior getZeroPowerBehavior() {
+        return null;
+    }
+
+    @Override
+    public boolean getPowerFloat() {
+        return false;
+    }
+
+    @Override
+    public void setTargetPosition(int position) {
+
+    }
+
+    @Override
+    public int getTargetPosition() {
+        return 0;
+    }
+
+    @Override
+    public boolean isBusy() {
+        return false;
+    }
+
+    @Override
+    public int getCurrentPosition() {
+        return 0;
+    }
+
+    @Override
+    public void setMode(RunMode mode) {
+
+    }
+
+    @Override
+    public RunMode getMode() {
+        return null;
+    }
+
+    @Override
+    public void setMotorEnable() {
+
+    }
+
+    @Override
+    public void setMotorDisable() {
+
+    }
+
+    @Override
+    public boolean isMotorEnabled() {
+        return false;
+    }
+
+    @Override
+    public void setVelocity(double angularRate) {
+
+    }
+
+    @Override
+    public void setVelocity(double angularRate, AngleUnit unit) {
+
+    }
+
+    @Override
+    public double getVelocity() {
+        return 0;
+    }
+
+    @Override
+    public double getVelocity(AngleUnit unit) {
+        return 0;
+    }
+
+    @Override
+    public void setVelocityPIDFCoefficients(double p, double i, double d, double f) {
+
+    }
+
+    @Override
+    public void setPositionPIDFCoefficients(double p) {
+
+    }
+
+    @Override
+    public void setTargetPositionTolerance(int tolerance) {
+
+    }
+
+    @Override
+    public int getTargetPositionTolerance() {
+        return 0;
+    }
+
+    @Override
+    public double getCurrent(CurrentUnit unit) {
+        return 0;
+    }
+
+    @Override
+    public double getCurrentAlert(CurrentUnit unit) {
+        return 0;
+    }
+
+    @Override
+    public void setCurrentAlert(double current, CurrentUnit unit) {
+
+    }
+
+    @Override
+    public boolean isOverCurrent() {
+        return false;
+    }
+
+    @Override
+    public void setDirection(Direction direction) {
+
+    }
+
+    @Override
+    public Direction getDirection() {
+        return null;
+    }
+
+    @Override
+    public void setPower(double power) {
+
+    }
+
+    @Override
+    public double getPower() {
+        return 0;
     }
 }
 
@@ -112,13 +285,15 @@ class WilyVoltageSensor extends WilyHardwareDevice implements VoltageSensor {
  */
 public class WilyHardwareMap implements Iterable<HardwareDevice> {
 
-    public DeviceMapping<VoltageSensor> voltageSensor = new DeviceMapping<VoltageSensor>(VoltageSensor.class);
+    public DeviceMapping<VoltageSensor>         voltageSensor         = new DeviceMapping<VoltageSensor>(VoltageSensor.class);
+    public DeviceMapping<DcMotor>               dcMotor               = new DeviceMapping<DcMotor>(DcMotor.class);
+    public DeviceMapping<DistanceSensor>        distanceSensor        = new DeviceMapping<DistanceSensor>(DistanceSensor.class);
 
     protected Map<String, List<HardwareDevice>> allDevicesMap         = new HashMap<String, List<HardwareDevice>>();
-    protected List<HardwareDevice>              allDevicesList        = null;   // cache for iteration
+    protected List<HardwareDevice>              allDevicesList        = new ArrayList<>();
 
     public WilyHardwareMap() {
-        voltageSensor.put("voltage_sensor", new WilyVoltageSensor());
+        put("voltage_sensor", VoltageSensor.class);
     }
 
     protected final Object lock = new Object();
@@ -128,15 +303,58 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
         return result;
     }
 
-    public <T> T get(Class<? extends T> classOrInterface, String deviceName) {
-        if (classOrInterface.equals(IMU.class)) {
-            return (T) new WilyIMU();
+    private synchronized <T> T tryGet(Class<? extends T> classOrInterface, String deviceName){
+        List<HardwareDevice> list = allDevicesMap.get(deviceName.trim());
+        if (list != null) {
+            for (HardwareDevice device : list){
+                if(classOrInterface.isInstance(device)) return classOrInterface.cast(device);
+            }
         }
         return null;
     }
 
-    public HardwareDevice get(String deviceName) { return null; } // @@@
+    public <T> T get(Class<? extends T> classOrInterface, String deviceName) {
+        if (classOrInterface.equals(IMU.class)) {
+            return (T) new WilyIMU();
+        }
+        T result = tryGet(classOrInterface, deviceName);
+        if (result == null) {
+            // Wily Works behavior is that we automatically add the device if it's not found:
+            put(deviceName, classOrInterface);
+            result = tryGet(classOrInterface, deviceName);
+        }
+        return result;
+    }
 
+    @Deprecated
+    public HardwareDevice get(String deviceName) {
+        throw new IllegalArgumentException("Use the typed version of get(), e.g. get(DcMotorEx.class, \"leftMotor\")");
+    }
+
+    // Wily Works way to add devices to the hardware map:
+    public synchronized void put(String deviceName, Class klass) {
+        deviceName = deviceName.trim();
+        List<HardwareDevice> list = allDevicesMap.get(deviceName);
+        if (list == null) {
+            list = new ArrayList<>();
+            allDevicesMap.put(deviceName, list);
+        }
+        HardwareDevice device;
+        if (DcMotor.class.isAssignableFrom(klass)) {
+            device = new WilyDcMotorEx();
+            dcMotor.put(deviceName, (DcMotor) device);
+        } else if (VoltageSensor.class.isAssignableFrom(klass)) {
+            device = new WilyVoltageSensor();
+            voltageSensor.put(deviceName, (VoltageSensor) device);
+        } else if (DistanceSensor.class.isAssignableFrom(klass)) {
+            device = new WilyDistanceSensor();
+            distanceSensor.put(deviceName, (DistanceSensor) device);
+        } else {
+            throw new IllegalArgumentException("Unexpected device type for HardwareMap");
+        }
+        list.add(device);
+        allDevicesList.add(device);
+    }
 
     private void initializeDeviceIfNecessary(HardwareDevice device) {
     }
@@ -191,15 +409,6 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
         public void put(String deviceName, DEVICE_TYPE device) {
             map.put(deviceName.trim(), device);
         }
-//
-//        public void put(@NonNull SerialNumber serialNumber, String deviceName, DEVICE_TYPE device) {
-//            internalPut(serialNumber, deviceName, device);
-//        }
-//
-//        protected void internalPut(@Nullable SerialNumber serialNumber, String deviceName, DEVICE_TYPE device) {
-//            synchronized (lock) {
-//            }
-//        }
 
         public void putLocal(String deviceName, DEVICE_TYPE device) {
             synchronized (lock) {
