@@ -148,25 +148,28 @@ public class WilyCore {
     // Callbacks provided to the guest. These are all called via reflection.
 
     // The guest calls this when they initialize:
-    public void initialize(String autoOpMode, int robotWidth, int robotLength) {
+    static public void initialize(String autoOpMode, int robotWidth, int robotLength) {
 
     }
 
     // Guest call to set the pose:
-    public void setPose(double x, double y, double heading,
+    static public void setPose(double x, double y, double heading,
                         double xVelocity, double yVelocity, double headingVelocity) {
 
     }
 
     // Guest call to set the drive powers:
-    public void setDrivePowers(
+    static public void setDrivePowers(
             double stickVelocityX, double stickVelocityY, double stickVelocityAngular,
             double assistVelocityX, double assistVelocityY, double assistVelocityAngular) {
 
+        simulation.setDrivePowers(
+                new PoseVelocity2d(new Vector2d(stickVelocityX, stickVelocityY), stickVelocityAngular),
+                new PoseVelocity2d(new Vector2d(assistVelocityX, assistVelocityY), assistVelocityAngular));
     }
 
     // Guest call to get the localized position:
-    public double[] getLocalization() {
+    static public double[] getLocalization() {
         return null;
     }
 
@@ -199,7 +202,7 @@ class Navigation {
                 -gamepad1.right_stick_x);
 
         drive.updatePoseEstimate();
-        drive.setDrivePowers(powers);
+        WilyCore.simulation.setDrivePowers(powers, null);
 
         telemetry.addData("x", drive.pose.position.x);
         telemetry.addData("y", drive.pose.position.y);

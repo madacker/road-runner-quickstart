@@ -10,6 +10,7 @@ import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2dDual;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /**
  * This class contains configuration and control methods for the Wily Works simulator.
@@ -30,10 +31,10 @@ public class WilyWorks {
     // Interaction
 
     // WilyLink class for communicating with the Wily Works simulator:
-    static private Class wilyLink = getWilyLink();
+    static private Class wilyCore = getWilyCore();
 
     // Check this boolean to determine whether you're running on the real robot or in a simulation:
-    static public boolean isSimulating = (wilyLink != null);
+    static public boolean isSimulating = (wilyCore != null);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Implementation
@@ -46,7 +47,7 @@ public class WilyWorks {
     }
 
     // Wrap WilyLink initialization with
-    static Class getWilyLink() {
+    static Class getWilyCore() {
         try {
             return initializeWilyLink();
         } catch (ClassNotFoundException|NoSuchMethodException|InvocationTargetException|IllegalAccessException e) {
@@ -78,9 +79,9 @@ public class WilyWorks {
 
     // Set the robot to a given pose and (optional) velocity in the simulation:
     static boolean setPose(Pose2d pose, PoseVelocity2d velocity) {
-        if (wilyLink != null) {
+        if (wilyCore != null) {
             try {
-                wilyLink.getMethod("setPose").invoke(null,
+                wilyCore.getMethod("setPose").invoke(null,
                         pose.position.x, pose.position.y, pose.heading.log(),
                         velocity.linearVel.x, velocity.linearVel.y, velocity.angVel);
                 return true; // ====>
@@ -97,9 +98,12 @@ public class WilyWorks {
             PoseVelocity2d stickVelocity,
             // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
             PoseVelocity2d assistVelocity) {
-        if (wilyLink != null) {
+        if (wilyCore != null) {
             try {
-                wilyLink.getMethod("setDrivePowers").invoke(null,
+                Method setDrivePowers = wilyCore.getMethod("setDrivePowers",
+                    double.class, double.class, double.class,
+                    double.class, double.class, double.class);
+                setDrivePowers.invoke(null,
                         stickVelocity.linearVel.x, stickVelocity.linearVel.y, stickVelocity.angVel,
                         assistVelocity.linearVel.x, assistVelocity.linearVel.y, assistVelocity.angVel);
                 return true; // ====>
@@ -112,9 +116,9 @@ public class WilyWorks {
 
     // Get the localizer position and velocity from the simulation:
     static public Twist2dDual<Time> localizerUpdate() {
-        if (wilyLink != null) {
+        if (wilyCore != null) {
             try {
-                double[] localization = (double[]) wilyLink.getMethod("getLocalization").invoke(null);
+                double[] localization = (double[]) wilyCore.getMethod("getLocalization").invoke(null);
                 return new Twist2dDual<>(new Vector2dDual<>(
                         new DualNum<>(new double[] { localization[0], localization[3] }),
                         new DualNum<>(new double[] { localization[1], localization[4] })),

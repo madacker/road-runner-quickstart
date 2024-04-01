@@ -270,6 +270,10 @@ public final class MecanumDrive {
     }
 
     public void setDrivePowers(PoseVelocity2d powers) {
+        // If running under Wily Works, request the drive powers directly:
+        if (WilyWorks.setDrivePowers(powers, new PoseVelocity2d(new Vector2d(0, 0), 0)))
+            return; // ====>
+
         MecanumKinematics.WheelVelocities<Time> wheelVels = new MecanumKinematics(1).inverse(
                 PoseVelocity2dDual.constant(powers, 1));
 
@@ -303,17 +307,25 @@ public final class MecanumDrive {
      * robot down.
      */
     public void setDrivePowers(
+            // Current pose:
             Pose2d pose,
+            // Current velocity:
             PoseVelocity2d poseVelocity,
-            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
+            // Desired manual power velocity, normalized voltage from -1 to 1, robot-relative
+            // coordinates, can be null:
             PoseVelocity2d stickVelocity,
-            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
+            // Desired computed power velocity, inches/s and radians/s, field-relative coordinates,
+            // can be null:
             PoseVelocity2d assistVelocity)
     {
         if (stickVelocity == null)
             stickVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
         if (assistVelocity == null)
             assistVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
+
+        // If running under Wily Works, request the drive powers directly:
+        if (WilyWorks.setDrivePowers(stickVelocity, assistVelocity))
+            return; // ====>
 
         // Compute the assist acceleration as the difference between the new assist velocity
         // and the old divided by delta-t:

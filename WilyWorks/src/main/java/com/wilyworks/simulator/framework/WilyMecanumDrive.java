@@ -145,45 +145,4 @@ public final class WilyMecanumDrive {
         final double ROBOT_RADIUS = 9;
         drawRobot(c, t, ROBOT_RADIUS);
     }
-
-    public void setDrivePowers(PoseVelocity2d powers) {
-        setDrivePowers(powers, null);
-    }
-
-    /**
-     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
-     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
-     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
-     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
-     * at the same time in which case the velocities are added together (to allow assist and stick
-     * control to blend together, for example).
-     *
-     * It's also possible to map the controller input to inches/s and radians/s instead of the
-     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
-     * .maxAngVel to determine the range to specify. Note however that the robot can actually
-     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
-     * robot down.
-     */
-    public void setDrivePowers(
-            // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
-            PoseVelocity2d stickVelocity,
-            // Computed power, inches/s and radians/s, field-relative coordinates, can be null:
-            PoseVelocity2d assistVelocity)
-    {
-        PoseVelocity2d fieldVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
-        if (stickVelocity != null) {
-            fieldVelocity = new PoseVelocity2d(new Vector2d(
-                    stickVelocity.linearVel.x * WilyMecanumDrive.PARAMS.maxWheelVel,
-                    stickVelocity.linearVel.y * WilyMecanumDrive.PARAMS.maxWheelVel),
-                    stickVelocity.angVel * WilyMecanumDrive.PARAMS.maxAngVel);
-            fieldVelocity = pose.times(fieldVelocity); // Make it field-relative
-        }
-        if (assistVelocity != null) {
-            fieldVelocity = new PoseVelocity2d(new Vector2d(
-                    fieldVelocity.linearVel.x + assistVelocity.linearVel.x,
-                    fieldVelocity.linearVel.y + assistVelocity.linearVel.y),
-                    fieldVelocity.angVel + assistVelocity.angVel);
-        }
-        simulation.requestVelocity(fieldVelocity);
-    }
 }
