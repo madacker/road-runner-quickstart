@@ -30,7 +30,9 @@ import java.util.Set;
  * interface with the guest application.
  */
 public class WilyCore {
-    static final double DELTA_T = 0.100; // 100ms
+    private static final double DELTA_T = 0.100; // 100ms
+
+    public static Simulation simulation;
 
     static double time() {
         return System.currentTimeMillis() / 1000.0;
@@ -111,6 +113,8 @@ public class WilyCore {
         opMode.hardwareMap = new HardwareMap();
         opMode.gamepad1 = new Gamepad();
         opMode.telemetry = new WilyTelemetry();
+
+        simulation = new Simulation();
 
         if (LinearOpMode.class.isAssignableFrom(klass)) {
             LinearOpMode linearOpMode = (LinearOpMode) opMode;

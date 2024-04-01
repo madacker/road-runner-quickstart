@@ -146,13 +146,24 @@ class Field {
 }
 
 public class Simulation {
+    public static class Kinematics {
+        // path profile parameters (in inches)
+        public double maxWheelVel = 60;
+        public double minProfileAccel = -30;
+        public double maxProfileAccel = 50;
+
+        // turn profile parameters (in radians)
+        public double maxAngVel = Math.PI; // shared with path
+        public double maxAngAccel = Math.PI;
+    }
+
     public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
     public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(0, 60), Math.toRadians(0)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(16, 18); // Size in inches of user's robot
     public DashboardCanvas canvas; // Canvas for the entire window frame
 
     private Field field;
-    private WilyMecanumDrive.Params kinematics; // Kinematic parameters for the simulation
+    private Kinematics kinematics = new Kinematics(); // Kinematic parameters for the simulation
     private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
 
     public Simulation() {
@@ -162,11 +173,6 @@ public class Simulation {
         field = new Field(this);
     }
 
-    // Set the kinematics for the simulation to use:
-    public void setKinematics(WilyMecanumDrive.Params kinematics) {
-        this.kinematics = kinematics;
-    }
-
     // Update the simulation's velocity to accommodate the request:
     public void requestVelocity(PoseVelocity2d velocity) { // Field relative, inch/s and radian/s
         this.requestedVelocity = velocity;
@@ -174,9 +180,9 @@ public class Simulation {
 
     // Move the robot in the requested direction via kinematics:
     public void advance(double dt) {
-        // Maintain the current velocity if no-one has called requestVelocity yet:
+        // Request a stop if no new velocity has been requested:
         if (requestedVelocity == null)
-            requestedVelocity = poseVelocity;
+            requestedVelocity = new PoseVelocity2d(new Vector2d(0, 0), 0);
 
         // Handle the rotational velocity:
         double currentAngular = poseVelocity.angVel;

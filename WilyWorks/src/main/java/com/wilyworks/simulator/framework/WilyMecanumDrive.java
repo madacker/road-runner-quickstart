@@ -75,8 +75,6 @@ public final class WilyMecanumDrive {
     Simulation simulation;
 
     public WilyMecanumDrive(Simulation simulation) {
-        simulation.setKinematics(PARAMS);
-
         this.pose = new Pose2d(
                 simulation.pose.position.x,
                 simulation.pose.position.y,
