@@ -6,6 +6,7 @@ public abstract class LinearOpMode extends OpMode {
 
     public void waitForStart() {
     }
+
     public final boolean opModeIsActive() {
         return true;
     }

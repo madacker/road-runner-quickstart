@@ -6,6 +6,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.badlogic.gdx.Application;
+import com.badlogic.gdx.Game;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -26,13 +27,40 @@ import java.util.List;
 import java.util.Set;
 
 /**
+ * This thread is tasked with regularly updating the Gamepad steate.
+ */
+class GamepadThread extends Thread {
+    Gamepad gamepad;
+
+    GamepadThread(Gamepad gamepad) {
+        this.gamepad = gamepad;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            // Update the gamepad state every 10 milliseconds:
+            try {
+                sleep(10);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            gamepad.update();
+        }
+    }
+}
+
+/**
  * Core class for Wily Works. This provides the entry point to the simulator and is the
  * interface with the guest application.
  */
 public class WilyCore {
     private static final double DELTA_T = 0.100; // 100ms
 
+    public static boolean updated; // True if WilyCore.update() has been called since
+    public static Gamepad gamepad;
     public static Simulation simulation;
+    public static GamepadThread gamepadThread;
 
     static double time() {
         return System.currentTimeMillis() / 1000.0;
@@ -109,12 +137,16 @@ public class WilyCore {
             return; // ====>
         }
 
-        OpMode opMode = (OpMode) klass.newInstance();
-        opMode.hardwareMap = new HardwareMap();
-        opMode.gamepad1 = new Gamepad();
-        opMode.telemetry = new WilyTelemetry();
 
         simulation = new Simulation();
+        gamepad = new Gamepad();
+
+        gamepadThread = new GamepadThread(gamepad);
+
+        OpMode opMode = (OpMode) klass.newInstance();
+        opMode.hardwareMap = new HardwareMap();
+        opMode.gamepad1 = gamepad;
+        opMode.telemetry = new WilyTelemetry();
 
         if (LinearOpMode.class.isAssignableFrom(klass)) {
             LinearOpMode linearOpMode = (LinearOpMode) opMode;
@@ -147,12 +179,14 @@ public class WilyCore {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Callbacks provided to the guest. These are all called via reflection.
 
-    // The guest calls this when they initialize:
-    static public void initialize(String autoOpMode, int robotWidth, int robotLength) {
-
+    //
+    static public void update(double deltaTime) {
+        simulation.update(deltaTime);
+        gamepad.update();
+        updated = true;
     }
 
-    // Guest call to set the pose:
+    // Guest call to set the pose and velocity:
     static public void setPose(double x, double y, double heading,
                         double xVelocity, double yVelocity, double headingVelocity) {
 
