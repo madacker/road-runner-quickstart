@@ -218,6 +218,7 @@ public class Simulation {
 
     public Simulation() {
         DashboardWindow dashboardWindow = new DashboardWindow("FTC Dashboard", 1280, 720);
+
         dashboardWindow.setVisible(true);
         canvas = dashboardWindow.getCanvas();
         field = new Field(this);

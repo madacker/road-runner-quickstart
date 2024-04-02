@@ -12,7 +12,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.wilyworks.simulator.framework.WilyMecanumDrive;
 import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -131,11 +130,6 @@ public class WilyCore {
                 break;
             }
         }
-        if (klass == null) {
-            oldTest();
-            return; // ====>
-        }
-
 
         simulation = new Simulation();
         gamepad = new Gamepad();
@@ -153,26 +147,6 @@ public class WilyCore {
             linearOpMode.runOpMode();
         } else {
             // @@@
-        }
-    }
-
-    static void oldTest() {
-        Simulation simulation = new Simulation();
-        WilyMecanumDrive mecanumDrive = new WilyMecanumDrive(simulation);
-        Gamepad gamepad = new Gamepad();
-        WilyTelemetry telemetry = new WilyTelemetry();
-        Navigation loop = new Navigation(mecanumDrive, gamepad, telemetry);
-
-        while (true) {
-            // We use a fixed time quanta to allow single-stepping in the debugger:
-            double time = time();
-            gamepad.update();
-            loop.update(DELTA_T);
-            simulation.update(DELTA_T);
-
-            // Busy-loop to consume any remaining time:
-            while (time() - time < DELTA_T)
-                ;
         }
     }
 
@@ -198,6 +172,8 @@ public class WilyCore {
             double stickVelocityX, double stickVelocityY, double stickVelocityAngular,
             double assistVelocityX, double assistVelocityY, double assistVelocityAngular) {
 
+        // If the user didn't explicitly call the simulation update() API, do it now on their
+        // behalf:
         if (!simulationUpdated)
             simulation.update(0);
 
@@ -221,41 +197,5 @@ public class WilyCore {
         } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException|InterruptedException e) {
             throw new RuntimeException(e);
         }
-    }
-}
-
-// Replace this class with your own. // @@@ Remove
-class Navigation {
-    WilyMecanumDrive drive;
-    Gamepad gamepad1;
-    WilyTelemetry telemetry;
-
-    Navigation(WilyMecanumDrive drive, Gamepad gamepad1, WilyTelemetry telemetry) {
-        this.drive = drive;
-        this.gamepad1 = gamepad1;
-        this.telemetry = telemetry;
-    }
-    void update(double deltaT) { // Time in seconds
-        PoseVelocity2d powers = new PoseVelocity2d(
-                new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
-                -gamepad1.right_stick_x);
-
-        drive.updatePoseEstimate();
-        WilyCore.simulation.setDrivePowers(powers, null);
-
-        telemetry.addData("x", drive.pose.position.x);
-        telemetry.addData("y", drive.pose.position.y);
-        telemetry.addData("heading", drive.pose.heading);
-        telemetry.addData("left_stick_x", gamepad1.left_stick_x);
-        telemetry.addData("left_stick_y", gamepad1.left_stick_y);
-        telemetry.addData("right_stick_x", gamepad1.right_stick_x);
-        telemetry.update();
-
-        // Code added to draw the pose:
-        TelemetryPacket p = new TelemetryPacket();
-        Canvas c = p.fieldOverlay();
-        c.setStroke("#3F51B5");
-        WilyMecanumDrive.drawRobot(c, drive.pose);
-        FtcDashboard.getInstance().sendTelemetryPacket(p);
     }
 }

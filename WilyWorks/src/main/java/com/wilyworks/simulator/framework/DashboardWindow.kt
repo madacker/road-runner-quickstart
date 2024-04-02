@@ -1,6 +1,11 @@
 package com.example.kinematictesting.framework
 
+import java.awt.Button
+import java.awt.Choice
 import java.awt.Dimension
+import java.awt.Label
+import java.awt.event.ActionEvent
+import java.awt.event.ActionListener
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferStrategy
@@ -39,7 +44,25 @@ class DashboardWindow(title: String, windowWidth: Int, windowHeight: Int) : JFra
 
         layout = BoxLayout(contentPane, BoxLayout.X_AXIS)
 
+        var choice = Choice()
+        choice.add("One")
+        choice.add("Two")
+
+        var statusLabel = Label();
+        statusLabel.setSize(350, 100)
+
+        var button = Button("Go")
+        button.addActionListener(object : ActionListener {
+            override fun actionPerformed(p0: ActionEvent?) {
+                var data = "Fruit selected: " + choice.getItem(choice.selectedIndex)
+                statusLabel.setText(data)
+            }
+        })
+
         canvasPanel.layout = BoxLayout(canvasPanel, BoxLayout.Y_AXIS)
+        canvasPanel.add(choice)
+        canvasPanel.add(button)
+        canvasPanel.add(statusLabel)
         canvasPanel.add(canvas)
 
         contentPane.add(canvasPanel)
