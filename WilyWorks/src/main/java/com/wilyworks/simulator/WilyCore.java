@@ -39,15 +39,16 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-
 
 /**
  * Structure for representing the choices of opmode:
@@ -93,12 +94,21 @@ class DashboardWindow extends JFrame {
             choice.add(opMode.name);
         }
 
+        // Read the preferred opMode from the registry:
+        Preferences preferences = Preferences.userRoot().node("com/wilyworks/simulator");
+        if (opModeChoices.size() > 0) {
+            choice.select(preferences.get("opmode", opModeChoices.get(0).name));
+        }
+
         Button button = new Button("Go");
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                // Inform the main thread of the choice:
-                WilyCore.opModeClass = opModeChoices.get(choice.getSelectedIndex()).klass;
+
+                // Inform the main thread of the choice and save the preference:
+                OpModeChoice opModeChoice = opModeChoices.get(choice.getSelectedIndex());
+                WilyCore.opModeClass = opModeChoice.klass;
+                preferences.put("opmode", opModeChoice.name);
             }
         });
 
@@ -383,7 +393,7 @@ public class WilyCore {
         allOps.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
         ArrayList<OpModeChoice> choices = new ArrayList<>();
 
-        // Build a list of the eligible opmodes with their friendly names:
+        // Build a list of the eligible opModes along with their friendly names:
         for (Class klass: allOps) {
             if ((OpMode.class.isAssignableFrom(klass)) &&
                     (!klass.isAnnotationPresent(Disabled.class))) {
@@ -415,6 +425,7 @@ public class WilyCore {
                 choices.add(new OpModeChoice(klass, name));
             }
         }
+        choices.sort(Comparator.comparing(x -> x.name));
         return choices;
     }
 
@@ -440,7 +451,7 @@ public class WilyCore {
                 throw new RuntimeException(e);
             }
         } else {
-            // @@@
+            // TODO: Implement non-LinearOpMode support
         }
     }
 
@@ -460,6 +471,8 @@ public class WilyCore {
 
         dashboardWindow.setVisible(true);
 
+        // Wait for the UI to tell us what opMode to run:
+        // TODO: Make this wait on an event.
         while (opModeClass == null) {
             try {
                 sleep(10);
