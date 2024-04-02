@@ -78,10 +78,13 @@ public class WilyWorks {
     // Road Runner control
 
     // Set the robot to a given pose and (optional) velocity in the simulation:
-    static boolean setPose(Pose2d pose, PoseVelocity2d velocity) {
+    static public boolean setPose(Pose2d pose, PoseVelocity2d velocity) {
         if (wilyCore != null) {
             try {
-                wilyCore.getMethod("setPose").invoke(null,
+                Method setPose = wilyCore.getMethod("setPose",
+                        double.class, double.class, double.class,
+                        double.class, double.class, double.class);
+                setPose.invoke(null,
                         pose.position.x, pose.position.y, pose.heading.log(),
                         velocity.linearVel.x, velocity.linearVel.y, velocity.angVel);
                 return true; // ====>

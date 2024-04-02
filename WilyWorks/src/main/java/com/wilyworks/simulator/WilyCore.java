@@ -2,6 +2,7 @@ package com.wilyworks.simulator;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
@@ -187,7 +188,9 @@ public class WilyCore {
     // Guest call to set the pose and velocity:
     static public void setPose(double x, double y, double heading,
                         double xVelocity, double yVelocity, double headingVelocity) {
-
+        simulation.setPose(
+                new Pose2d(x, y, heading),
+                new PoseVelocity2d(new Vector2d(xVelocity, yVelocity), headingVelocity));
     }
 
     // Guest call to set the drive powers:

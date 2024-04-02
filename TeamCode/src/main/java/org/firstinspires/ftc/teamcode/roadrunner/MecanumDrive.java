@@ -230,6 +230,8 @@ public final class MecanumDrive {
     public MecanumDrive(HardwareMap hardwareMap, Pose2d pose, Globals globals) {
         this.pose = pose;
 
+        WilyWorks.setPose(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
+
         LynxFirmware.throwIfModulesAreOutdated(hardwareMap);
 
         for (LynxModule module : hardwareMap.getAll(LynxModule.class)) {

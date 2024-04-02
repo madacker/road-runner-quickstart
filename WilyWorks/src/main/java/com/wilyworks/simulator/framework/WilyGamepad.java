@@ -78,7 +78,9 @@ class KeyDispatcher implements KeyEventDispatcher {
             case KeyEvent.VK_BRACELEFT: button[SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK] = pressed; break;
             case KeyEvent.VK_BRACERIGHT: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK] = pressed; break;
         }
-        axisValue = (ctrlPressed) ? 0.20f : ((shiftPressed) ? 1.0f : 0.5f);
+
+        // Speed is 20% of max when control is pressed, 100% when shift is pressed, 40% otherwise:
+        axisValue = (ctrlPressed) ? 0.20f : ((shiftPressed) ? 1.0f : 0.4f);
         return true;
     }
 }

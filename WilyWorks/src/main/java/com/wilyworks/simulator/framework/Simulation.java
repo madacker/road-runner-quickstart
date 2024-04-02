@@ -13,6 +13,7 @@ import com.acmerobotics.roadrunner.Vector2dDual;
 import com.example.kinematictesting.framework.DashboardCanvas;
 import com.example.kinematictesting.framework.DashboardWindow;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.wilyworks.simulator.framework.WilyTelemetry;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -387,4 +388,11 @@ public class Simulation {
 
     // Entry point to get the current localizer position:
     public double[] localizerUpdate() { return localizer.update(); }
+
+    // Entry point to set the pose and velocity, both in field coordinates:
+    public void setPose(Pose2d pose, PoseVelocity2d poseVelocity) {
+        this.pose = pose;
+        this.poseVelocity = poseVelocity;
+        this.localizer = new Localizer(this);
+    }
 }
