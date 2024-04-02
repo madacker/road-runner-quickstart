@@ -2,34 +2,11 @@ package com.wilyworks.simulator.framework;
 
 import static java.lang.System.nanoTime;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.roadrunner.DualNum;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
-import com.acmerobotics.roadrunner.Time;
-import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.roadrunner.Vector2dDual;
-import com.example.kinematictesting.framework.DashboardCanvas;
-import com.example.kinematictesting.framework.DashboardWindow;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.wilyworks.simulator.framework.WilyTelemetry;
 
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
-import java.awt.GraphicsConfiguration;
-import java.awt.GraphicsEnvironment;
-import java.awt.Image;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.awt.Transparency;
-import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
-
-import javax.imageio.ImageIO;
 
 class Localizer {
     Simulation simulation;
@@ -86,7 +63,6 @@ public class Simulation {
     public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
     public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(0, 60), Math.toRadians(0)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(16, 18); // Size in inches of user's robot
-    public DashboardCanvas canvas; // Canvas for the entire window frame
 
     private Localizer localizer;
     private Kinematics kinematics = new Kinematics(); // Kinematic parameters for the simulation

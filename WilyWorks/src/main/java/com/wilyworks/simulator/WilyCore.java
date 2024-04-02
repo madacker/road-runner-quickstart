@@ -1,13 +1,9 @@
 package com.wilyworks.simulator;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.dashboard.canvas.Canvas;
-import com.example.kinematictesting.framework.DashboardCanvas;
-import com.example.kinematictesting.framework.DashboardWindow;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -20,15 +16,24 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.reflections.Reflections;
 
+import java.awt.Button;
+import java.awt.Choice;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
+import java.awt.Label;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +44,90 @@ import java.util.List;
 import java.util.Set;
 
 import javax.imageio.ImageIO;
+import javax.swing.BoxLayout;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+class DashboardWindow extends JFrame {
+    final int WINDOW_WIDTH = 1280;
+    final int WINDOW_HEIGHT = 720;
+    DashboardCanvas canvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
+    JPanel canvasPanel = new JPanel();
+
+    DashboardWindow() {
+        setTitle("Dashboard");
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                super.windowClosing(e);
+                dispose();
+                System.exit(0);
+            }
+        });
+
+        setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+        setLocationRelativeTo(null);
+        setResizable(false);
+
+        BoxLayout layout = new BoxLayout(getContentPane(), BoxLayout.X_AXIS);
+
+        Choice choice = new Choice();
+        choice.add("One");
+        choice.add("Two");
+
+        Label statusLabel = new Label();
+        statusLabel.setSize(350, 100);
+
+        Button button = new Button("Go");
+        button.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                statusLabel.setText("Fruit: " + choice.getItem(choice.getSelectedIndex()));
+            }
+        });
+
+        canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
+        canvasPanel.add(choice);
+        canvasPanel.add(button);
+        canvasPanel.add(statusLabel);
+        canvasPanel.add(canvas);
+
+        getContentPane().add(canvasPanel);
+        pack();
+
+        canvas.start();
+    }
+}
+
+/**
+ * Wrapper for the dashboard drawing canvas.
+ */
+class DashboardCanvas extends java.awt.Canvas {
+    BufferStrategy bufferStrat;
+    int width;
+    int height;
+
+    DashboardCanvas(int width, int height) {
+        this.width = width;
+        this.height = height;
+
+        setBounds(0, 0, width, height);
+        setPreferredSize(new Dimension(width, height));
+        setIgnoreRepaint(true);
+    }
+
+    void start() {
+        createBufferStrategy(2);
+        bufferStrat = getBufferStrategy();
+        requestFocus();
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        return new Dimension(width, height);
+    }
+}
 
 /**
  * Field view manager.
@@ -202,7 +291,7 @@ public class WilyCore {
     public static Gamepad gamepad;
     public static Simulation simulation;
     public static Field field;
-    public static DashboardCanvas canvas;
+    public static DashboardCanvas dashboardCanvas;
     public static GamepadThread gamepadThread;
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
@@ -307,13 +396,13 @@ public class WilyCore {
         simulation.advance(deltaT);
 
         // All Graphics objects can be cast to Graphics2D:
-        Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
+        Graphics2D g = (Graphics2D) dashboardCanvas.getBufferStrategy().getDrawGraphics();
 
-        g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        g.clearRect(0, 0, dashboardCanvas.getWidth(), dashboardCanvas.getHeight());
         field.render(g);
 
         g.dispose();
-        canvas.getBufferStrategy().show();
+        dashboardCanvas.getBufferStrategy().show();
         simulationUpdated = true;
     }
 
@@ -350,10 +439,9 @@ public class WilyCore {
     // Application entry point for Wily Works!
     public static void main(String[] args)
     {
-        DashboardWindow dashboardWindow = new DashboardWindow("FTC Dashboard", 1280, 720);
-
+        DashboardWindow dashboardWindow = new DashboardWindow();
         dashboardWindow.setVisible(true);
-        canvas = dashboardWindow.getCanvas();
+        dashboardCanvas = dashboardWindow.canvas;
 
         simulation = new Simulation();
         field = new Field(simulation);
