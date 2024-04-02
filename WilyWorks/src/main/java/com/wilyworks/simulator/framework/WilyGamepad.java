@@ -20,48 +20,49 @@ class KeyDispatcher implements KeyEventDispatcher {
 
     public boolean[] button = new boolean[SDL.SDL_CONTROLLER_BUTTON_MAX];
     public float[] axis = new float[SDL.SDL_CONTROLLER_AXIS_MAX];
+    public float axisValue;
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent keyEvent) {
         int code = keyEvent.getKeyCode();
         boolean pressed = (keyEvent.getID() != KeyEvent.KEY_RELEASED);
-        float value = (!pressed) ? 0 : ((shiftPressed) ? 1.0f : ((ctrlPressed) ? 0.2f : 0.5f));
+        float multiplier = (pressed) ? 1.0f : 0.0f;
 
         switch (code) {
             case KeyEvent.VK_ALT: altPressed = pressed; break;
             case KeyEvent.VK_CONTROL: ctrlPressed = pressed; break;
             case KeyEvent.VK_SHIFT: shiftPressed = pressed; break;
 
-            case KeyEvent.VK_A: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = -value; break;
-            case KeyEvent.VK_D: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = value; break;
-            case KeyEvent.VK_W: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = -value; break;
-            case KeyEvent.VK_S: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = value; break;
-            case KeyEvent.VK_COMMA: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT] = value; break;
-            case KeyEvent.VK_PERIOD: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT] = value; break;
+            case KeyEvent.VK_A: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = -multiplier; break;
+            case KeyEvent.VK_D: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = multiplier; break;
+            case KeyEvent.VK_W: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = -multiplier; break;
+            case KeyEvent.VK_S: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = multiplier; break;
+            case KeyEvent.VK_COMMA: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT] = multiplier; break;
+            case KeyEvent.VK_PERIOD: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT] = multiplier; break;
 
             case KeyEvent.VK_LEFT:
                 if (altPressed)
                     button[SDL.SDL_CONTROLLER_BUTTON_DPAD_LEFT] = pressed;
                 else
-                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = -value;
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = -multiplier;
                 break;
             case KeyEvent.VK_RIGHT:
                 if (altPressed)
                     button[SDL.SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = pressed;
                 else
-                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = value;
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = multiplier;
                 break;
             case KeyEvent.VK_UP:
                 if (altPressed)
                     button[SDL.SDL_CONTROLLER_BUTTON_DPAD_UP] = pressed;
                 else
-                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = -value;
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = -multiplier;
                 break;
             case KeyEvent.VK_DOWN:
                 if (altPressed)
                     button[SDL.SDL_CONTROLLER_BUTTON_DPAD_DOWN] = pressed;
                 else
-                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = value;
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = multiplier;
                 break;
 
             case KeyEvent.VK_E:
@@ -77,6 +78,7 @@ class KeyDispatcher implements KeyEventDispatcher {
             case KeyEvent.VK_BRACELEFT: button[SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK] = pressed; break;
             case KeyEvent.VK_BRACERIGHT: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK] = pressed; break;
         }
+        axisValue = (ctrlPressed) ? 0.20f : ((shiftPressed) ? 1.0f : 0.5f);
         return true;
     }
 }
@@ -156,7 +158,7 @@ public class WilyGamepad {
     // Get axis state from either the controller or the keyboard, with the latter winning ties:
     float getAxis(int sdlAxis) {
         if (keyDispatcher.axis[sdlAxis] != 0)
-            return keyDispatcher.axis[sdlAxis];
+            return keyDispatcher.axis[sdlAxis] * keyDispatcher.axisValue;
         else if (controller != null)
             return deadZone(controller.getAxis(sdlAxis));
         else

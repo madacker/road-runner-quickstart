@@ -89,7 +89,7 @@ public final class Log {
 
     public static int println(int priority, @RecentlyNullable String tag, @RecentlyNonNull String msg) {
         Map<Integer, String> map = Map.of(ASSERT, "ASSERT", DEBUG, "DEBUG", ERROR, "ERROR", INFO, "INFO", VERBOSE, "VERBOSE", WARN, "WARN");
-        System.out.printf("Log %s: %s, %s\n", map.get(priority), tag, msg);
+        System.out.printf("Log(%s) %s: %s\n", map.get(priority), tag, msg);
         return 0;
     }
 }

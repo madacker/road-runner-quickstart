@@ -1,11 +1,14 @@
 package com.wilyworks.simulator.framework;
 
+import static java.lang.System.nanoTime;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.example.kinematictesting.framework.DashboardCanvas;
 import com.example.kinematictesting.framework.DashboardWindow;
+import com.qualcomm.robotcore.hardware.DcMotor;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -58,10 +61,12 @@ class Field {
         initializeRobotImage();
     }
 
+    // Round to an integer:
     static int round(double value) {
         return (int) Math.round(value);
     }
 
+    // Initialize the robot image bitmap:
     private void initializeRobotImage() {
         final int OPACITY = round(255 * 0.8);
         final double WHEEL_PADDING_X = 0.05;
@@ -108,6 +113,7 @@ class Field {
                 round(ROBOT_IMAGE_HEIGHT * DIRECTION_LINE_HEIGHT));
     }
 
+    // Render just the robot:
     void renderRobot(Graphics2D g) {
         AffineTransform imageTransform = new AffineTransform();
         imageTransform.translate(simulation.pose.position.x, simulation.pose.position.y);
@@ -165,12 +171,18 @@ public class Simulation {
     private Field field;
     private Kinematics kinematics = new Kinematics(); // Kinematic parameters for the simulation
     private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
+    private double lastUpdateTime = time(); // Time of last update() call, in seconds
 
     public Simulation() {
         DashboardWindow dashboardWindow = new DashboardWindow("FTC Dashboard", 1280, 720);
         dashboardWindow.setVisible(true);
         canvas = dashboardWindow.getCanvas();
         field = new Field(this);
+    }
+
+    // Get the current time, in seconds:
+    static double time() {
+        return nanoTime() * 1e-9;
     }
 
     // Move the robot in the requested direction via kinematics:
@@ -273,7 +285,16 @@ public class Simulation {
         poseVelocity = new PoseVelocity2d(new Vector2d(currentLinearX, currentLinearY), currentAngular);
     }
 
+    // Advance the simulation and update the field view. deltaT is specified in seconds.
     public void update(double deltaT) {
+        // If delta-t is zero then use the real-time clock:
+        double time = time();
+        if (deltaT <= 0) {
+            deltaT = time - lastUpdateTime;
+        }
+        lastUpdateTime = time;
+
+        // Advance the simulation:
         advance(deltaT);
 
         // All Graphics objects can be cast to Graphics2D:
@@ -286,21 +307,18 @@ public class Simulation {
         canvas.getBufferStrategy().show();
     }
 
-
-    /**
-     * Power the motors according to the specified velocities. 'stickVelocity' is for controller
-     * input and 'assistVelocity' is for computed driver assistance. The former is specified in
-     * voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
-     * whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
-     * at the same time in which case the velocities are added together (to allow assist and stick
-     * control to blend together, for example).
-     *
-     * It's also possible to map the controller input to inches/s and radians/s instead of the
-     * normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
-     * .maxAngVel to determine the range to specify. Note however that the robot can actually
-     * go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
-     * robot down.
-     */
+    // Power the motors according to the specified velocities. 'stickVelocity' is for controller
+    // input and 'assistVelocity' is for computed driver assistance. The former is specified in
+    // voltage values normalized from -1 to 1 (just like the regular DcMotor::SetPower() API)
+    // whereas the latter is in inches/s or radians/s. Both types of velocities can be specified
+    // at the same time in which case the velocities are added together (to allow assist and stick
+    // control to blend together, for example).
+    //
+    // It's also possible to map the controller input to inches/s and radians/s instead of the
+    // normalized -1 to 1 voltage range. You can reference MecanumDrive.PARAMS.maxWheelVel and
+    // .maxAngVel to determine the range to specify. Note however that the robot can actually
+    // go faster than Road Runner's PARAMS values so you would be unnecessarily slowing your
+    // robot down.
     public void setDrivePowers(
             // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:
             PoseVelocity2d stickVelocity,
@@ -323,5 +341,4 @@ public class Simulation {
         }
         this.requestedVelocity = fieldVelocity;
     }
-
 }

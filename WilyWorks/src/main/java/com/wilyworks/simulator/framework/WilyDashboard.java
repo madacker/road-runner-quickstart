@@ -28,8 +28,6 @@ public class WilyDashboard {
         telemetryPacket.data.forEach((key, value) -> data.put(key, value));
         log = telemetryPacket.log;
         fieldOverlay = telemetryPacket.fieldOverlay();
-
-        WilyCore.simulation.update(0.050); // @@@@
     }
 
     public void withConfigRoot(CustomVariableConsumer function) {

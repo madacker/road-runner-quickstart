@@ -5,8 +5,6 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.dashboard.canvas.Canvas;
-import com.badlogic.gdx.Application;
-import com.badlogic.gdx.Game;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -57,7 +55,7 @@ class GamepadThread extends Thread {
 public class WilyCore {
     private static final double DELTA_T = 0.100; // 100ms
 
-    public static boolean updated; // True if WilyCore.update() has been called since
+    public static boolean simulationUpdated; // True if WilyCore.update() has been called since
     public static Gamepad gamepad;
     public static Simulation simulation;
     public static GamepadThread gamepadThread;
@@ -180,11 +178,10 @@ public class WilyCore {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Callbacks provided to the guest. These are all called via reflection.
 
-    //
+    // The guest can specify the delta-t (which is handy when single stepping):
     static public void update(double deltaTime) {
         simulation.update(deltaTime);
-        gamepad.update();
-        updated = true;
+        simulationUpdated = true;
     }
 
     // Guest call to set the pose and velocity:
@@ -198,9 +195,13 @@ public class WilyCore {
             double stickVelocityX, double stickVelocityY, double stickVelocityAngular,
             double assistVelocityX, double assistVelocityY, double assistVelocityAngular) {
 
+        if (!simulationUpdated)
+            simulation.update(0);
+
         simulation.setDrivePowers(
                 new PoseVelocity2d(new Vector2d(stickVelocityX, stickVelocityY), stickVelocityAngular),
                 new PoseVelocity2d(new Vector2d(assistVelocityX, assistVelocityY), assistVelocityAngular));
+        simulationUpdated = false;
     }
 
     // Guest call to get the localized position:
