@@ -142,6 +142,7 @@ public class WilyCore {
         gamepad = new Gamepad();
 
         gamepadThread = new GamepadThread(gamepad);
+        gamepadThread.start();
 
         OpMode opMode = (OpMode) klass.newInstance();
         opMode.hardwareMap = new HardwareMap();

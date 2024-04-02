@@ -3,10 +3,88 @@ package com.wilyworks.simulator.framework;
 import com.badlogic.gdx.controllers.Controller;
 
 import org.libsdl.SDL;
-import org.libsdl.SDL_Error;
 
 import uk.co.electronstudio.sdl2gdx.SDL2ControllerManager;
 
+import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.KeyEvent;
+
+/**
+ * Windows hook for key presses.
+ */
+class KeyDispatcher implements KeyEventDispatcher {
+    private boolean altPressed;
+    private boolean ctrlPressed;
+    private boolean shiftPressed;
+
+    public boolean[] button = new boolean[SDL.SDL_CONTROLLER_BUTTON_MAX];
+    public float[] axis = new float[SDL.SDL_CONTROLLER_AXIS_MAX];
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent keyEvent) {
+        int code = keyEvent.getKeyCode();
+        boolean pressed = (keyEvent.getID() != KeyEvent.KEY_RELEASED);
+        float value = (!pressed) ? 0 : ((shiftPressed) ? 1.0f : ((ctrlPressed) ? 0.2f : 0.5f));
+
+        switch (code) {
+            case KeyEvent.VK_ALT: altPressed = pressed; break;
+            case KeyEvent.VK_CONTROL: ctrlPressed = pressed; break;
+            case KeyEvent.VK_SHIFT: shiftPressed = pressed; break;
+
+            case KeyEvent.VK_A: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = -value; break;
+            case KeyEvent.VK_D: axis[SDL.SDL_CONTROLLER_AXIS_LEFTX] = value; break;
+            case KeyEvent.VK_W: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = -value; break;
+            case KeyEvent.VK_S: axis[SDL.SDL_CONTROLLER_AXIS_LEFTY] = value; break;
+            case KeyEvent.VK_COMMA: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT] = value; break;
+            case KeyEvent.VK_PERIOD: axis[SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT] = value; break;
+
+            case KeyEvent.VK_LEFT:
+                if (altPressed)
+                    button[SDL.SDL_CONTROLLER_BUTTON_DPAD_LEFT] = pressed;
+                else
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = -value;
+                break;
+            case KeyEvent.VK_RIGHT:
+                if (altPressed)
+                    button[SDL.SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = pressed;
+                else
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTX] = value;
+                break;
+            case KeyEvent.VK_UP:
+                if (altPressed)
+                    button[SDL.SDL_CONTROLLER_BUTTON_DPAD_UP] = pressed;
+                else
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = -value;
+                break;
+            case KeyEvent.VK_DOWN:
+                if (altPressed)
+                    button[SDL.SDL_CONTROLLER_BUTTON_DPAD_DOWN] = pressed;
+                else
+                    axis[SDL.SDL_CONTROLLER_AXIS_RIGHTY] = value;
+                break;
+
+            case KeyEvent.VK_E:
+            case KeyEvent.VK_SPACE: button[SDL.SDL_CONTROLLER_BUTTON_A] = pressed; break;
+            case KeyEvent.VK_B: button[SDL.SDL_CONTROLLER_BUTTON_B] = pressed; break;
+            case KeyEvent.VK_X: button[SDL.SDL_CONTROLLER_BUTTON_X] = pressed; break;
+            case KeyEvent.VK_Y: button[SDL.SDL_CONTROLLER_BUTTON_Y] = pressed; break;
+            case KeyEvent.VK_DEAD_TILDE: button[SDL.SDL_CONTROLLER_BUTTON_GUIDE] = pressed; break;
+            case KeyEvent.VK_TAB: button[SDL.SDL_CONTROLLER_BUTTON_START] = pressed; break;
+            case KeyEvent.VK_BACK_SPACE: button[SDL.SDL_CONTROLLER_BUTTON_BACK] = pressed; break;
+            case KeyEvent.VK_SEMICOLON: button[SDL.SDL_CONTROLLER_BUTTON_LEFTSHOULDER] = pressed; break;
+            case KeyEvent.VK_QUOTE: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = pressed; break;
+            case KeyEvent.VK_BRACELEFT: button[SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK] = pressed; break;
+            case KeyEvent.VK_BRACERIGHT: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK] = pressed; break;
+        }
+        return true;
+    }
+}
+
+/**
+ * Wily Works Gamepad implementation that takes input either from a connected gamepad or
+ * from the keyboard.
+ */
 public class WilyGamepad {
 
     public volatile float left_stick_x = 0f;
@@ -36,19 +114,16 @@ public class WilyGamepad {
     public volatile boolean square = false;
     public volatile boolean share = false;
     public volatile boolean options = false;
-    //    public volatile boolean touchpad = false;
-//    public volatile boolean touchpad_finger_1;
-//    public volatile boolean touchpad_finger_2;
-//    public volatile float touchpad_finger_1_x;
-//    public volatile float touchpad_finger_1_y;
-//    public volatile float touchpad_finger_2_x;
-//    public volatile float touchpad_finger_2_y;
     public volatile boolean ps = false;
 
     SDL2ControllerManager controllerManager;
+    KeyDispatcher keyDispatcher;
+    Controller controller;
 
     public WilyGamepad() {
         controllerManager = new SDL2ControllerManager();
+        keyDispatcher = new KeyDispatcher();
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyDispatcher);
     }
 
     void updateButtonAliases(){
@@ -62,6 +137,7 @@ public class WilyGamepad {
         ps = guide;
     }
 
+    // FTC automatically implements a dead-zone but we have to do it manually on PC:
     private float deadZone(float value) {
         final double EPSILON = 0.05f;
         if (Math.abs(value) <= EPSILON)
@@ -69,40 +145,53 @@ public class WilyGamepad {
         return value;
     }
 
+    // Get button state from either the controller or the keyboard:
+    boolean getButton(int sdlButton) {
+        if (controller != null)
+            return controller.getButton(sdlButton) || keyDispatcher.button[sdlButton];
+        else
+            return keyDispatcher.button[sdlButton];
+    }
+
+    // Get axis state from either the controller or the keyboard, with the latter winning ties:
+    float getAxis(int sdlAxis) {
+        if (keyDispatcher.axis[sdlAxis] != 0)
+            return keyDispatcher.axis[sdlAxis];
+        else if (controller != null)
+            return deadZone(controller.getAxis(sdlAxis));
+        else
+            return 0;
+    }
+
     // Poll the attached game controller to update the button and axis states
     public void update() {
+        // Set some state so 'getButton' and 'getAxis' work:
         int count = controllerManager.getControllers().size;
-        Controller controller = null;
-        if (count != 0) {
-            controller = controllerManager.getControllers().get(0);
-            try {
-                controllerManager.pollState();
-            } catch (SDL_Error e) {
-                return;
-            }
+        controller = (count == 0) ? null : controllerManager.getControllers().get(0);
 
-            a = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_A);
-            b = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_B);
-            x = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_X);
-            y = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_Y);
-            back = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_BACK);
-            guide = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_GUIDE);
-            start = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_START);
-            dpad_up = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_UP);
-            dpad_down = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-            dpad_left = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-            dpad_right = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-            left_bumper = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-            right_bumper = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-            left_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK);
-            right_stick_button = controller.getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+        a = getButton(SDL.SDL_CONTROLLER_BUTTON_A);
+        b = getButton(SDL.SDL_CONTROLLER_BUTTON_B);
+        x = getButton(SDL.SDL_CONTROLLER_BUTTON_X);
+        y = getButton(SDL.SDL_CONTROLLER_BUTTON_Y);
+        back = getButton(SDL.SDL_CONTROLLER_BUTTON_BACK);
+        guide = getButton(SDL.SDL_CONTROLLER_BUTTON_GUIDE);
+        start = getButton(SDL.SDL_CONTROLLER_BUTTON_START);
+        dpad_up = getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_UP);
+        dpad_down = getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        dpad_left = getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+        dpad_right = getButton(SDL.SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        left_bumper = getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+        right_bumper = getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+        left_stick_button = getButton(SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK);
+        right_stick_button = getButton(SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK);
 
-            left_stick_x = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX));
-            left_stick_y = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTY));
-            right_stick_x = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTX));
-            right_stick_y = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTY));
-            left_trigger = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT));
-            right_trigger = deadZone(controller.getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
-        }
+        left_stick_x = getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTX);
+        left_stick_y = getAxis(SDL.SDL_CONTROLLER_AXIS_LEFTY);
+        right_stick_x = getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTX);
+        right_stick_y = getAxis(SDL.SDL_CONTROLLER_AXIS_RIGHTY);
+        left_trigger = getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        right_trigger = getAxis(SDL.SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+        updateButtonAliases();
     }
 }

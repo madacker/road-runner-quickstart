@@ -36,7 +36,7 @@ public class InspectionState
     public boolean wifiDirectConnected;
     public int wifiChannel;
     public boolean locationEnabled;
-    public String deviceName = "";
+    public String deviceName = "Simulator";
     public double batteryFraction;
     public boolean robotControllerInstalled;
     public boolean driverStationInstalled;
@@ -63,8 +63,4 @@ public class InspectionState
     public void initializeLocal()
     {
     }
-
-//    public void initializeLocal(DeviceNameManager nameManager)
-//    {
-//    }
 }
