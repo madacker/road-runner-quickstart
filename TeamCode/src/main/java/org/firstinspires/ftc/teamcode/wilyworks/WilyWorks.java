@@ -118,7 +118,8 @@ public class WilyWorks {
     static public Twist2dDual<Time> localizerUpdate() {
         if (wilyCore != null) {
             try {
-                double[] localization = (double[]) wilyCore.getMethod("getLocalization").invoke(null);
+                Method getLocalization = wilyCore.getMethod("getLocalization");
+                double[] localization = (double[]) getLocalization.invoke(null);
                 return new Twist2dDual<>(new Vector2dDual<>(
                         new DualNum<>(new double[] { localization[0], localization[3] }),
                         new DualNum<>(new double[] { localization[1], localization[4] })),

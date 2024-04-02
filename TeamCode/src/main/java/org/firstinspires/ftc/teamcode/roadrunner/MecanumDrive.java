@@ -553,7 +553,10 @@ public final class MecanumDrive {
     public void updatePoseEstimate() {
         assert(!poseOwnedByPoser);
 
-        Twist2dDual<Time> twist = localizer.update();
+        Twist2dDual<Time> twist = WilyWorks.localizerUpdate();
+        if (twist == null) {
+            twist = localizer.update();
+        }
         pose = pose.plus(twist.value());
 
         FlightRecorder.write("ESTIMATED_POSE", new PoseMessage(pose));

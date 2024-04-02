@@ -3,9 +3,13 @@ package com.wilyworks.simulator.framework;
 import static java.lang.System.nanoTime;
 
 import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.roadrunner.DualNum;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.Time;
+import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.Vector2dDual;
 import com.example.kinematictesting.framework.DashboardCanvas;
 import com.example.kinematictesting.framework.DashboardWindow;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -25,6 +29,43 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import javax.imageio.ImageIO;
+
+class Localizer {
+    Simulation simulation;
+    Pose2d previousPose;
+    PoseVelocity2d previousVelocity;
+
+    Localizer(Simulation simulation) {
+        this.simulation = simulation;
+        this.previousPose = simulation.pose;
+        this.previousVelocity = simulation.poseVelocity;
+    }
+    static Vector2d transform(double x, double y, double theta) {
+        return new Vector2d(x * Math.cos(theta) - y * Math.sin(theta),
+                x * Math.sin(theta) + y * Math.cos(theta));
+    }
+    double[] update() {
+        double deltaAng = simulation.pose.heading.log() - previousPose.heading.log();
+        double deltaAngVel = simulation.poseVelocity.angVel - previousVelocity.angVel;
+
+        // Transform from field-absolute position to robot-relative position:
+        double robotAngle = simulation.pose.heading.log();
+        Vector2d deltaLinear = transform(
+                simulation.pose.position.x - previousPose.position.x,
+                simulation.pose.position.y - previousPose.position.y,
+                -robotAngle);
+        Vector2d deltaLinearVel = transform(
+                simulation.poseVelocity.linearVel.x - previousVelocity.linearVel.x,
+                simulation.poseVelocity.linearVel.y - previousVelocity.linearVel.y,
+                -robotAngle);
+
+        previousPose = simulation.pose;
+        previousVelocity = simulation.poseVelocity;
+
+        return new double[]{deltaLinear.x, deltaLinear.y, deltaAng,
+            deltaLinearVel.x, deltaLinearVel.y, deltaAngVel};
+    }
+}
 
 class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
@@ -169,6 +210,7 @@ public class Simulation {
     public DashboardCanvas canvas; // Canvas for the entire window frame
 
     private Field field;
+    private Localizer localizer;
     private Kinematics kinematics = new Kinematics(); // Kinematic parameters for the simulation
     private PoseVelocity2d requestedVelocity; // Velocity requested by MecanumDrive
     private double lastUpdateTime = time(); // Time of last update() call, in seconds
@@ -178,6 +220,7 @@ public class Simulation {
         dashboardWindow.setVisible(true);
         canvas = dashboardWindow.getCanvas();
         field = new Field(this);
+        localizer = new Localizer(this);
     }
 
     // Get the current time, in seconds:
@@ -341,4 +384,7 @@ public class Simulation {
         }
         this.requestedVelocity = fieldVelocity;
     }
+
+    // Entry point to get the current localizer position:
+    public double[] localizerUpdate() { return localizer.update(); }
 }

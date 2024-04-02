@@ -206,7 +206,7 @@ public class WilyCore {
 
     // Guest call to get the localized position:
     static public double[] getLocalization() {
-        return null;
+        return simulation.localizerUpdate();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

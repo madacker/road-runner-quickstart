@@ -13,12 +13,12 @@ import com.acmerobotics.roadrunner.Vector2dDual;
 
 import java.util.LinkedList;
 
-class Localizer {
+class OldLocalizer {
     Simulation simulation;
     Pose2d previousPose;
     PoseVelocity2d previousVelocity;
 
-    Localizer(Simulation simulation) {
+    OldLocalizer(Simulation simulation) {
         this.simulation = simulation;
         this.previousPose = simulation.pose;
         this.previousVelocity = simulation.poseVelocity;
@@ -69,7 +69,7 @@ public final class WilyMecanumDrive {
     }
 
     public static Params PARAMS = new Params();
-    public final Localizer localizer;
+    public final OldLocalizer localizer;
     public Pose2d pose;
     public PoseVelocity2d poseVelocity; // Robot-relative, not field-relative
     Simulation simulation;
@@ -80,7 +80,7 @@ public final class WilyMecanumDrive {
                 simulation.pose.position.y,
                 simulation.pose.heading.log());
         this.simulation = simulation;
-        this.localizer = new Localizer(simulation);
+        this.localizer = new OldLocalizer(simulation);
     }
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
@@ -95,7 +95,7 @@ public final class WilyMecanumDrive {
         } else {
             // Use forward Euler integration for refinement and conversion:
             Twist2d robotTwist = twist.value();
-            Vector2d fieldDelta = Localizer.transform(
+            Vector2d fieldDelta = OldLocalizer.transform(
                     robotTwist.line.x,
                     robotTwist.line.y,
                     pose.heading.log() + robotTwist.angle);
