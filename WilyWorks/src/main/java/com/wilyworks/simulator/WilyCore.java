@@ -1,5 +1,7 @@
 package com.wilyworks.simulator;
 
+import static java.lang.Thread.sleep;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
@@ -24,7 +26,6 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
-import java.awt.Label;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
@@ -37,7 +38,6 @@ import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -48,13 +48,29 @@ import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
+
+/**
+ * Structure for representing the choices of opmode:
+ */
+class OpModeChoice {
+    Class<?> klass;
+    String name;
+
+    public OpModeChoice(Class<?> klass, String name) {
+        this.klass = klass; this.name = name;
+    }
+}
+
+/**
+ * Class responsible for creation of the main window.
+ */
 class DashboardWindow extends JFrame {
     final int WINDOW_WIDTH = 1280;
     final int WINDOW_HEIGHT = 720;
-    DashboardCanvas canvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
+    DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
     JPanel canvasPanel = new JPanel();
 
-    DashboardWindow() {
+    DashboardWindow(List<OpModeChoice> opModeChoices) {
         setTitle("Dashboard");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -73,30 +89,28 @@ class DashboardWindow extends JFrame {
         BoxLayout layout = new BoxLayout(getContentPane(), BoxLayout.X_AXIS);
 
         Choice choice = new Choice();
-        choice.add("One");
-        choice.add("Two");
-
-        Label statusLabel = new Label();
-        statusLabel.setSize(350, 100);
+        for (OpModeChoice opMode: opModeChoices) {
+            choice.add(opMode.name);
+        }
 
         Button button = new Button("Go");
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                statusLabel.setText("Fruit: " + choice.getItem(choice.getSelectedIndex()));
+                // Inform the main thread of the choice:
+                WilyCore.opModeClass = opModeChoices.get(choice.getSelectedIndex()).klass;
             }
         });
 
         canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
         canvasPanel.add(choice);
         canvasPanel.add(button);
-        canvasPanel.add(statusLabel);
-        canvasPanel.add(canvas);
+        canvasPanel.add(dashboardCanvas);
 
         getContentPane().add(canvasPanel);
         pack();
 
-        canvas.start();
+        dashboardCanvas.start();
     }
 }
 
@@ -293,91 +307,13 @@ public class WilyCore {
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
     public static GamepadThread gamepadThread;
+    public static Class<?> opModeClass;
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
     private static double lastUpdateTime = time(); // Time of last update() call, in seconds
 
     static double time() {
         return System.currentTimeMillis() / 1000.0;
-    }
-
-    // Structure for representing the choices of opmode:
-    static class OpModeChoice {
-        Class<?> klass;
-        String name;
-
-        public OpModeChoice(Class<?> klass, String name) {
-            this.klass = klass; this.name = name;
-        }
-    }
-
-    // Enumerate all potential OpModes to be run:
-    static List<OpModeChoice> enumerateOpModeChoices() {
-        // Use the Reflections library to enumerate all classes in this package that have the
-        // @Autonomous and @TeleOp annotations:
-        Reflections reflections = new Reflections("org.firstinspires.ftc");
-        Set<Class<?>> allOps = new HashSet<>();
-        allOps.addAll(reflections.getTypesAnnotatedWith(Autonomous.class));
-        allOps.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
-        ArrayList<OpModeChoice> choices = new ArrayList<>();
-
-        // Build a list of the eligible opmodes with their friendly names:
-        for (Class klass: allOps) {
-            if ((OpMode.class.isAssignableFrom(klass)) &&
-                (!klass.isAnnotationPresent(Disabled.class))) {
-
-                // getName() returns a fully qualified name ("org.firstinspires.ftc.teamcode.MyOp").
-                // Use only the last portion ("MyOp" in this example):
-                String name = klass.getName();
-                name = name.substring(name.lastIndexOf(".") + 1); // Skip the dot itself
-
-                // Override the name if an annotation exists:
-                TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
-                if (teleOpAnnotation != null) {
-                    if (!teleOpAnnotation.name().equals("")) {
-                        name = teleOpAnnotation.name();
-                    }
-                    if (!teleOpAnnotation.group().equals("")) {
-                        name = teleOpAnnotation.group() + ": " + name;
-                    }
-                }
-                Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
-                if (autonomousAnnotation != null) {
-                    if (!autonomousAnnotation.name().equals("")) {
-                        name = autonomousAnnotation.name();
-                    }
-                    if (!autonomousAnnotation.group().equals("")) {
-                        name = autonomousAnnotation.group() + ": " + name;
-                    }
-                }
-                choices.add(new OpModeChoice(klass, name));
-            }
-        }
-        return choices;
-    }
-
-    // Invoke the user's "runOpMode" method:
-    static void runOpMode() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, InterruptedException {
-        List<OpModeChoice> choices = enumerateOpModeChoices();
-        Class<?> klass = null;
-        for (OpModeChoice choice: choices) {
-            if (choice.name.equals("Explore: DistanceTest")) {
-                klass = choice.klass;
-                break;
-            }
-        }
-
-        OpMode opMode = (OpMode) klass.newInstance();
-        opMode.hardwareMap = new HardwareMap();
-        opMode.gamepad1 = gamepad;
-        opMode.telemetry = new WilyTelemetry();
-
-        if (LinearOpMode.class.isAssignableFrom(klass)) {
-            LinearOpMode linearOpMode = (LinearOpMode) opMode;
-            linearOpMode.runOpMode();
-        } else {
-            // @@@
-        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -436,12 +372,84 @@ public class WilyCore {
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // Application entry point for Wily Works!
+
+    // Enumerate all potential OpModes to be run:
+    static List<OpModeChoice> enumerateOpModeChoices() {
+        // Use the Reflections library to enumerate all classes in this package that have the
+        // @Autonomous and @TeleOp annotations:
+        Reflections reflections = new Reflections("org.firstinspires.ftc");
+        Set<Class<?>> allOps = new HashSet<>();
+        allOps.addAll(reflections.getTypesAnnotatedWith(Autonomous.class));
+        allOps.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
+        ArrayList<OpModeChoice> choices = new ArrayList<>();
+
+        // Build a list of the eligible opmodes with their friendly names:
+        for (Class klass: allOps) {
+            if ((OpMode.class.isAssignableFrom(klass)) &&
+                    (!klass.isAnnotationPresent(Disabled.class))) {
+
+                // getName() returns a fully qualified name ("org.firstinspires.ftc.teamcode.MyOp").
+                // Use only the last portion ("MyOp" in this example):
+                String name = klass.getName();
+                name = name.substring(name.lastIndexOf(".") + 1); // Skip the dot itself
+
+                // Override the name if an annotation exists:
+                TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
+                if (teleOpAnnotation != null) {
+                    if (!teleOpAnnotation.name().equals("")) {
+                        name = teleOpAnnotation.name();
+                    }
+                    if (!teleOpAnnotation.group().equals("")) {
+                        name = teleOpAnnotation.group() + ": " + name;
+                    }
+                }
+                Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
+                if (autonomousAnnotation != null) {
+                    if (!autonomousAnnotation.name().equals("")) {
+                        name = autonomousAnnotation.name();
+                    }
+                    if (!autonomousAnnotation.group().equals("")) {
+                        name = autonomousAnnotation.group() + ": " + name;
+                    }
+                }
+                choices.add(new OpModeChoice(klass, name));
+            }
+        }
+        return choices;
+    }
+
+    // Call from the window manager to invoke the user's chosen "runOpMode" method:
+    static void runOpMode(Class<?> klass) {
+        OpMode opMode;
+        try {
+            opMode = (OpMode) klass.newInstance();
+        } catch (InstantiationException|IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+
+        opMode.hardwareMap = new HardwareMap();
+        opMode.gamepad1 = gamepad;
+        opMode.telemetry = new WilyTelemetry();
+
+        if (LinearOpMode.class.isAssignableFrom(klass)) {
+            LinearOpMode linearOpMode = (LinearOpMode) opMode;
+
+            try {
+                linearOpMode.runOpMode();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            // @@@
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // This is the application entry point that starts up all of Wily Works!
     public static void main(String[] args)
     {
-        DashboardWindow dashboardWindow = new DashboardWindow();
-        dashboardWindow.setVisible(true);
-        dashboardCanvas = dashboardWindow.canvas;
+        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices());
+        dashboardCanvas = dashboardWindow.dashboardCanvas;
 
         simulation = new Simulation();
         field = new Field(simulation);
@@ -450,10 +458,15 @@ public class WilyCore {
         gamepadThread = new GamepadThread(gamepad);
         gamepadThread.start();
 
-        try {
-            runOpMode();
-        } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException|InterruptedException e) {
-            throw new RuntimeException(e);
+        dashboardWindow.setVisible(true);
+
+        while (opModeClass == null) {
+            try {
+                sleep(10);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
+        WilyCore.runOpMode(opModeClass);
     }
 }

@@ -8,6 +8,9 @@ import com.acmerobotics.roadrunner.Vector2d;
 
 import java.awt.Dimension;
 
+/**
+ * Fake localizer for the simulation.
+ */
 class Localizer {
     Simulation simulation;
     Pose2d previousPose;
@@ -18,10 +21,14 @@ class Localizer {
         this.previousPose = simulation.pose;
         this.previousVelocity = simulation.poseVelocity;
     }
+
+    // Rotate a vector by 'theta' radians:
     static Vector2d transform(double x, double y, double theta) {
         return new Vector2d(x * Math.cos(theta) - y * Math.sin(theta),
                 x * Math.sin(theta) + y * Math.cos(theta));
     }
+
+    // Return an 'twist' that represents all movement since the last call:
     double[] update() {
         double deltaAng = simulation.pose.heading.log() - previousPose.heading.log();
         double deltaAngVel = simulation.poseVelocity.angVel - previousVelocity.angVel;
