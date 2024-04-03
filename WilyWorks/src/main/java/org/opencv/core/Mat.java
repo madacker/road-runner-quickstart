@@ -1601,285 +1601,285 @@ public class Mat {
     }
 
     // C++: Mat::Mat()
-    private static native long n_Mat();
+    private static long n_Mat() { return 0; }
 
     // C++: Mat::Mat(int rows, int cols, int type)
-    private static native long n_Mat(int rows, int cols, int type);
+    private static long n_Mat(int rows, int cols, int type) { return 0; }
 
     // C++: Mat::Mat(int ndims, const int* sizes, int type)
-    private static native long n_Mat(int ndims, int[] sizes, int type);
+    private static long n_Mat(int ndims, int[] sizes, int type) { return 0; }
 
     // C++: Mat::Mat(int rows, int cols, int type, void* data)
-    private static native long n_Mat(int rows, int cols, int type, ByteBuffer data);
+    private static long n_Mat(int rows, int cols, int type, ByteBuffer data) { return 0; }
 
     // C++: Mat::Mat(int rows, int cols, int type, void* data, size_t step)
-    private static native long n_Mat(int rows, int cols, int type, ByteBuffer data, long step);
+    private static long n_Mat(int rows, int cols, int type, ByteBuffer data, long step) { return 0; }
 
     // C++: Mat::Mat(Size size, int type)
-    private static native long n_Mat(double size_width, double size_height, int type);
+    private static long n_Mat(double size_width, double size_height, int type) { return 0; }
 
     // C++: Mat::Mat(int rows, int cols, int type, Scalar s)
-    private static native long n_Mat(int rows, int cols, int type, double s_val0, double s_val1, double s_val2, double s_val3);
+    private static long n_Mat(int rows, int cols, int type, double s_val0, double s_val1, double s_val2, double s_val3) { return 0; }
 
     // C++: Mat::Mat(Size size, int type, Scalar s)
-    private static native long n_Mat(double size_width, double size_height, int type, double s_val0, double s_val1, double s_val2, double s_val3);
+    private static long n_Mat(double size_width, double size_height, int type, double s_val0, double s_val1, double s_val2, double s_val3) { return 0; }
 
     // C++: Mat::Mat(int ndims, const int* sizes, int type, Scalar s)
-    private static native long n_Mat(int ndims, int[] sizes, int type, double s_val0, double s_val1, double s_val2, double s_val3);
+    private static long n_Mat(int ndims, int[] sizes, int type, double s_val0, double s_val1, double s_val2, double s_val3) { return 0; }
 
     // C++: Mat::Mat(Mat m, Range rowRange, Range colRange = Range::all())
-    private static native long n_Mat(long m_nativeObj, int rowRange_start, int rowRange_end, int colRange_start, int colRange_end);
+    private static long n_Mat(long m_nativeObj, int rowRange_start, int rowRange_end, int colRange_start, int colRange_end) { return 0; }
 
-    private static native long n_Mat(long m_nativeObj, int rowRange_start, int rowRange_end);
+    private static long n_Mat(long m_nativeObj, int rowRange_start, int rowRange_end) { return 0; }
 
     // C++: Mat::Mat(const Mat& m, const std::vector<Range>& ranges)
-    private static native long n_Mat(long m_nativeObj, Range[] ranges);
+    private static long n_Mat(long m_nativeObj, Range[] ranges) { return 0; }
 
     // C++: Mat Mat::adjustROI(int dtop, int dbottom, int dleft, int dright)
-    private static native long n_adjustROI(long nativeObj, int dtop, int dbottom, int dleft, int dright);
+    private static long n_adjustROI(long nativeObj, int dtop, int dbottom, int dleft, int dright) { return 0; }
 
     // C++: void Mat::assignTo(Mat m, int type = -1)
-    private static native void n_assignTo(long nativeObj, long m_nativeObj, int type);
+    private static void n_assignTo(long nativeObj, long m_nativeObj, int type) {}
 
-    private static native void n_assignTo(long nativeObj, long m_nativeObj);
+    private static void n_assignTo(long nativeObj, long m_nativeObj) {}
 
     // C++: int Mat::channels()
-    private static native int n_channels(long nativeObj);
+    private static int n_channels(long nativeObj) { return 0; }
 
     // C++: int Mat::checkVector(int elemChannels, int depth = -1, bool
     // requireContinuous = true)
-    private static native int n_checkVector(long nativeObj, int elemChannels, int depth, boolean requireContinuous);
+    private static int n_checkVector(long nativeObj, int elemChannels, int depth, boolean requireContinuous) { return 0; }
 
-    private static native int n_checkVector(long nativeObj, int elemChannels, int depth);
+    private static int n_checkVector(long nativeObj, int elemChannels, int depth) { return 0; }
 
-    private static native int n_checkVector(long nativeObj, int elemChannels);
+    private static int n_checkVector(long nativeObj, int elemChannels) { return 0; }
 
     // C++: Mat Mat::clone()
-    private static native long n_clone(long nativeObj);
+    private static long n_clone(long nativeObj) { return 0; }
 
     // C++: Mat Mat::col(int x)
-    private static native long n_col(long nativeObj, int x);
+    private static long n_col(long nativeObj, int x) { return 0; }
 
     // C++: Mat Mat::colRange(int startcol, int endcol)
-    private static native long n_colRange(long nativeObj, int startcol, int endcol);
+    private static long n_colRange(long nativeObj, int startcol, int endcol) { return 0; }
 
     // C++: int Mat::dims()
-    private static native int n_dims(long nativeObj);
+    private static int n_dims(long nativeObj) { return 0; }
 
     // C++: int Mat::cols()
-    private static native int n_cols(long nativeObj);
+    private static int n_cols(long nativeObj) { return 0; }
 
     // C++: void Mat::convertTo(Mat& m, int rtype, double alpha = 1, double beta
     // = 0)
-    private static native void n_convertTo(long nativeObj, long m_nativeObj, int rtype, double alpha, double beta);
+    private static void n_convertTo(long nativeObj, long m_nativeObj, int rtype, double alpha, double beta) {}
 
-    private static native void n_convertTo(long nativeObj, long m_nativeObj, int rtype, double alpha);
+    private static void n_convertTo(long nativeObj, long m_nativeObj, int rtype, double alpha) {}
 
-    private static native void n_convertTo(long nativeObj, long m_nativeObj, int rtype);
+    private static void n_convertTo(long nativeObj, long m_nativeObj, int rtype) {}
 
     // C++: void Mat::copyTo(Mat& m)
-    private static native void n_copyTo(long nativeObj, long m_nativeObj);
+    private static void n_copyTo(long nativeObj, long m_nativeObj) {}
 
     // C++: void Mat::copyTo(Mat& m, Mat mask)
-    private static native void n_copyTo(long nativeObj, long m_nativeObj, long mask_nativeObj);
+    private static void n_copyTo(long nativeObj, long m_nativeObj, long mask_nativeObj) {}
 
     // C++: void Mat::create(int rows, int cols, int type)
-    private static native void n_create(long nativeObj, int rows, int cols, int type);
+    private static void n_create(long nativeObj, int rows, int cols, int type) {}
 
     // C++: void Mat::create(Size size, int type)
-    private static native void n_create(long nativeObj, double size_width, double size_height, int type);
+    private static void n_create(long nativeObj, double size_width, double size_height, int type) {}
 
     // C++: void Mat::create(int ndims, const int* sizes, int type)
-    private static native void n_create(long nativeObj, int ndims, int[] sizes, int type);
+    private static void n_create(long nativeObj, int ndims, int[] sizes, int type) {}
 
     // C++: void Mat::copySize(const Mat& m)
-    private static native void n_copySize(long nativeObj, long m_nativeObj);
+    private static void n_copySize(long nativeObj, long m_nativeObj) {}
 
     // C++: Mat Mat::cross(Mat m)
-    private static native long n_cross(long nativeObj, long m_nativeObj);
+    private static long n_cross(long nativeObj, long m_nativeObj) { return 0; }
 
     // C++: long Mat::dataAddr()
-    private static native long n_dataAddr(long nativeObj);
+    private static long n_dataAddr(long nativeObj) { return 0; }
 
     // C++: int Mat::depth()
-    private static native int n_depth(long nativeObj);
+    private static int n_depth(long nativeObj) { return 0; }
 
     // C++: Mat Mat::diag(int d = 0)
-    private static native long n_diag(long nativeObj, int d);
+    private static long n_diag(long nativeObj, int d) { return 0; }
 
     // C++: static Mat Mat::diag(Mat d)
-    private static native long n_diag(long d_nativeObj);
+    private static long n_diag(long d_nativeObj) { return 0; }
 
     // C++: double Mat::dot(Mat m)
-    private static native double n_dot(long nativeObj, long m_nativeObj);
+    private static double n_dot(long nativeObj, long m_nativeObj) { return 0; }
 
     // C++: size_t Mat::elemSize()
-    private static native long n_elemSize(long nativeObj);
+    private static long n_elemSize(long nativeObj) { return 0; }
 
     // C++: size_t Mat::elemSize1()
-    private static native long n_elemSize1(long nativeObj);
+    private static long n_elemSize1(long nativeObj) { return 0; }
 
     // C++: bool Mat::empty()
-    private static native boolean n_empty(long nativeObj);
+    private static boolean n_empty(long nativeObj) { return true; }
 
     // C++: static Mat Mat::eye(int rows, int cols, int type)
-    private static native long n_eye(int rows, int cols, int type);
+    private static long n_eye(int rows, int cols, int type) { return 0; }
 
     // C++: static Mat Mat::eye(Size size, int type)
-    private static native long n_eye(double size_width, double size_height, int type);
+    private static long n_eye(double size_width, double size_height, int type) { return 0; }
 
     // C++: Mat Mat::inv(int method = DECOMP_LU)
-    private static native long n_inv(long nativeObj, int method);
+    private static long n_inv(long nativeObj, int method) { return 0; }
 
-    private static native long n_inv(long nativeObj);
+    private static long n_inv(long nativeObj) { return 0; }
 
     // C++: bool Mat::isContinuous()
-    private static native boolean n_isContinuous(long nativeObj);
+    private static boolean n_isContinuous(long nativeObj) { return false; }
 
     // C++: bool Mat::isSubmatrix()
-    private static native boolean n_isSubmatrix(long nativeObj);
+    private static boolean n_isSubmatrix(long nativeObj) { return false; }
 
     // C++: void Mat::locateROI(Size wholeSize, Point ofs)
-    private static native void locateROI_0(long nativeObj, double[] wholeSize_out, double[] ofs_out);
+    private static void locateROI_0(long nativeObj, double[] wholeSize_out, double[] ofs_out) {}
 
     // C++: Mat Mat::mul(Mat m, double scale = 1)
-    private static native long n_mul(long nativeObj, long m_nativeObj, double scale);
+    private static long n_mul(long nativeObj, long m_nativeObj, double scale) { return 0; }
 
-    private static native long n_mul(long nativeObj, long m_nativeObj);
+    private static long n_mul(long nativeObj, long m_nativeObj) { return 0; }
 
-    private static native long n_matMul(long nativeObj, long m_nativeObj);
+    private static long n_matMul(long nativeObj, long m_nativeObj) { return 0; }
 
     // C++: static Mat Mat::ones(int rows, int cols, int type)
-    private static native long n_ones(int rows, int cols, int type);
+    private static long n_ones(int rows, int cols, int type) { return 0; }
 
     // C++: static Mat Mat::ones(Size size, int type)
-    private static native long n_ones(double size_width, double size_height, int type);
+    private static long n_ones(double size_width, double size_height, int type) { return 0; }
 
     // C++: static Mat Mat::ones(int ndims, const int* sizes, int type)
-    private static native long n_ones(int ndims, int[] sizes, int type);
+    private static long n_ones(int ndims, int[] sizes, int type) { return 0; }
 
     // C++: void Mat::push_back(Mat m)
-    private static native void n_push_back(long nativeObj, long m_nativeObj);
+    private static void n_push_back(long nativeObj, long m_nativeObj) {}
 
     // C++: void Mat::release()
-    private static native void n_release(long nativeObj);
+    private static void n_release(long nativeObj) {}
 
     // C++: Mat Mat::reshape(int cn, int rows = 0)
-    private static native long n_reshape(long nativeObj, int cn, int rows);
+    private static long n_reshape(long nativeObj, int cn, int rows) { return 0; }
 
-    private static native long n_reshape(long nativeObj, int cn);
+    private static long n_reshape(long nativeObj, int cn) { return 0; }
 
     // C++: Mat Mat::reshape(int cn, int newndims, const int* newsz)
-    private static native long n_reshape_1(long nativeObj, int cn, int newndims, int[] newsz);
+    private static long n_reshape_1(long nativeObj, int cn, int newndims, int[] newsz) { return 0; }
 
     // C++: Mat Mat::row(int y)
-    private static native long n_row(long nativeObj, int y);
+    private static long n_row(long nativeObj, int y) { return 0; }
 
     // C++: Mat Mat::rowRange(int startrow, int endrow)
-    private static native long n_rowRange(long nativeObj, int startrow, int endrow);
+    private static long n_rowRange(long nativeObj, int startrow, int endrow) { return 0; }
 
     // C++: int Mat::rows()
-    private static native int n_rows(long nativeObj);
+    private static int n_rows(long nativeObj) { return 0; }
 
     // C++: Mat Mat::operator =(Scalar s)
-    private static native long n_setTo(long nativeObj, double s_val0, double s_val1, double s_val2, double s_val3);
+    private static long n_setTo(long nativeObj, double s_val0, double s_val1, double s_val2, double s_val3) { return 0; }
 
     // C++: Mat Mat::setTo(Scalar value, Mat mask = Mat())
-    private static native long n_setTo(long nativeObj, double s_val0, double s_val1, double s_val2, double s_val3, long mask_nativeObj);
+    private static long n_setTo(long nativeObj, double s_val0, double s_val1, double s_val2, double s_val3, long mask_nativeObj) { return 0; }
 
     // C++: Mat Mat::setTo(Mat value, Mat mask = Mat())
-    private static native long n_setTo(long nativeObj, long value_nativeObj, long mask_nativeObj);
+    private static long n_setTo(long nativeObj, long value_nativeObj, long mask_nativeObj) { return 0; }
 
-    private static native long n_setTo(long nativeObj, long value_nativeObj);
+    private static long n_setTo(long nativeObj, long value_nativeObj) { return 0; }
 
     // C++: Size Mat::size()
-    private static native double[] n_size(long nativeObj);
+    private static double[] n_size(long nativeObj) { return new double[1]; }
 
     // C++: int Mat::size(int i)
-    private static native int n_size_i(long nativeObj, int i);
+    private static int n_size_i(long nativeObj, int i) { return 0; }
 
     // C++: size_t Mat::step1(int i = 0)
-    private static native long n_step1(long nativeObj, int i);
+    private static long n_step1(long nativeObj, int i) { return 0; }
 
-    private static native long n_step1(long nativeObj);
+    private static long n_step1(long nativeObj) { return 0; }
 
     // C++: Mat Mat::operator()(Range rowRange, Range colRange)
-    private static native long n_submat_rr(long nativeObj, int rowRange_start, int rowRange_end, int colRange_start, int colRange_end);
+    private static long n_submat_rr(long nativeObj, int rowRange_start, int rowRange_end, int colRange_start, int colRange_end) { return 0; }
 
     // C++: Mat Mat::operator()(const std::vector<Range>& ranges)
-    private static native long n_submat_ranges(long nativeObj, Range[] ranges);
+    private static long n_submat_ranges(long nativeObj, Range[] ranges) { return 0; }
 
     // C++: Mat Mat::operator()(Rect roi)
-    private static native long n_submat(long nativeObj, int roi_x, int roi_y, int roi_width, int roi_height);
+    private static long n_submat(long nativeObj, int roi_x, int roi_y, int roi_width, int roi_height) { return 0; }
 
     // C++: Mat Mat::t()
-    private static native long n_t(long nativeObj);
+    private static long n_t(long nativeObj) { return 0; }
 
     // C++: size_t Mat::total()
-    private static native long n_total(long nativeObj);
+    private static long n_total(long nativeObj) { return 0; }
 
     // C++: int Mat::type()
-    private static native int n_type(long nativeObj);
+    private static int n_type(long nativeObj) { return 0; }
 
     // C++: static Mat Mat::zeros(int rows, int cols, int type)
-    private static native long n_zeros(int rows, int cols, int type);
+    private static long n_zeros(int rows, int cols, int type) { return 0; }
 
     // C++: static Mat Mat::zeros(Size size, int type)
-    private static native long n_zeros(double size_width, double size_height, int type);
+    private static long n_zeros(double size_width, double size_height, int type) { return 0; }
 
     // C++: static Mat Mat::zeros(int ndims, const int* sizes, int type)
-    private static native long n_zeros(int ndims, int[] sizes, int type);
+    private static long n_zeros(int ndims, int[] sizes, int type) { return 0; }
 
-    // native support for java finalize()
-    private static native void n_delete(long nativeObj);
+    // support for java finalize()
+    private static void n_delete(long nativeObj) {}
 
-    private static native int nPutD(long self, int row, int col, int count, double[] data);
+    private static int nPutD(long self, int row, int col, int count, double[] data) { return 0; }
 
-    private static native int nPutDIdx(long self, int[] idx, int count, double[] data);
+    private static int nPutDIdx(long self, int[] idx, int count, double[] data) { return 0; }
 
-    private static native int nPutF(long self, int row, int col, int count, float[] data);
+    private static int nPutF(long self, int row, int col, int count, float[] data) { return 0; }
 
-    private static native int nPutFIdx(long self, int[] idx, int count, float[] data);
+    private static int nPutFIdx(long self, int[] idx, int count, float[] data) { return 0; }
 
-    private static native int nPutI(long self, int row, int col, int count, int[] data);
+    private static int nPutI(long self, int row, int col, int count, int[] data) { return 0; }
 
-    private static native int nPutIIdx(long self, int[] idx, int count, int[] data);
+    private static int nPutIIdx(long self, int[] idx, int count, int[] data) { return 0; }
 
-    private static native int nPutS(long self, int row, int col, int count, short[] data);
+    private static int nPutS(long self, int row, int col, int count, short[] data) { return 0; }
 
-    private static native int nPutSIdx(long self, int[] idx, int count, short[] data);
+    private static int nPutSIdx(long self, int[] idx, int count, short[] data) { return 0; }
 
-    private static native int nPutB(long self, int row, int col, int count, byte[] data);
+    private static int nPutB(long self, int row, int col, int count, byte[] data) { return 0; }
 
-    private static native int nPutBIdx(long self, int[] idx, int count, byte[] data);
+    private static int nPutBIdx(long self, int[] idx, int count, byte[] data) { return 0; }
 
-    private static native int nPutBwOffset(long self, int row, int col, int count, int offset, byte[] data);
+    private static int nPutBwOffset(long self, int row, int col, int count, int offset, byte[] data) { return 0; }
 
-    private static native int nPutBwIdxOffset(long self, int[] idx, int count, int offset, byte[] data);
+    private static int nPutBwIdxOffset(long self, int[] idx, int count, int offset, byte[] data) { return 0; }
 
-    private static native int nGetB(long self, int row, int col, int count, byte[] vals);
+    private static int nGetB(long self, int row, int col, int count, byte[] vals) { return 0; }
 
-    private static native int nGetBIdx(long self, int[] idx, int count, byte[] vals);
+    private static int nGetBIdx(long self, int[] idx, int count, byte[] vals) { return 0; }
 
-    private static native int nGetS(long self, int row, int col, int count, short[] vals);
+    private static int nGetS(long self, int row, int col, int count, short[] vals) { return 0; }
 
-    private static native int nGetSIdx(long self, int[] idx, int count, short[] vals);
+    private static int nGetSIdx(long self, int[] idx, int count, short[] vals) { return 0; }
 
-    private static native int nGetI(long self, int row, int col, int count, int[] vals);
+    private static int nGetI(long self, int row, int col, int count, int[] vals) { return 0; }
 
-    private static native int nGetIIdx(long self, int[] idx, int count, int[] vals);
+    private static int nGetIIdx(long self, int[] idx, int count, int[] vals) { return 0; }
 
-    private static native int nGetF(long self, int row, int col, int count, float[] vals);
+    private static int nGetF(long self, int row, int col, int count, float[] vals) { return 0; }
 
-    private static native int nGetFIdx(long self, int[] idx, int count, float[] vals);
+    private static int nGetFIdx(long self, int[] idx, int count, float[] vals) { return 0; }
 
-    private static native int nGetD(long self, int row, int col, int count, double[] vals);
+    private static int nGetD(long self, int row, int col, int count, double[] vals) { return 0; }
 
-    private static native int nGetDIdx(long self, int[] idx, int count, double[] vals);
+    private static int nGetDIdx(long self, int[] idx, int count, double[] vals) { return 0; }
 
-    private static native double[] nGet(long self, int row, int col);
+    private static double[] nGet(long self, int row, int col) { return new double[row*col]; }
 
-    private static native double[] nGetIdx(long self, int[] idx);
+    private static double[] nGetIdx(long self, int[] idx) { return new double[1]; }
 
-    private static native String nDump(long self);
+    private static String nDump(long self) { return ""; }
 }

@@ -15,6 +15,8 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.SerialNumber;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraCharacteristics;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
@@ -24,6 +26,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.robotcore.external.navigation.Quaternion;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.robotcore.internal.system.Deadline;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +38,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Consumer;
+
+import kotlin.coroutines.Continuation;
 
 /**
  * Wily Works device subclass implementation.
@@ -122,6 +128,64 @@ class WilyVoltageSensor extends WilyHardwareDevice implements VoltageSensor {
 class WilyDistanceSensor extends WilyHardwareDevice implements DistanceSensor {
     @Override
     public double getDistance(DistanceUnit unit) { return DistanceUnit.infinity; }
+}
+
+/**
+ * Wily Works named webcam implementation.
+ */
+class WilyWebcam extends WilyHardwareDevice implements WebcamName {
+
+    @Override
+    public boolean isWebcam() {
+        return true;
+    }
+
+    @Override
+    public boolean isCameraDirection() {
+        return false;
+    }
+
+    @Override
+    public boolean isSwitchable() {
+        return false;
+    }
+
+    @Override
+    public boolean isUnknown() {
+        return false;
+    }
+
+    @Override
+    public void asyncRequestCameraPermission(Context context, Deadline deadline, Continuation<? extends Consumer<Boolean>> continuation) {
+
+    }
+
+    @Override
+    public boolean requestCameraPermission(Deadline deadline) {
+        return false;
+    }
+
+    @Override
+    public CameraCharacteristics getCameraCharacteristics() {
+        return null;
+    }
+
+    @NonNull
+    @Override
+    public SerialNumber getSerialNumber() {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public String getUsbDeviceNameIfAttached() {
+        return null;
+    }
+
+    @Override
+    public boolean isAttached() {
+        return false;
+    }
 }
 
 /**
@@ -288,6 +352,7 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
     public DeviceMapping<VoltageSensor>         voltageSensor         = new DeviceMapping<VoltageSensor>(VoltageSensor.class);
     public DeviceMapping<DcMotor>               dcMotor               = new DeviceMapping<DcMotor>(DcMotor.class);
     public DeviceMapping<DistanceSensor>        distanceSensor        = new DeviceMapping<DistanceSensor>(DistanceSensor.class);
+    public DeviceMapping<WebcamName>            webcamName            = new DeviceMapping<WebcamName>(WebcamName.class);
 
     protected Map<String, List<HardwareDevice>> allDevicesMap         = new HashMap<String, List<HardwareDevice>>();
     protected List<HardwareDevice>              allDevicesList        = new ArrayList<>();
@@ -296,7 +361,7 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
         put("voltage_sensor", VoltageSensor.class);
     }
 
-    public final Context appContext = null;
+    public final Context appContext = new Context();
     protected final Object lock = new Object();
 
     public <T> List<T> getAll(Class<? extends T> classOrInterface) {
@@ -350,6 +415,9 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
         } else if (DistanceSensor.class.isAssignableFrom(klass)) {
             device = new WilyDistanceSensor();
             distanceSensor.put(deviceName, (DistanceSensor) device);
+        } else if (WebcamName.class.isAssignableFrom(klass)) {
+            device = new WilyWebcam();
+            webcamName.put(deviceName, (WebcamName) device);
         } else {
             throw new IllegalArgumentException("Unexpected device type for HardwareMap");
         }

@@ -23,15 +23,30 @@ package org.openftc.easyopencv;
 
 import android.content.Context;
 
+import com.wilyworks.simulator.framework.WilyOpenCvWebcam;
+
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 
 public abstract class OpenCvCameraFactory
 {
-// ###    static OpenCvCameraFactory theInstance = new OpenCvCameraFactoryImpl();
-// ###
     public static OpenCvCameraFactory getInstance()
     {
-        return null; // ### theInstance;
+        return new OpenCvCameraFactory() {
+            @Override
+            public OpenCvWebcam createWebcam(WebcamName cameraName) {
+                return new WilyOpenCvWebcam();
+            }
+
+            @Override
+            public OpenCvWebcam createWebcam(WebcamName cameraName, int viewportContainerId) {
+                return new WilyOpenCvWebcam();
+            }
+
+            @Override
+            public int[] splitLayoutForMultipleViewports(int containerId, int numViewports, ViewportSplitMethod viewportSplitMethod) {
+                return new int[0];
+            }
+        };
     }
 // ###
 // ###    /*

@@ -1,6 +1,10 @@
 package android.content;
 
-public abstract class Context {
-    public abstract Resources getResources();
-    public abstract String getPackageName();
+public class Context {
+    public Resources getResources() {
+        return new Resources();
+    }
+    public String getPackageName() {
+        return "WilyWorks";
+    }
 }
