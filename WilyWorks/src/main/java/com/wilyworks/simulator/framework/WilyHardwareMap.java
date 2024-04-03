@@ -1,6 +1,8 @@
 package com.wilyworks.simulator.framework;
 
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -294,6 +296,7 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
         put("voltage_sensor", VoltageSensor.class);
     }
 
+    public final Context appContext = null;
     protected final Object lock = new Object();
 
     public <T> List<T> getAll(Class<? extends T> classOrInterface) {

@@ -89,15 +89,15 @@ class DashboardWindow extends JFrame {
 
         BoxLayout layout = new BoxLayout(getContentPane(), BoxLayout.X_AXIS);
 
-        Choice choice = new Choice();
+        Choice dropDown = new Choice();
         for (OpModeChoice opMode: opModeChoices) {
-            choice.add(opMode.name);
+            dropDown.add(opMode.name);
         }
 
         // Read the preferred opMode from the registry:
         Preferences preferences = Preferences.userRoot().node("com/wilyworks/simulator");
         if (opModeChoices.size() > 0) {
-            choice.select(preferences.get("opmode", opModeChoices.get(0).name));
+            dropDown.select(preferences.get("opmode", opModeChoices.get(0).name));
         }
 
         Button button = new Button("Go");
@@ -106,14 +106,14 @@ class DashboardWindow extends JFrame {
             public void actionPerformed(ActionEvent actionEvent) {
 
                 // Inform the main thread of the choice and save the preference:
-                OpModeChoice opModeChoice = opModeChoices.get(choice.getSelectedIndex());
+                OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
                 WilyCore.opModeClass = opModeChoice.klass;
                 preferences.put("opmode", opModeChoice.name);
             }
         });
 
         canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
-        canvasPanel.add(choice);
+        canvasPanel.add(dropDown);
         canvasPanel.add(button);
         canvasPanel.add(dashboardCanvas);
 
@@ -285,10 +285,13 @@ class Field {
  * This thread is tasked with regularly updating the Gamepad steate.
  */
 class GamepadThread extends Thread {
-    Gamepad gamepad;
+    Gamepad gamepad1;
+    Gamepad gamepad2;
 
-    GamepadThread(Gamepad gamepad) {
-        this.gamepad = gamepad;
+    GamepadThread(Gamepad gamepad1, Gamepad gamepad2) {
+        this.gamepad1 = gamepad1;
+        this.gamepad2 = gamepad2;
+        // TODO: @@@ Need to add gamepad2 support
     }
 
     @Override
@@ -300,7 +303,7 @@ class GamepadThread extends Thread {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            gamepad.update();
+            gamepad1.update();
         }
     }
 }
@@ -312,7 +315,8 @@ class GamepadThread extends Thread {
 public class WilyCore {
     private static final double DELTA_T = 0.100; // 100ms
 
-    public static Gamepad gamepad;
+    public static Gamepad gamepad1;
+    public static Gamepad gamepad2;
     public static Simulation simulation;
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
@@ -439,7 +443,8 @@ public class WilyCore {
         }
 
         opMode.hardwareMap = new HardwareMap();
-        opMode.gamepad1 = gamepad;
+        opMode.gamepad1 = gamepad1;
+        opMode.gamepad2 = gamepad2;
         opMode.telemetry = new WilyTelemetry();
 
         if (LinearOpMode.class.isAssignableFrom(klass)) {
@@ -464,9 +469,10 @@ public class WilyCore {
 
         simulation = new Simulation();
         field = new Field(simulation);
-        gamepad = new Gamepad();
+        gamepad1 = new Gamepad();
+        gamepad2 = new Gamepad(); // @@@ Need to hook into
 
-        gamepadThread = new GamepadThread(gamepad);
+        gamepadThread = new GamepadThread(gamepad1, gamepad2);
         gamepadThread.start();
 
         dashboardWindow.setVisible(true);

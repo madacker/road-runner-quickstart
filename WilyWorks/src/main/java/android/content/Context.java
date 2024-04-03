@@ -1,4 +1,6 @@
 package android.content;
 
-public class Context {
+public abstract class Context {
+    public abstract Resources getResources();
+    public abstract String getPackageName();
 }

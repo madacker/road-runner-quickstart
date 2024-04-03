@@ -45,14 +45,14 @@ public abstract class OpenCvCameraFactory
 // ###     */
 // ###    public abstract OpenCvInternalCamera2 createInternalCamera2(OpenCvInternalCamera2.CameraDirection direction);
 // ###    public abstract OpenCvInternalCamera2 createInternalCamera2(OpenCvInternalCamera2.CameraDirection direction, int viewportContainerId);
-// ###
-// ###    /*
-// ###     * Webcam
-// ###     */
-// ###    public abstract OpenCvWebcam createWebcam(WebcamName cameraName);
-// ###    public abstract OpenCvWebcam createWebcam(WebcamName cameraName, int viewportContainerId);
-// ###    public abstract OpenCvSwitchableWebcam createSwitchableWebcam(WebcamName... names);
-// ###    public abstract OpenCvSwitchableWebcam createSwitchableWebcam(int viewportContainerId, WebcamName... names);
+
+    /*
+     * Webcam
+     */
+    public abstract OpenCvWebcam createWebcam(WebcamName cameraName);
+    public abstract OpenCvWebcam createWebcam(WebcamName cameraName, int viewportContainerId);
+//    public abstract OpenCvSwitchableWebcam createSwitchableWebcam(WebcamName... names);
+//    public abstract OpenCvSwitchableWebcam createSwitchableWebcam(int viewportContainerId, WebcamName... names);
 // ###
 // ###    /*
 // ###     * Vuforia passthrough
