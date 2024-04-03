@@ -6,12 +6,15 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorController;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareDevice;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.ServoController;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.SerialNumber;
 
@@ -189,6 +192,83 @@ class WilyWebcam extends WilyHardwareDevice implements WebcamName {
 }
 
 /**
+ * Wily Works Servo implementation.
+ */
+class WilyServo extends WilyHardwareDevice implements Servo {
+
+    @Override
+    public ServoController getController() {
+        return null;
+    }
+
+    @Override
+    public int getPortNumber() {
+        return 0;
+    }
+
+    @Override
+    public void setDirection(Direction direction) {
+
+    }
+
+    @Override
+    public Direction getDirection() {
+        return null;
+    }
+
+    @Override
+    public void setPosition(double position) {
+
+    }
+
+    @Override
+    public double getPosition() {
+        return 0;
+    }
+
+    @Override
+    public void scaleRange(double min, double max) {
+
+    }
+}
+
+/**
+ * Wily Works CRServo implementation.
+ */
+class WilyCRServo extends WilyHardwareDevice implements CRServo {
+
+    @Override
+    public ServoController getController() {
+        return null;
+    }
+
+    @Override
+    public int getPortNumber() {
+        return 0;
+    }
+
+    @Override
+    public void setDirection(Direction direction) {
+
+    }
+
+    @Override
+    public Direction getDirection() {
+        return null;
+    }
+
+    @Override
+    public void setPower(double power) {
+
+    }
+
+    @Override
+    public double getPower() {
+        return 0;
+    }
+}
+
+/**
  * Wily Works DcMotorEx implementation.
  */
 class WilyDcMotorEx extends WilyHardwareDevice implements DcMotorEx {
@@ -353,6 +433,8 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
     public DeviceMapping<DcMotor>               dcMotor               = new DeviceMapping<DcMotor>(DcMotor.class);
     public DeviceMapping<DistanceSensor>        distanceSensor        = new DeviceMapping<DistanceSensor>(DistanceSensor.class);
     public DeviceMapping<WebcamName>            webcamName            = new DeviceMapping<WebcamName>(WebcamName.class);
+    public DeviceMapping<Servo>                 servo                 = new DeviceMapping<Servo>(Servo.class);
+    public DeviceMapping<CRServo>               crservo               = new DeviceMapping<CRServo>(CRServo.class);
 
     protected Map<String, List<HardwareDevice>> allDevicesMap         = new HashMap<String, List<HardwareDevice>>();
     protected List<HardwareDevice>              allDevicesList        = new ArrayList<>();
@@ -406,7 +488,13 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
             allDevicesMap.put(deviceName, list);
         }
         HardwareDevice device;
-        if (DcMotor.class.isAssignableFrom(klass)) {
+        if (CRServo.class.isAssignableFrom(klass)) {
+            device = new WilyCRServo();
+            crservo.put(deviceName, (CRServo) device);
+        } else if (Servo.class.isAssignableFrom(klass)) {
+            device = new WilyServo();
+            servo.put(deviceName, (Servo) device);
+        } else if (DcMotor.class.isAssignableFrom(klass)) {
             device = new WilyDcMotorEx();
             dcMotor.put(deviceName, (DcMotor) device);
         } else if (VoltageSensor.class.isAssignableFrom(klass)) {

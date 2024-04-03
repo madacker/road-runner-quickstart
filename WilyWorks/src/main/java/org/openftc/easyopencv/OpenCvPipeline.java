@@ -30,4 +30,6 @@ public abstract class OpenCvPipeline
     }
 
     public abstract Mat processFrame(Mat input);
+
+    public void onViewportTapped() {}
 }

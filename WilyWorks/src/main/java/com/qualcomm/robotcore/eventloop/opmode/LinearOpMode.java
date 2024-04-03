@@ -22,4 +22,6 @@ public abstract class LinearOpMode extends OpMode {
     public final boolean isStopRequested() {
         return false;
     }
+
+    public final boolean isStarted() { return true; }
 }
