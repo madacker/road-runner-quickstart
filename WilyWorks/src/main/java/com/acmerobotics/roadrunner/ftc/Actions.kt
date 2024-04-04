@@ -11,17 +11,17 @@ import com.acmerobotics.roadrunner.Action
  * Run [a] to completion in a blocking loop.
  */
 fun runBlocking(a: Action) {
-//    val dash = FtcDashboard.getInstance()
-//    val c = Canvas()
-//    a.preview(c)
-//
-//    var b = true
-//    while (b && !Thread.currentThread().isInterrupted) {
-//        val p = TelemetryPacket()
-//        p.fieldOverlay().operations.addAll(c.operations)
-//
-//        b = a.run(p)
-//
-//        dash.sendTelemetryPacket(p)
-//    }
+    val dash = FtcDashboard.getInstance()
+    val c = Canvas()
+    a.preview(c)
+
+    var b = true
+    while (b && !Thread.currentThread().isInterrupted) {
+        val p = TelemetryPacket()
+        p.fieldOverlay().operations.addAll(c.operations)
+
+        b = a.run(p)
+
+        dash.sendTelemetryPacket(p)
+    }
 }

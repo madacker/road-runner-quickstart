@@ -7,6 +7,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Globals;
+import org.firstinspires.ftc.teamcode.Settings;
+import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
 @TeleOp
@@ -30,6 +32,8 @@ public final class StrafeTest extends LinearOpMode {
         MecanumDrive.PARAMS.lateralGain = 0;
         MecanumDrive.PARAMS.lateralVelGain = 0;
 
+        Settings settings = new Settings(telemetry, gamepad1);
+        Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
