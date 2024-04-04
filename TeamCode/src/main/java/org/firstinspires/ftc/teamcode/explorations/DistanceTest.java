@@ -54,6 +54,7 @@ public class DistanceTest extends LinearOpMode {
         Settings settings = new Settings(telemetry, gamepad1);
         Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
+
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         DistanceSensor distanceSensor = hardwareMap.get(DistanceSensor.class, "distance");
         TimeSplitter timer = TimeSplitter.create("getDistance");
