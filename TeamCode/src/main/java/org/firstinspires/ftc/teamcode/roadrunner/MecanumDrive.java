@@ -444,6 +444,8 @@ public final class MecanumDrive {
             Pose2dDual<Time> txWorldTarget = timeTrajectory.get(t);
 
             PoseVelocity2d robotVelRobot = poseVelocity;
+            if (!poseOwnedByPoser)
+                robotVelRobot = updatePoseEstimate();
 
             PoseVelocity2dDual<Time> command = new HolonomicController(
                     PARAMS.axialGain, PARAMS.lateralGain, PARAMS.headingGain,
@@ -520,6 +522,8 @@ public final class MecanumDrive {
             Pose2dDual<Time> txWorldTarget = turn.get(t);
 
             PoseVelocity2d robotVelRobot = poseVelocity;
+            if (!poseOwnedByPoser)
+                robotVelRobot = updatePoseEstimate();
 
             PoseVelocity2dDual<Time> command = new HolonomicController(
                     PARAMS.axialGain, PARAMS.lateralGain, PARAMS.headingGain,
@@ -552,7 +556,7 @@ public final class MecanumDrive {
         }
     }
 
-    public void updatePoseEstimate() {
+    public PoseVelocity2d updatePoseEstimate() {
         assert(!poseOwnedByPoser);
 
         Twist2dDual<Time> twist = WilyWorks.localizerUpdate();
@@ -564,6 +568,7 @@ public final class MecanumDrive {
         FlightRecorder.write("ESTIMATED_POSE", new PoseMessage(pose));
 
         poseVelocity = twist.velocity().value();
+        return poseVelocity;
     }
 
     public static void drawRobot(Canvas c, Pose2d t, double robotRadius) {
