@@ -270,7 +270,7 @@ class Field {
 
         renderRobot(g);
         if (FtcDashboard.fieldOverlay != null)
-            FtcDashboard.fieldOverlay.render(g);
+            FtcDashboard.fieldOverlay.renderAndClear(g);
 
         // Restore:
         g.setTransform(oldTransform);
@@ -330,6 +330,17 @@ public class WilyCore {
         return System.currentTimeMillis() / 1000.0;
     }
 
+    // Render the entire window:
+    static public void render() {
+        // All Graphics objects can be cast to Graphics2D:
+        Graphics2D g = (Graphics2D) dashboardCanvas.getBufferStrategy().getDrawGraphics();
+
+        g.clearRect(0, 0, dashboardCanvas.getWidth(), dashboardCanvas.getHeight());
+        field.render(g);
+        g.dispose();
+        dashboardCanvas.getBufferStrategy().show();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Callbacks provided to the guest. These are all called via reflection.
 
@@ -345,14 +356,9 @@ public class WilyCore {
         // Advance the simulation:
         simulation.advance(deltaT);
 
-        // All Graphics objects can be cast to Graphics2D:
-        Graphics2D g = (Graphics2D) dashboardCanvas.getBufferStrategy().getDrawGraphics();
+        // Render everything:
+        render();
 
-        g.clearRect(0, 0, dashboardCanvas.getWidth(), dashboardCanvas.getHeight());
-        field.render(g);
-
-        g.dispose();
-        dashboardCanvas.getBufferStrategy().show();
         simulationUpdated = true;
     }
 

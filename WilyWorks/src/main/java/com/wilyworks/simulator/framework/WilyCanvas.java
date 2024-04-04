@@ -422,7 +422,7 @@ public class WilyCanvas {
         g.scale(userScaleX, userScaleY);
     }
 
-    public void render(Graphics2D g) {
+    public void renderAndClear(Graphics2D g) {
         // https://github.dev/acmerobotics/ftc-dashboard/blob/26920d66b1abe1e03d5d10d7ec3701467ea56a0c/FtcDashboard/dash/src/components/views/FieldView/Field.js
         defaultTransform = g.getTransform();
         userOriginX = 0;
