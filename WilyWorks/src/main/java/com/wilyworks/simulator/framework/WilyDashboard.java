@@ -11,6 +11,9 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import java.util.ArrayList;
 import java.util.TreeMap;
 
+/**
+ * Wily Works implementation of the FTC Dashboard.
+ */
 public class WilyDashboard {
     static public TreeMap<String, String> data = new TreeMap<>();
     static public ArrayList<String> log = new ArrayList<>();
@@ -23,9 +26,11 @@ public class WilyDashboard {
         return null; // ###
     }
 
+    // Append the telemetry to our accumulated list. Everything will get rendered later when
+    // WilyCore.update() is called.
     public void sendTelemetryPacket(TelemetryPacket telemetryPacket) {
         // https://www.baeldung.com/java-merge-maps
-        telemetryPacket.data.forEach((key, value) -> data.put(key, value));
+        telemetryPacket.data.forEach((key, value) -> this.data.put(key, value));
         log = telemetryPacket.log;
         fieldOverlay = telemetryPacket.fieldOverlay();
     }
