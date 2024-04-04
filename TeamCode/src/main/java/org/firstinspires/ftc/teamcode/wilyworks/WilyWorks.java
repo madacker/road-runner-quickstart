@@ -104,11 +104,8 @@ public class WilyWorks {
         if (wilyCore != null) {
             try {
                 Method setDrivePowers = wilyCore.getMethod("setDrivePowers",
-                    double.class, double.class, double.class,
-                    double.class, double.class, double.class);
-                setDrivePowers.invoke(null,
-                        stickVelocity.linearVel.x, stickVelocity.linearVel.y, stickVelocity.angVel,
-                        assistVelocity.linearVel.x, assistVelocity.linearVel.y, assistVelocity.angVel);
+                    PoseVelocity2d.class, PoseVelocity2d.class);
+                setDrivePowers.invoke(null, stickVelocity, assistVelocity);
                 return true; // ====>
             } catch (InvocationTargetException|IllegalAccessException|NoSuchMethodException e) {
                 throw new RuntimeException(e);

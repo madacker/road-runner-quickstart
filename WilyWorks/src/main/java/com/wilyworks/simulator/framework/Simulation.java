@@ -117,8 +117,6 @@ public class Simulation {
         double currentAngle = Math.atan2(currentLinearY, currentLinearX); // Rise over run
         double requestedAngle = Math.atan2(requestedLinearY, requestedLinearX);
 
-        WilyTelemetry.instance.addData("requestedVelocity", requestedVelocity); // @@@
-
         // If the requested velocity is close to zero then its angle is rather undetermined.
         // Use the current angle in that case:
         if (Math.abs(requestedVelocity) == 0)

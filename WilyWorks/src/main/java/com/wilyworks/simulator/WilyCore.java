@@ -372,17 +372,15 @@ public class WilyCore {
 
     // Guest call to set the drive powers:
     static public void setDrivePowers(
-            double stickVelocityX, double stickVelocityY, double stickVelocityAngular,
-            double assistVelocityX, double assistVelocityY, double assistVelocityAngular) {
+            PoseVelocity2d stickVelocity,
+            PoseVelocity2d assistVelocity) {
 
         // If the user didn't explicitly call the simulation update() API, do it now on their
         // behalf:
         if (!simulationUpdated)
             update(0);
 
-        simulation.setDrivePowers(
-                new PoseVelocity2d(new Vector2d(stickVelocityX, stickVelocityY), stickVelocityAngular),
-                new PoseVelocity2d(new Vector2d(assistVelocityX, assistVelocityY), assistVelocityAngular));
+        simulation.setDrivePowers(stickVelocity, assistVelocity);
         simulationUpdated = false;
     }
 
