@@ -453,8 +453,8 @@ public final class MecanumDrive {
             )
                     .compute(txWorldTarget, pose, robotVelRobot);
 
-            // Enlighten Wily Works as to the target velocity:
-            WilyWorks.setDrivePowers(null, txWorldTarget.velocity().value());
+            // Enlighten Wily Works as to where we should be:
+            WilyWorks.setPose(txWorldTarget.value(), txWorldTarget.velocity().value());
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
             double voltage = Globals.getVoltage();
@@ -534,8 +534,8 @@ public final class MecanumDrive {
             )
                     .compute(txWorldTarget, pose, robotVelRobot);
 
-            // Enlighten Wily Works as to the target velocity:
-            WilyWorks.setDrivePowers(null, txWorldTarget.velocity().value());
+            // Enlighten Wily Works as to where we should be:
+            WilyWorks.setPose(txWorldTarget.value(), txWorldTarget.velocity().value());
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
             double voltage = Globals.getVoltage();

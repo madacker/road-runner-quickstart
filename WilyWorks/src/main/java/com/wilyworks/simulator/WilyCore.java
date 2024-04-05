@@ -365,9 +365,13 @@ public class WilyCore {
     // Guest call to set the pose and velocity:
     static public void setPose(double x, double y, double heading,
                         double xVelocity, double yVelocity, double headingVelocity) {
+        // If the user didn't explicitly call the simulation update() API, do it now:
+        if (!simulationUpdated)
+            update(0);
         simulation.setPose(
                 new Pose2d(x, y, heading),
                 new PoseVelocity2d(new Vector2d(xVelocity, yVelocity), headingVelocity));
+        simulationUpdated = false;
     }
 
     // Guest call to set the drive powers:
@@ -375,8 +379,7 @@ public class WilyCore {
             PoseVelocity2d stickVelocity,
             PoseVelocity2d assistVelocity) {
 
-        // If the user didn't explicitly call the simulation update() API, do it now on their
-        // behalf:
+        // If the user didn't explicitly call the simulation update() API, do it now:
         if (!simulationUpdated)
             update(0);
 
