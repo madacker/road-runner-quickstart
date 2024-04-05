@@ -6,6 +6,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Path2D;
 import java.util.ArrayList;
 
 abstract class CanvasOp {
@@ -405,16 +406,6 @@ public class WilyCanvas {
 
     private static int round(double x) { return (int) Math.round(x); }
 
-    private int[] coords(double[] coords, boolean isPolygon) {
-        int[] result = new int[coords.length + 1];
-        for (int i = 0; i < coords.length; i++) {
-            result[i] = round(coords[i]);
-        }
-        if (isPolygon)
-            result[coords.length] = round(coords[0]);
-        return result;
-    }
-
     private void setUserTransform(Graphics2D g) {
         g.setTransform(defaultTransform);
         g.translate(userOriginX, userOriginY);
@@ -471,24 +462,30 @@ public class WilyCanvas {
                             2 * circle.radius, 2 * circle.radius));
                 }
             } else if (op instanceof Polygon) {
+                // TODO: Improve pixel resolution of other primitives
                 Polygon polygon = (Polygon) op;
+                Path2D.Double path = new Path2D.Double();
+                path.moveTo(polygon.xPoints[0], polygon.yPoints[0]);
+                for (int i = 1; i < polygon.xPoints.length; i++) {
+                    path.lineTo(polygon.xPoints[i], polygon.yPoints[i]);
+                }
                 if (polygon.stroke) {
                     g.setColor(strokeColor);
-                    g.drawPolygon(coords(polygon.xPoints, true),
-                            coords(polygon.yPoints, true),
-                            polygon.xPoints.length);
+                    g.draw(path);
                 } else {
                     g.setColor(fillColor);
-                    g.drawPolyline(coords(polygon.xPoints, true),
-                            coords(polygon.yPoints, true),
-                            polygon.xPoints.length);
+                    g.fill(path);
                 }
             } else if (op instanceof Polyline) {
                 Polyline polyline = (Polyline) op;
                 g.setColor(strokeColor);
-                g.drawPolyline(coords(polyline.xPoints, false),
-                        coords(polyline.yPoints, false),
-                        polyline.xPoints.length);
+
+                Path2D.Double path = new Path2D.Double();
+                path.moveTo(polyline.xPoints[0], polyline.yPoints[0]);
+                for (int i = 1; i < polyline.xPoints.length; i++) {
+                    path.lineTo(polyline.xPoints[i], polyline.yPoints[i]);
+                }
+                g.draw(path);
             } else if (op instanceof Spline) {
                 Spline spline = (Spline) op;
                 final int SPLINE_SAMPLES = 250;
