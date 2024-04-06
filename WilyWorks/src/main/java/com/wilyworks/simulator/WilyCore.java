@@ -95,6 +95,7 @@ class DashboardWindow extends JFrame {
         for (OpModeChoice opMode: opModeChoices) {
             dropDown.add(opMode.name);
         }
+        dropDown.setMaximumSize(new Dimension(400, 100));
 
         // Read the preferred opMode from the registry:
         Preferences preferences = Preferences.userRoot().node("com/wilyworks/simulator");
@@ -102,10 +103,9 @@ class DashboardWindow extends JFrame {
             dropDown.select(preferences.get("opmode", opModeChoices.get(0).name));
         }
 
-//        JButton button = new JButton("Go");
-//        button.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Button button = new Button("Init");
+        button.setMaximumSize(new Dimension(50, 50));
 
-        Button button = new Button("Go");
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
