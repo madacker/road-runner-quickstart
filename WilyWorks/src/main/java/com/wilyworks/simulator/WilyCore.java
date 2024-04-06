@@ -50,6 +50,7 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -103,8 +104,8 @@ class DashboardWindow extends JFrame {
             dropDown.select(preferences.get("opmode", opModeChoices.get(0).name));
         }
 
-        Button button = new Button("Init");
-        button.setMaximumSize(new Dimension(50, 50));
+        JButton button = new JButton("Init");
+        button.setMaximumSize(new Dimension(100, 50));
 
         button.addActionListener(new ActionListener() {
             @Override
@@ -113,21 +114,21 @@ class DashboardWindow extends JFrame {
                 case STOPPED:
                     // Inform the main thread of the choice and save the preference:
                     OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass);
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, null);
                     preferences.put("opmode", opModeChoice.name);
                     dropDown.setVisible(false);
-                    button.setLabel("Start");
+                    button.setText("Start");
                     break;
 
                 case INITIALIZED:
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.STARTED, WilyCore.status.klass);
-                    button.setLabel("Stop");
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.STARTED, WilyCore.status.klass, button);
+                    button.setText("Stop");
                     break;
 
                 case STARTED:
                     WilyCore.opModeThread.interrupt();
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null);
-                    button.setLabel("Init");
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null, null);
+                    button.setText("Init");
                     dropDown.setVisible(true);
                     break;
                 }
@@ -352,7 +353,7 @@ public class WilyCore {
     public static DashboardCanvas dashboardCanvas;
     public static GamepadThread gamepadThread;
     public static OpModeThread opModeThread;
-    public static Status status = new Status(State.STOPPED, null);
+    public static Status status = new Status(State.STOPPED, null, null);
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
     private static double lastUpdateTime = time(); // Time of last update() call, in seconds
@@ -368,8 +369,9 @@ public class WilyCore {
     public static class Status {
         public Class<?> klass;
         public State state;
-        public Status(State state, Class<?> klass) {
-            this.klass = klass; this.state = state;
+        public JButton stopButton;
+        public Status(State state, Class<?> klass, JButton button) {
+            this.state = state; this.klass = klass; this.stopButton = button;
         }
     }
 
@@ -557,13 +559,15 @@ public class WilyCore {
             opModeThread.start();
             try {
                 opModeThread.join();
+
+                // If the thread exited while the UI still thinks the opMode is running, update
+                // the button state:
+                if (status.stopButton != null)
+                    status.stopButton.doClick(0);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
 
-            // The opMode exited. Update the state:
-            status = new Status(State.STOPPED, null);
-            dashboardWindow.repaint();
         }
     }
 }
