@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.wilyworks;
+package com.wilyworks.common;
 
 import static java.lang.ClassLoader.getSystemClassLoader;
 
@@ -13,7 +13,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
- * This class contains configuration and control methods for the Wily Works simulator.
+ * FTC programs use this class to configure and interface with the Wily Works simulator.
  */
 public class WilyWorks {
 
@@ -104,7 +104,7 @@ public class WilyWorks {
         if (wilyCore != null) {
             try {
                 Method setDrivePowers = wilyCore.getMethod("setDrivePowers",
-                    PoseVelocity2d.class, PoseVelocity2d.class);
+                        PoseVelocity2d.class, PoseVelocity2d.class);
                 setDrivePowers.invoke(null, stickVelocity, assistVelocity);
                 return true; // ====>
             } catch (InvocationTargetException|IllegalAccessException|NoSuchMethodException e) {
@@ -120,10 +120,10 @@ public class WilyWorks {
             try {
                 Method getLocalization = wilyCore.getMethod("getLocalization");
                 double[] localization = (double[]) getLocalization.invoke(null);
-                return new Twist2dDual<>(new Vector2dDual<>(
-                        new DualNum<>(new double[] { localization[0], localization[3] }),
-                        new DualNum<>(new double[] { localization[1], localization[4] })),
-                        new DualNum<>(new double[] { localization[2], localization[5] }));
+                return new Twist2dDual<Time>(new Vector2dDual<Time>(
+                        new DualNum<Time>(new double[] { localization[0], localization[3] }),
+                        new DualNum<Time>(new double[] { localization[1], localization[4] })),
+                        new DualNum<Time>(new double[] { localization[2], localization[5] }));
 
             } catch (InvocationTargetException|IllegalAccessException|NoSuchMethodException e) {
                 throw new RuntimeException(e);

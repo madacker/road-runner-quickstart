@@ -38,10 +38,10 @@ import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.wilyworks.common.WilyWorks;
 
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Stats;
-import org.firstinspires.ftc.teamcode.wilyworks.WilyWorks;
 import org.firstinspires.inspection.InspectionState;
 
 import java.lang.Math;
