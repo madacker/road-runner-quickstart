@@ -1,5 +1,6 @@
 package com.wilyworks.simulator;
 
+import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 
 import com.acmerobotics.dashboard.FtcDashboard;
@@ -22,7 +23,6 @@ import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Choice;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -49,12 +49,11 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 /**
- * Structure for representing the choices of opmode:
+ * Structure for representing the choices of opMode:
  */
 class OpModeChoice {
     Class<?> klass;
@@ -72,8 +71,11 @@ class DashboardWindow extends JFrame {
     final int WINDOW_WIDTH = 1280;
     final int WINDOW_HEIGHT = 720;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
+    Thread opModeThread;
 
-    DashboardWindow(List<OpModeChoice> opModeChoices) {
+    DashboardWindow(Thread opModeThread, List<OpModeChoice> opModeChoices) {
+        this.opModeThread = opModeThread;
+
         setTitle("Dashboard");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -109,11 +111,27 @@ class DashboardWindow extends JFrame {
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
+                switch (WilyCore.status.state) {
+                case STOPPED:
+                    // Inform the main thread of the choice and save the preference:
+                    OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass);
+                    preferences.put("opmode", opModeChoice.name);
+                    dropDown.setEnabled(false);
+                    button.setLabel("Start");
+                    break;
 
-                // Inform the main thread of the choice and save the preference:
-                OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
-                WilyCore.opModeClass = opModeChoice.klass;
-                preferences.put("opmode", opModeChoice.name);
+                case INITIALIZED:
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.STARTED, WilyCore.status.klass);
+                    button.setLabel("Stop");
+                    break;
+
+                case STARTED:
+                    WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null);
+                    button.setLabel("Init");
+                    dropDown.setEnabled(true);
+                    break;
+                }
             }
         });
 
@@ -188,7 +206,7 @@ class Field {
 
     Field(Simulation simulation) {
         this.simulation = simulation;
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader classLoader = currentThread().getContextClassLoader();
 
         InputStream stream = classLoader.getResourceAsStream("background/season-2023-centerstage/field-2023-juice-dark.png");
         if (stream != null) {
@@ -333,13 +351,25 @@ public class WilyCore {
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
     public static GamepadThread gamepadThread;
-    public static Class<?> opModeClass;
+    public static Status status = new Status(State.STOPPED, null);
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
     private static double lastUpdateTime = time(); // Time of last update() call, in seconds
 
     static double time() {
         return System.currentTimeMillis() / 1000.0;
+    }
+
+    /**
+     * Structure to communicate between the UI and the thread running the opMode.
+     */
+    public enum State { STOPPED, INITIALIZED, STARTED };
+    public static class Status {
+        public Class<?> klass;
+        public State state;
+        public Status(State state, Class<?> klass) {
+            this.klass = klass; this.state = state;
+        }
     }
 
     // Render the entire window:
@@ -483,7 +513,7 @@ public class WilyCore {
     // This is the application entry point that starts up all of Wily Works!
     public static void main(String[] args)
     {
-        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices());
+        DashboardWindow dashboardWindow = new DashboardWindow(currentThread(), enumerateOpModeChoices());
         dashboardCanvas = dashboardWindow.dashboardCanvas;
 
         simulation = new Simulation();
@@ -496,15 +526,24 @@ public class WilyCore {
 
         dashboardWindow.setVisible(true);
 
-        // Wait for the UI to tell us what opMode to run:
-        // TODO: Make this wait on an event.
-        while (opModeClass == null) {
-            try {
-                sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+        // Endless call opModes:
+        while (true) {
+            // Wait for the UI to tell us what opMode to run:
+            // TODO: Make this wait on an event.
+            while (status.state == State.STOPPED) {
+                try {
+                    sleep(30);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
+
+            // Run the user's opMode:
+            WilyCore.runOpMode(status.klass);
+
+            // The opMode cleanly exited. Update the state:
+            status = new Status(State.STOPPED, null);
+            dashboardWindow.repaint();
         }
-        WilyCore.runOpMode(opModeClass);
     }
 }
