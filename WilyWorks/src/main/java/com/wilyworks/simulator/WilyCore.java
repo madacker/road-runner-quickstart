@@ -72,11 +72,8 @@ class DashboardWindow extends JFrame {
     final int WINDOW_WIDTH = 1280;
     final int WINDOW_HEIGHT = 720;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
-    Thread opModeThread;
 
-    DashboardWindow(Thread opModeThread, List<OpModeChoice> opModeChoices) {
-        this.opModeThread = opModeThread;
-
+    DashboardWindow(List<OpModeChoice> opModeChoices) {
         setTitle("Dashboard");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -128,6 +125,7 @@ class DashboardWindow extends JFrame {
                     break;
 
                 case STARTED:
+                    WilyCore.opModeThread.interrupt();
                     WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null);
                     button.setLabel("Init");
                     dropDown.setEnabled(true);
@@ -353,6 +351,7 @@ public class WilyCore {
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
     public static GamepadThread gamepadThread;
+    public static OpModeThread opModeThread;
     public static Status status = new Status(State.STOPPED, null);
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
@@ -511,11 +510,23 @@ public class WilyCore {
         }
     }
 
+    // Thread dedicated to running the user's opMode:
+    static class OpModeThread extends Thread {
+        Class<?> opModeClass;
+        OpModeThread(Class<?> opModeClass) {
+            this.opModeClass = opModeClass;
+        }
+        @Override
+        public void run() {
+            WilyCore.runOpMode(status.klass);
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // This is the application entry point that starts up all of Wily Works!
     public static void main(String[] args)
     {
-        DashboardWindow dashboardWindow = new DashboardWindow(currentThread(), enumerateOpModeChoices());
+        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices());
         dashboardCanvas = dashboardWindow.dashboardCanvas;
 
         simulation = new Simulation();
@@ -529,7 +540,7 @@ public class WilyCore {
 
         dashboardWindow.setVisible(true);
 
-        // Endless call opModes:
+        // Endlessly call opModes:
         while (true) {
             // Wait for the UI to tell us what opMode to run:
             // TODO: Make this wait on an event.
@@ -541,10 +552,16 @@ public class WilyCore {
                 }
             }
 
-            // Run the user's opMode:
-            WilyCore.runOpMode(status.klass);
+            // Run the opMode on a dedicated thread so that it can be interrupted as necessary:
+            opModeThread = new OpModeThread(status.klass);
+            opModeThread.start();
+            try {
+                opModeThread.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
-            // The opMode cleanly exited. Update the state:
+            // The opMode exited. Update the state:
             status = new Status(State.STOPPED, null);
             dashboardWindow.repaint();
         }
