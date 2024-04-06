@@ -69,7 +69,7 @@ class OpModeChoice {
  * Class responsible for creation of the main window.
  */
 class DashboardWindow extends JFrame {
-    final int WINDOW_WIDTH = 1280;
+    final int WINDOW_WIDTH = 720; // 1280
     final int WINDOW_HEIGHT = 720;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -115,7 +115,7 @@ class DashboardWindow extends JFrame {
                     OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
                     WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass);
                     preferences.put("opmode", opModeChoice.name);
-                    dropDown.setEnabled(false);
+                    dropDown.setVisible(false);
                     button.setLabel("Start");
                     break;
 
@@ -128,7 +128,7 @@ class DashboardWindow extends JFrame {
                     WilyCore.opModeThread.interrupt();
                     WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null);
                     button.setLabel("Init");
-                    dropDown.setEnabled(true);
+                    dropDown.setVisible(true);
                     break;
                 }
             }
