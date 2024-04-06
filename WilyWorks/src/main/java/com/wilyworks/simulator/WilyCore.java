@@ -17,6 +17,7 @@ import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.reflections.Reflections;
 
 import java.awt.BorderLayout;
@@ -347,6 +348,7 @@ public class WilyCore {
 
     public static Gamepad gamepad1;
     public static Gamepad gamepad2;
+    public static Telemetry telemetry;
     public static Simulation simulation;
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
@@ -494,7 +496,7 @@ public class WilyCore {
         opMode.hardwareMap = new HardwareMap();
         opMode.gamepad1 = gamepad1;
         opMode.gamepad2 = gamepad2;
-        opMode.telemetry = new WilyTelemetry();
+        opMode.telemetry = telemetry;
 
         if (LinearOpMode.class.isAssignableFrom(klass)) {
             LinearOpMode linearOpMode = (LinearOpMode) opMode;
@@ -520,6 +522,7 @@ public class WilyCore {
         field = new Field(simulation);
         gamepad1 = new Gamepad();
         gamepad2 = new Gamepad(); // @@@ Need to hook into
+        telemetry = new WilyTelemetry();
 
         gamepadThread = new GamepadThread(gamepad1, gamepad2);
         gamepadThread.start();
