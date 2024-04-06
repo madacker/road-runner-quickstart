@@ -18,9 +18,11 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.reflections.Reflections;
 
+import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Choice;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -47,6 +49,7 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -69,7 +72,6 @@ class DashboardWindow extends JFrame {
     final int WINDOW_WIDTH = 1280;
     final int WINDOW_HEIGHT = 720;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
-    JPanel canvasPanel = new JPanel();
 
     DashboardWindow(List<OpModeChoice> opModeChoices) {
         setTitle("Dashboard");
@@ -100,6 +102,9 @@ class DashboardWindow extends JFrame {
             dropDown.select(preferences.get("opmode", opModeChoices.get(0).name));
         }
 
+//        JButton button = new JButton("Go");
+//        button.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         Button button = new Button("Go");
         button.addActionListener(new ActionListener() {
             @Override
@@ -112,12 +117,19 @@ class DashboardWindow extends JFrame {
             }
         });
 
-        canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
-        canvasPanel.add(dropDown);
-        canvasPanel.add(button);
-        canvasPanel.add(dashboardCanvas);
+        JPanel masterPanel = new JPanel(new BorderLayout());
 
-        getContentPane().add(canvasPanel);
+        JPanel menuPanel = new JPanel();
+        menuPanel.setLayout(new BoxLayout(menuPanel, BoxLayout.X_AXIS));
+        menuPanel.add(button);
+        menuPanel.add(dropDown);
+        masterPanel.add(menuPanel, BorderLayout.NORTH);
+
+        JPanel canvasPanel = new JPanel();
+        canvasPanel.add(dashboardCanvas);
+        masterPanel.add(canvasPanel, BorderLayout.CENTER);
+
+        getContentPane().add(masterPanel);
         pack();
 
         dashboardCanvas.start();
