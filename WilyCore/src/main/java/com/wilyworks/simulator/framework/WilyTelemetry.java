@@ -1,7 +1,5 @@
 package com.wilyworks.simulator.framework;
 
-import com.example.kinematictesting.framework.TelemetryWindow;
-
 import org.firstinspires.ftc.robotcore.external.Func;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 

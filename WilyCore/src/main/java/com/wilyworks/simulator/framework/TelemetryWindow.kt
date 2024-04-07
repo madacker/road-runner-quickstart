@@ -1,4 +1,4 @@
-package com.example.kinematictesting.framework
+package com.wilyworks.simulator.framework
 
 import java.awt.Canvas
 import java.awt.Dimension

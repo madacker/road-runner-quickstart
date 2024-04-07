@@ -33,9 +33,8 @@ repositories {
 }
 
 dependencies {
-    implementation "com.acmerobotics.roadrunner:core:1.0.0-beta6"
-
+    implementation "com.acmerobotics.roadrunner:core:1.0.0-beta6" // For Pose2d, PoseVelocity2d, etc.
     implementation "uk.co.electronstudio.sdl2gdx:sdl2gdx:1.0.+" // For gamepad control
-    implementation "org.reflections:reflections:0.10.2"
+    implementation "org.reflections:reflections:0.10.2" // For enumerating classes with annotations
     implementation project(path: ':WilyWorks') // For enumerating all classes
 }
