@@ -52,6 +52,7 @@ import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 /**
@@ -73,6 +74,7 @@ class DashboardWindow extends JFrame {
     final int WINDOW_WIDTH = 720; // 1280
     final int WINDOW_HEIGHT = 720;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
+    String opModeName = "";
 
     DashboardWindow(List<OpModeChoice> opModeChoices) {
         setTitle("Dashboard");
@@ -107,6 +109,8 @@ class DashboardWindow extends JFrame {
         JButton button = new JButton("Init");
         button.setMaximumSize(new Dimension(100, 50));
 
+        JLabel label = new JLabel("");
+
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
@@ -115,9 +119,12 @@ class DashboardWindow extends JFrame {
                     // Inform the main thread of the choice and save the preference:
                     OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
                     WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, null);
-                    preferences.put("opmode", opModeChoice.name);
-                    dropDown.setVisible(false);
+                    dropDown.setMaximumSize(new Dimension(0, 0));
                     button.setText("Start");
+
+                    opModeName = opModeChoice.name;
+                    preferences.put("opmode", opModeName);
+                    label.setText(opModeName);
                     break;
 
                 case INITIALIZED:
@@ -129,7 +136,8 @@ class DashboardWindow extends JFrame {
                     WilyCore.opModeThread.interrupt();
                     WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null, null);
                     button.setText("Init");
-                    dropDown.setVisible(true);
+                    dropDown.setMaximumSize(new Dimension(400, 100));
+                    label.setText("");
                     break;
                 }
             }
@@ -141,6 +149,7 @@ class DashboardWindow extends JFrame {
         menuPanel.setLayout(new BoxLayout(menuPanel, BoxLayout.X_AXIS));
         menuPanel.add(button);
         menuPanel.add(dropDown);
+        menuPanel.add(label);
         masterPanel.add(menuPanel, BorderLayout.NORTH);
 
         JPanel canvasPanel = new JPanel();
