@@ -21,7 +21,6 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.reflections.Reflections;
 
 import java.awt.BorderLayout;
-import java.awt.Button;
 import java.awt.Choice;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -59,11 +58,13 @@ import javax.swing.JPanel;
  * Structure for representing the choices of opMode:
  */
 class OpModeChoice {
-    Class<?> klass;
-    String name;
+    Class<?> klass; // Class reference
+    String givenName; // Name give by user to @teleOp or @autonomous, e.g., "match auton"
+    String fullName; // Fully with group and given name, e.g., "tests: match auton"
+    String className; // Root of the class name, e.g., "Auton"
 
-    public OpModeChoice(Class<?> klass, String name) {
-        this.klass = klass; this.name = name;
+    public OpModeChoice(Class<?> klass, String fullName, String givenName, String className) {
+        this.klass = klass; this.fullName = fullName; this.givenName = givenName; this.className = className;
     }
 }
 
@@ -76,7 +77,8 @@ class DashboardWindow extends JFrame {
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
     String opModeName = "";
 
-    DashboardWindow(List<OpModeChoice> opModeChoices) {
+    DashboardWindow(List<OpModeChoice> opModeChoices, String[] args) {
+        Preferences preferences = Preferences.userRoot().node("com/wilyworks/simulator");
         setTitle("Dashboard");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -96,19 +98,33 @@ class DashboardWindow extends JFrame {
 
         Choice dropDown = new Choice();
         for (OpModeChoice opMode: opModeChoices) {
-            dropDown.add(opMode.name);
+            dropDown.add(opMode.fullName);
         }
         dropDown.setMaximumSize(new Dimension(400, 100));
 
-        // Read the preferred opMode from the registry:
-        Preferences preferences = Preferences.userRoot().node("com/wilyworks/simulator");
+        // If an opMode was specified on the command line, look for it in the list of
+        // potential choices:
+        OpModeChoice autoStart = null;
+        if (args.length > 0) {
+            String requestedOpMode = args[0].toLowerCase();
+            for (OpModeChoice choice: opModeChoices) {
+                if ((choice.fullName.toLowerCase().equals(requestedOpMode)) ||
+                    (choice.givenName.toLowerCase().equals(requestedOpMode)) ||
+                    (choice.className.toLowerCase().equals(requestedOpMode))) {
+                    autoStart = choice;
+                }
+            }
+        }
+
+        // Pre-select the preferred opMode, either from the registry or from the auto-start:
         if (opModeChoices.size() > 0) {
-            dropDown.select(preferences.get("opmode", opModeChoices.get(0).name));
+            dropDown.select((autoStart != null)
+                    ? autoStart.fullName
+                    : preferences.get("opmode", opModeChoices.get(0).fullName));
         }
 
         JButton button = new JButton("Init");
         button.setMaximumSize(new Dimension(100, 50));
-
         JLabel label = new JLabel("");
 
         button.addActionListener(new ActionListener() {
@@ -122,7 +138,7 @@ class DashboardWindow extends JFrame {
                     dropDown.setMaximumSize(new Dimension(0, 0));
                     button.setText("Start");
 
-                    opModeName = opModeChoice.name;
+                    opModeName = opModeChoice.fullName;
                     preferences.put("opmode", opModeName);
                     label.setText(opModeName);
                     break;
@@ -142,6 +158,12 @@ class DashboardWindow extends JFrame {
                 }
             }
         });
+
+        // When auto-starting, press the button twice to jump straight from 'STOPPED' to 'STARTED':
+        if (autoStart != null) {
+            button.doClick(0);
+            button.doClick(0);
+        }
 
         JPanel masterPanel = new JPanel(new BorderLayout());
 
@@ -396,7 +418,8 @@ public class WilyCore {
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // Callbacks provided to the guest. These are all called via reflection.
+    // Callbacks provided to the guest. These are all called via reflection from the WilyWorks
+    // class.
 
     // The guest can specify the delta-t (which is handy when single stepping):
     static public void update(double deltaT) {
@@ -465,32 +488,34 @@ public class WilyCore {
 
                 // getName() returns a fully qualified name ("org.firstinspires.ftc.teamcode.MyOp").
                 // Use only the last portion ("MyOp" in this example):
-                String name = klass.getName();
-                name = name.substring(name.lastIndexOf(".") + 1); // Skip the dot itself
+                String className = klass.getName();
+                className = className.substring(className.lastIndexOf(".") + 1); // Skip the dot itself
+                String givenName = className;
+                String fullName = className;
 
                 // Override the name if an annotation exists:
                 TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
                 if (teleOpAnnotation != null) {
                     if (!teleOpAnnotation.name().equals("")) {
-                        name = teleOpAnnotation.name();
+                        givenName = teleOpAnnotation.name();
                     }
                     if (!teleOpAnnotation.group().equals("")) {
-                        name = teleOpAnnotation.group() + ": " + name;
+                        fullName = teleOpAnnotation.group() + ": " + givenName;
                     }
                 }
                 Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
                 if (autonomousAnnotation != null) {
                     if (!autonomousAnnotation.name().equals("")) {
-                        name = autonomousAnnotation.name();
+                        givenName = autonomousAnnotation.name();
                     }
                     if (!autonomousAnnotation.group().equals("")) {
-                        name = autonomousAnnotation.group() + ": " + name;
+                        fullName = autonomousAnnotation.group() + ": " + givenName;
                     }
                 }
-                choices.add(new OpModeChoice(klass, name));
+                choices.add(new OpModeChoice(klass, fullName, givenName, className));
             }
         }
-        choices.sort(Comparator.comparing(x -> x.name));
+        choices.sort(Comparator.comparing(x -> x.fullName));
         return choices;
     }
 
@@ -537,7 +562,8 @@ public class WilyCore {
     // This is the application entry point that starts up all of Wily Works!
     public static void main(String[] args)
     {
-        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices());
+        // Start the UI:
+        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices(), args);
         dashboardCanvas = dashboardWindow.dashboardCanvas;
 
         simulation = new Simulation();
@@ -553,7 +579,7 @@ public class WilyCore {
 
         // Endlessly call opModes:
         while (true) {
-            // Wait for the UI to tell us what opMode to run:
+            // Wait for the DashboardWindow UI to tell us what opMode to run:
             // TODO: Make this wait on an event.
             while (status.state == State.STOPPED) {
                 try {
