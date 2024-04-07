@@ -60,7 +60,7 @@ public class AprilTagProcessorImpl extends AprilTagProcessor {
 
     @Override
     public ArrayList<AprilTagDetection> getDetections() {
-        return null;
+        return new ArrayList<>(); // ### Empty detection list
     }
 
     @Override

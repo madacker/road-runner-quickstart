@@ -109,8 +109,8 @@ class DashboardWindow extends JFrame {
             String requestedOpMode = args[0].toLowerCase();
             for (OpModeChoice choice: opModeChoices) {
                 if ((choice.fullName.toLowerCase().equals(requestedOpMode)) ||
-                    (choice.givenName.toLowerCase().equals(requestedOpMode)) ||
-                    (choice.className.toLowerCase().equals(requestedOpMode))) {
+                        (choice.givenName.toLowerCase().equals(requestedOpMode)) ||
+                        (choice.className.toLowerCase().equals(requestedOpMode))) {
                     autoStart = choice;
                 }
             }
@@ -131,30 +131,30 @@ class DashboardWindow extends JFrame {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 switch (WilyCore.status.state) {
-                case STOPPED:
-                    // Inform the main thread of the choice and save the preference:
-                    OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, null);
-                    dropDown.setMaximumSize(new Dimension(0, 0));
-                    button.setText("Start");
+                    case STOPPED:
+                        // Inform the main thread of the choice and save the preference:
+                        OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
+                        WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, null);
+                        dropDown.setMaximumSize(new Dimension(0, 0));
+                        button.setText("Start");
 
-                    opModeName = opModeChoice.fullName;
-                    preferences.put("opmode", opModeName);
-                    label.setText(opModeName);
-                    break;
+                        opModeName = opModeChoice.fullName;
+                        preferences.put("opmode", opModeName);
+                        label.setText(opModeName);
+                        break;
 
-                case INITIALIZED:
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.STARTED, WilyCore.status.klass, button);
-                    button.setText("Stop");
-                    break;
+                    case INITIALIZED:
+                        WilyCore.status = new WilyCore.Status(WilyCore.State.STARTED, WilyCore.status.klass, button);
+                        button.setText("Stop");
+                        break;
 
-                case STARTED:
-                    WilyCore.opModeThread.interrupt();
-                    WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null, null);
-                    button.setText("Init");
-                    dropDown.setMaximumSize(new Dimension(400, 100));
-                    label.setText("");
-                    break;
+                    case STARTED:
+                        WilyCore.opModeThread.interrupt();
+                        WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null, null);
+                        button.setText("Init");
+                        dropDown.setMaximumSize(new Dimension(400, 100));
+                        label.setText("");
+                        break;
                 }
             }
         });
@@ -353,6 +353,7 @@ class GamepadThread extends Thread {
         this.gamepad1 = gamepad1;
         this.gamepad2 = gamepad2;
         // TODO: @@@ Need to add gamepad2 support
+        setName("Wily gamepad thread");
     }
 
     @Override
@@ -441,7 +442,7 @@ public class WilyCore {
 
     // Guest call to set the pose and velocity:
     static public void setPose(double x, double y, double heading,
-                        double xVelocity, double yVelocity, double headingVelocity) {
+                               double xVelocity, double yVelocity, double headingVelocity) {
         // If the user didn't explicitly call the simulation update() API, do it now:
         if (!simulationUpdated)
             update(0);
@@ -551,6 +552,7 @@ public class WilyCore {
         Class<?> opModeClass;
         OpModeThread(Class<?> opModeClass) {
             this.opModeClass = opModeClass;
+            setName("Wily OpMode thread");
         }
         @Override
         public void run() {
@@ -562,6 +564,8 @@ public class WilyCore {
     // This is the application entry point that starts up all of Wily Works!
     public static void main(String[] args)
     {
+        Thread.currentThread().setName("Wily core thread");
+
         // Start the UI:
         DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices(), args);
         dashboardCanvas = dashboardWindow.dashboardCanvas;
@@ -602,7 +606,6 @@ public class WilyCore {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
         }
     }
 }
