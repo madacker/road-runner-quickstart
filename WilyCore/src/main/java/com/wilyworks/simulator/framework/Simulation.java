@@ -167,15 +167,24 @@ public class Simulation {
         double x = pose.position.x + dt * currentLinearX;
         double y = pose.position.y + dt * currentLinearY;
 
-        // Wrap the coordinates for now:
-        if (x > 72.0)
-            x -= 144.0;
-        if (x <= -72.0)
-            x += 144.0;
-        if (y > 72.0)
-            y -= 144.0;
-        if (y <= -72.0)
-            y += 144.0;
+        // Keep the robot on the field. Zero the component velocity that made it leave
+        // the field:
+        if (x > 72.0) {
+            x = 72.0;
+            currentLinearX = 0;
+        }
+        if (x <= -72.0) {
+            x = -72.0;
+            currentLinearX = 0;
+        }
+        if (y > 72.0) {
+            y = 72.0;
+            currentLinearY = 0;
+        }
+        if (y <= -72.0) {
+            y = -72.0;
+            currentLinearY = 0;
+        }
 
         // Update our official pose and velocity:
         pose = new Pose2d(x, y, pose.heading.log() + dt * currentAngular);
