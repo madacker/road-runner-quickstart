@@ -40,6 +40,8 @@ import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -52,6 +54,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 /**
@@ -72,8 +75,8 @@ class OpModeChoice {
  * Class responsible for creation of the main window.
  */
 class DashboardWindow extends JFrame {
-    final int WINDOW_WIDTH = 720; // 1280
-    final int WINDOW_HEIGHT = 720;
+    final int WINDOW_WIDTH = 500;
+    final int WINDOW_HEIGHT = 500;
     DashboardCanvas dashboardCanvas = new DashboardCanvas(WINDOW_WIDTH, WINDOW_HEIGHT);
     String opModeName = "";
 
@@ -91,7 +94,7 @@ class DashboardWindow extends JFrame {
         });
 
         setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-        setLocationRelativeTo(null);
+        setLocation(400, 0);
         setResizable(false);
 
         BoxLayout layout = new BoxLayout(getContentPane(), BoxLayout.X_AXIS);
@@ -134,7 +137,7 @@ class DashboardWindow extends JFrame {
                     case STOPPED:
                         // Inform the main thread of the choice and save the preference:
                         OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
-                        WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, null);
+                        WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, button);
                         dropDown.setMaximumSize(new Dimension(0, 0));
                         button.setText("Start");
 
@@ -220,7 +223,7 @@ class DashboardCanvas extends java.awt.Canvas {
 class Field {
     // Make the field view 720x720 pixels but inset the field surface so that there's padding
     // all around it:
-    final int FIELD_VIEW_DIMENSION = 720;
+    final int FIELD_VIEW_DIMENSION = 500;
     final int FIELD_SURFACE_DIMENSION = 480;
 
     // These are derived from the above to describe the field rendering:
@@ -335,10 +338,6 @@ class Field {
 
         // Restore:
         g.setTransform(oldTransform);
-
-        // Draw some debug text:
-        g.setColor(new Color(0xffffff));
-        g.drawString("Hello kinematic world!", 20, 20);
     }
 }
 
@@ -536,11 +535,25 @@ public class WilyCore {
 
         if (LinearOpMode.class.isAssignableFrom(klass)) {
             LinearOpMode linearOpMode = (LinearOpMode) opMode;
-
             try {
                 linearOpMode.runOpMode();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            } catch (Exception exception) {
+                // There was an exception. Print the stack trace to stdout:
+                exception.printStackTrace();
+
+                // Now put the stack trace into a popup:
+                StringWriter writer = new StringWriter();
+                PrintWriter printWriter = new PrintWriter(writer);
+                exception.printStackTrace(printWriter);
+                printWriter.flush();
+                String stackTrace = writer.toString().replace("\n", "\n    ");
+                String message = "Your program hit an unhandled exception:\n\n    " + stackTrace + "\n" +
+                        "You can also find this stacktrace in clickable form in the 'Debug' or 'Run' tab.\n"
+                        + "Once there click on 'Create breakpoint' and re-run using the debug 'bug' icon to\n"
+                        + "stop the debugger at exactly the right spot.";
+
+                JOptionPane.showMessageDialog(null, message, "Exception",
+                        JOptionPane.INFORMATION_MESSAGE);
             }
         } else {
             // TODO: Implement non-LinearOpMode support
@@ -568,8 +581,9 @@ public class WilyCore {
 
         // Start the UI:
         DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices(), args);
-        dashboardCanvas = dashboardWindow.dashboardCanvas;
+        dashboardWindow.setVisible(true);
 
+        dashboardCanvas = dashboardWindow.dashboardCanvas;
         simulation = new Simulation();
         field = new Field(simulation);
         gamepad1 = new Gamepad();
@@ -578,8 +592,6 @@ public class WilyCore {
 
         gamepadThread = new GamepadThread(gamepad1, gamepad2);
         gamepadThread.start();
-
-        dashboardWindow.setVisible(true);
 
         // Endlessly call opModes:
         while (true) {
@@ -597,14 +609,15 @@ public class WilyCore {
             opModeThread = new OpModeThread(status.klass);
             opModeThread.start();
             try {
+                // Wait for the opMode thread to complete:
                 opModeThread.join();
-
-                // If the thread exited while the UI still thinks the opMode is running, update
-                // the button state:
-                if (status.stopButton != null)
-                    status.stopButton.doClick(0);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
+            }
+
+            // If the thread finished without the user stopping it, switch the mode back to STOPPED:
+            while (status.state != State.STOPPED) {
+                status.stopButton.doClick(0);
             }
         }
     }

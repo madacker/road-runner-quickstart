@@ -34,7 +34,7 @@ class TelemetryWindow(title: String, windowSize: Int) : JFrame() {
         })
 
         setSize(internalWidth, internalHeight)
-        setLocationRelativeTo(null)
+        setLocation(0, 0)
 
         isResizable = false
 
