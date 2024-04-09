@@ -581,8 +581,18 @@ public class WilyCore {
     {
         Thread.currentThread().setName("Wily core thread");
 
+        // Enumerate all of the opModes:
+        List<OpModeChoice> opModeChoices = enumerateOpModeChoices();
+        if (opModeChoices.size() == 0) {
+            String message = "Couldn't find @TeleOp or @Autonomous classes anywhere. Is the SRC_ROOT\n"
+                + "environment variable set correctly in the WilyWorks configuration you created?";
+            JOptionPane.showMessageDialog(null, message, "Exception",
+                    JOptionPane.INFORMATION_MESSAGE);
+            System.exit(0); // ====>
+        }
+
         // Start the UI:
-        DashboardWindow dashboardWindow = new DashboardWindow(enumerateOpModeChoices(), args);
+        DashboardWindow dashboardWindow = new DashboardWindow(opModeChoices, args);
         dashboardWindow.setVisible(true);
 
         dashboardCanvas = dashboardWindow.dashboardCanvas;
