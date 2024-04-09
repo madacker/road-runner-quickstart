@@ -117,6 +117,13 @@ class DashboardWindow extends JFrame {
                     autoStart = choice;
                 }
             }
+            if (autoStart == null) {
+                String message = String.format(
+                    "Couldn't find an opMode called '%s'. Are you sure you set the\n" +
+                    "configuration's program argument correctly?", args[0]);
+                JOptionPane.showMessageDialog(null, message, "Exception",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
         }
 
         // Pre-select the preferred opMode, either from the registry or from the auto-start:
