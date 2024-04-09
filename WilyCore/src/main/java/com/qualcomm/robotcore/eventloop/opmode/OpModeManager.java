@@ -36,7 +36,7 @@ import org.firstinspires.ftc.robotcore.internal.opmode.OpModeMeta;
 
 /**
  * OpModeManager instances are used to register OpModes for use.
- * @see AnnotatedOpModeManager
+ * see AnnotatedOpModeManager
  * @see OpModeRegistrar
  */
 public interface OpModeManager

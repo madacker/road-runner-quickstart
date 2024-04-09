@@ -139,6 +139,7 @@ class DashboardWindow extends JFrame {
                         OpModeChoice opModeChoice = opModeChoices.get(dropDown.getSelectedIndex());
                         WilyCore.status = new WilyCore.Status(WilyCore.State.INITIALIZED, opModeChoice.klass, button);
                         dropDown.setMaximumSize(new Dimension(0, 0));
+                        dropDown.setVisible(false); // Needed for long opMode names, for whatever reason
                         button.setText("Start");
 
                         opModeName = opModeChoice.fullName;
@@ -156,6 +157,7 @@ class DashboardWindow extends JFrame {
                         WilyCore.status = new WilyCore.Status(WilyCore.State.STOPPED, null, null);
                         button.setText("Init");
                         dropDown.setMaximumSize(new Dimension(400, 100));
+                        dropDown.setVisible(true);
                         label.setText("");
                         break;
                 }
@@ -547,10 +549,10 @@ public class WilyCore {
                 exception.printStackTrace(printWriter);
                 printWriter.flush();
                 String stackTrace = writer.toString().replace("\n", "\n    ");
-                String message = "Your program hit an unhandled exception:\n\n    " + stackTrace + "\n" +
-                        "You can also find this stacktrace in clickable form in the 'Debug' or 'Run' tab.\n"
-                        + "Once there click on 'Create breakpoint' and re-run using the debug 'bug' icon to\n"
-                        + "stop the debugger at exactly the right spot.";
+                String message = "Your program hit an unhandled exception:\n\n    " + stackTrace + "\n"
+                        + "You can also find this stacktrace in clickable form in the 'Debug/Console' or \n"
+                        + "'Run' tabs. Once there click on 'Create breakpoint' and re-run using the debug\n"
+                        + "'bug' icon to stop the debugger at exactly the right spot.";
 
                 JOptionPane.showMessageDialog(null, message, "Exception",
                         JOptionPane.INFORMATION_MESSAGE);

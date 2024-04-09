@@ -88,8 +88,15 @@ public final class Log {
     }
 
     public static int println(int priority, @RecentlyNullable String tag, @RecentlyNonNull String msg) {
-        Map<Integer, String> map = Map.of(ASSERT, "ASSERT", DEBUG, "DEBUG", ERROR, "ERROR", INFO, "INFO", VERBOSE, "VERBOSE", WARN, "WARN");
-        System.out.printf("Log(%s) %s: %s\n", map.get(priority), tag, msg);
+        String priorityString =
+                priority == ASSERT ? "ASSERT" :
+                        priority == DEBUG ? "DEBUG" :
+                                priority == ERROR ? "ERROR" :
+                                        priority == INFO ? "INFO" :
+                                                priority == VERBOSE ? "VERBOSE" :
+                                                        priority == WARN ? "WARN" :
+                                                                "UNKNOWN";
+        System.out.printf("Log(%s) %s: %s\n", priorityString, tag, msg);
         return 0;
     }
 }

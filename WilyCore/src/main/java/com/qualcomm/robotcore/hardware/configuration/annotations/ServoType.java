@@ -65,7 +65,6 @@ import java.lang.annotation.Target;
  * <p>
  * Must be accompanied by {@link DeviceProperties} annotation
  *
- * @see HardwareMap#put(String, HardwareDevice)
  * @see HardwareMap#get(Class, String)
  * @see HardwareMap#get(String)
  */
