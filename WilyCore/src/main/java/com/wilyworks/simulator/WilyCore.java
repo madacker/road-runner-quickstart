@@ -398,7 +398,7 @@ public class WilyCore {
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
     private static double lastUpdateTime = time(); // Time of last update() call, in seconds
 
-    static double time() {
+    public static double time() {
         return System.currentTimeMillis() / 1000.0;
     }
 
