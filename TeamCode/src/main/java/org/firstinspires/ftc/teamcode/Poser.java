@@ -20,9 +20,12 @@ import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.wilyworks.common.WilyWorks;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.opticaltracking.WilyOpticalTracking;
+import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTracking;
 import org.firstinspires.ftc.teamcode.opticaltracking.OpticalTrackingPaa5100;
 import org.firstinspires.ftc.teamcode.roadrunner.Localizer;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
@@ -1118,7 +1121,7 @@ class OpticalFlowLocalizer {
         }
     }
 
-    OpticalTrackingPaa5100 device; // SDK device object
+    OpticalTracking device; // SDK device object
     double previousYaw; // Yaw from the previous call to update()
     Pose2d sensorPose; // Pose for the sensor where it's on the robot (not pose for the robot center)
     Pose2d inferiorSensorPose; // Inferior pose as determined by the sensor
@@ -1128,7 +1131,11 @@ class OpticalFlowLocalizer {
 
     OpticalFlowLocalizer(HardwareMap hardwareMap) {
         descriptor = OPTICAL_DESCRIPTORS[0];
-        device = hardwareMap.get(OpticalTrackingPaa5100.class, descriptor.name);
+        if (WilyWorks.isSimulating) {
+            device = new WilyOpticalTracking();
+        } else {
+            device = hardwareMap.get(OpticalTrackingPaa5100.class, descriptor.name);
+        }
         device.getMotion(); // Zero the movement
         previousYaw = Globals.getYaw();
         setPose(new Pose2d(0, 0, 0));

@@ -30,17 +30,7 @@ import java.util.ArrayList;
 @SuppressWarnings({"WeakerAccess", "unused"}) // Ignore access and unused warnings
 @I2cDeviceType
 @DeviceProperties(name = "Optical Tracking Sensor PAA5100/SC18IS602B", description = "Optical Tracking sensor from Marcel", xmlTag = "OPTICAL_TRACKING_PAA5100", compatibleControlSystems = ControlSystem.REV_HUB)
-public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch> {
-
-    // Structure for returning the motion:
-    static public class Motion {
-        public int x;
-        public int y;
-        Motion(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
-    }
+public class OpticalTrackingPaa5100 extends I2cDeviceSynchDevice<I2cDeviceSynch> implements OpticalTracking {
 
     // Quality of the signal from the most recent getMotion() call:
     private int lastQuality = 0;
