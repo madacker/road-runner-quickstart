@@ -460,6 +460,14 @@ public class WilyCore {
         simulationUpdated = false;
     }
 
+    // Get the simulation's true pose and velocity:
+    static public Pose2d getPose() {
+        return simulation.pose;
+    }
+    static public PoseVelocity2d getPoseVelocity() {
+        return simulation.poseVelocity;
+    }
+
     // Guest call to set the drive powers:
     static public void setDrivePowers(
             PoseVelocity2d stickVelocity,

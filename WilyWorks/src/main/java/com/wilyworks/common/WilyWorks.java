@@ -95,6 +95,32 @@ public class WilyWorks {
         return false;
     }
 
+    // Get the simulation's true pose:
+    static public Pose2d getPose() {
+        if (wilyCore != null) {
+            try {
+                Method getPose = wilyCore.getMethod("getPose");
+                return (Pose2d) getPose.invoke(null);
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
+    }
+
+    // Get the simulation's true pose:
+    static public PoseVelocity2d getPoseVelocity() {
+        if (wilyCore != null) {
+            try {
+                Method getPose = wilyCore.getMethod("getPoseVelocity");
+                return (PoseVelocity2d) getPose.invoke(null);
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
+    }
+
     // Set the drive powers:
     static public boolean setDrivePowers(
             // Manual power, normalized voltage from -1 to 1, robot-relative coordinates, can be null:

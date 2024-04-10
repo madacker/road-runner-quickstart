@@ -1202,7 +1202,10 @@ class OpticalFlowLocalizer {
         Point centerOffset = descriptor.offset.negate().rotate(thetaPrime);
 
         sensorPose = new Pose2d(xPrime, yPrime, thetaPrime);
-        Pose2d newRobotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+        Pose2d newRobotPose = WilyWorks.getPose();
+        if (newRobotPose == null) {
+            newRobotPose = new Pose2d(xPrime - centerOffset.x, yPrime - centerOffset.y, thetaPrime);
+        }
         Poser.Twist twist = new Poser.Twist(newRobotPose, robotPose);
         robotPose = newRobotPose;
 
