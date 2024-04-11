@@ -418,9 +418,7 @@ class WilyDcMotorEx extends WilyHardwareDevice implements DcMotorEx {
     }
 
     @Override
-    public void setDirection(Direction direction) {
-
-    }
+    public void setDirection(Direction direction) { }
 
     @Override
     public Direction getDirection() {
@@ -428,9 +426,7 @@ class WilyDcMotorEx extends WilyHardwareDevice implements DcMotorEx {
     }
 
     @Override
-    public void setPower(double power) {
-
-    }
+    public void setPower(double power) { }
 
     @Override
     public double getPower() {
@@ -444,24 +440,16 @@ class WilyDcMotorEx extends WilyHardwareDevice implements DcMotorEx {
 class WilyDigitalChannel extends WilyHardwareDevice implements DigitalChannel {
 
     @Override
-    public Mode getMode() {
-        return null;
-    }
+    public Mode getMode() { return null; }
 
     @Override
-    public void setMode(Mode mode) {
-
-    }
+    public void setMode(Mode mode) {}
 
     @Override
-    public boolean getState() {
-        return false;
-    }
+    public boolean getState() { return false; }
 
     @Override
-    public void setState(boolean state) {
-
-    }
+    public void setState(boolean state) {}
 }
 
 /**

@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.System.nanoTime;
 
+import android.util.Size;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
@@ -9,6 +11,8 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.wilyworks.common.Wily;
+import com.wilyworks.common.WilyWorks;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -16,8 +20,24 @@ import org.firstinspires.inspection.InspectionState;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@link Globals} contains all state that can be accessed globally any time
- * within the sensor loop.
+ * Set the configuration for Wily Works.
+ */
+@Wily
+class WilyConfig extends WilyWorks.Config {
+    WilyConfig() {
+        robotWidth = 3;
+        cameras = new Camera[]{
+            new Camera("webcamback", -5.75, -6, Math.PI, Math.toRadians(75), 0.190),
+            new Camera("webcamfront", 7, -0.5, 0, Math.toRadians(70.4), 0.190)
+        };
+        distanceSensors = new DistanceSensor[]{
+            new DistanceSensor("distance", -1, 3.5, Math.PI)
+        };
+    }
+}
+
+/**
+ * Contains all state that can be accessed globally any time within the sensor loop.
  */
 public class Globals {
     static final double VOLTAGE_READ_INTERVAL = 0.1; // In seconds, update every 100ms
