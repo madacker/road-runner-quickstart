@@ -28,6 +28,17 @@ public class WilyWorks {
         public double robotWidth = 24.0;
         public double robotHeight = 24.0;
 
+        // Maximum linear and rotational speeds in inches/s and radians/s, respectively:
+        public double maxLinearSpeed = 60;
+        public double maxAngularSpeed = Math.PI;
+
+        // Maximum linear acceleration and deceleration, in inches/s/s:
+        public double maxLinearAcceleration = 50;
+        public double maxLinearDeceleration = -30; // Should be negative
+
+        // Maximum angular acceleration and deceleration, in radians/s/s:
+        public double maxAngularAcceleration = Math.PI;
+
         // If 'true', add error to all sensor measurements to simulate real life:
         public boolean addError = true;
 
