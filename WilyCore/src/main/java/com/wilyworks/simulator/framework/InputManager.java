@@ -29,6 +29,7 @@ class KeyDispatcher implements KeyEventDispatcher {
     private boolean ctrlPressed; // True if the Control key is currently being pressed
     private boolean shiftPressed; // True if the Shift key is currently being pressed
 
+    public boolean gamepad1Active = true; // True if gamepad1 is receiving input; false if gamepad2 is active
     public boolean[] button = new boolean[SDL.SDL_CONTROLLER_BUTTON_MAX];
     public float[] axis = new float[SDL.SDL_CONTROLLER_AXIS_MAX];
     public float axisMultiplier; // When an axis is activated, use this for its speed
@@ -53,6 +54,8 @@ class KeyDispatcher implements KeyEventDispatcher {
                 }
                 break;
 
+            case KeyEvent.VK_1: gamepad1Active = true; break;
+            case KeyEvent.VK_2: gamepad1Active = false; break;
             case KeyEvent.VK_CONTROL: ctrlPressed = pressed; break;
             case KeyEvent.VK_SHIFT: shiftPressed = pressed; break;
 
@@ -121,7 +124,7 @@ class KeyDispatcher implements KeyEventDispatcher {
 }
 
 /**
- * This class is tasked with regularly updated the state of the Gamepad objects.
+ * This class is tasked with regularly updating the state of the Gamepad objects.
  */
 public class InputManager extends Thread {
     Gamepad gamepad1;
@@ -129,7 +132,10 @@ public class InputManager extends Thread {
 
     SDL2ControllerManager controllerManager = new SDL2ControllerManager();
     KeyDispatcher keyDispatcher = new KeyDispatcher();
-    Controller controller;
+
+    // State used by the 'get' methods:
+    Controller getController;
+    boolean getActive;
 
     // Wrap the two gamepad objects:
     public InputManager(Gamepad gamepad1, Gamepad gamepad2) {
@@ -144,6 +150,7 @@ public class InputManager extends Thread {
     }
 
     // The input worker thread runs this loop forever:
+    @SuppressWarnings({"InfiniteLoopStatement", "BusyWait"})
     @Override
     public void run() {
         while (true) {
@@ -153,7 +160,8 @@ public class InputManager extends Thread {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            update(gamepad1);
+            update(gamepad1, keyDispatcher.gamepad1Active);
+            update(gamepad2, !keyDispatcher.gamepad1Active);
         }
     }
 
@@ -167,28 +175,34 @@ public class InputManager extends Thread {
 
     // Get button state from either the controller or the keyboard:
     boolean getButton(int sdlButton) {
-        if (controller != null)
-            return controller.getButton(sdlButton) || keyDispatcher.button[sdlButton];
+        if (!getActive)
+            return false;
+        else if (getController != null)
+            return getController.getButton(sdlButton) || keyDispatcher.button[sdlButton];
         else
             return keyDispatcher.button[sdlButton];
     }
 
     // Get axis state from either the controller or the keyboard, with the latter winning ties:
     float getAxis(int sdlAxis) {
-        if (keyDispatcher.axis[sdlAxis] != 0)
+        if (!getActive)
+            return 0;
+        else if (keyDispatcher.axis[sdlAxis] != 0)
             return keyDispatcher.axis[sdlAxis] * keyDispatcher.axisMultiplier;
-        else if (controller != null)
-            return deadZone(controller.getAxis(sdlAxis));
+        else if (getController != null)
+            return deadZone(getController.getAxis(sdlAxis));
         else
             return 0;
     }
 
     // Poll the attached game controller to update the button and axis states
-    public void update(Gamepad gamepad) {
+    void update(Gamepad gamepad, boolean isActive) {
         // Set some state so 'getButton' and 'getAxis' work:
         int count = controllerManager.getControllers().size;
-        controller = (count == 0) ? null : controllerManager.getControllers().get(0);
+        getController = (count == 0) ? null : controllerManager.getControllers().get(0);
+        getActive = isActive;
 
+        // Now set the state:
         gamepad.a = getButton(SDL.SDL_CONTROLLER_BUTTON_A);
         gamepad.b = getButton(SDL.SDL_CONTROLLER_BUTTON_B);
         gamepad.x = getButton(SDL.SDL_CONTROLLER_BUTTON_X);
