@@ -19,7 +19,8 @@ public class WilyTelemetry implements Telemetry {
     // Use this font for display on the PC. It's different from the sizing font because the
     // sizing font doesn't support the full unicode character set (like emojis):
     final int DISPLAY_FONT_SIZE = 16;
-    final Font DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
+    final Font PROPORTIONAL_DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
+    final Font MONOSPACE_FONT = new Font(Font.MONOSPACED, Font.PLAIN, DISPLAY_FONT_SIZE);
 
     // Try to emulate the same line width as the REV Driver Station in its horizontal
     // configuration. Because the DS uses a proportional font, and because we don't have
@@ -30,9 +31,12 @@ public class WilyTelemetry implements Telemetry {
     // settling on the following and measuring its width using the strings
     // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
     // are each as wide as can be displayed on the REV Control Hub without wrapping:
-    final Font SIZING_FONT = new Font(null, Font.PLAIN, 10);
-    final int WIDTH_IN_FONT_UNITS = 239;
+    final Font PROPORTIONAL_SIZING_FONT = new Font(null, Font.PLAIN, 10);
+    final int LINE_WIDTH_IN_FONT_UNITS = 239;
     final int HEIGHT_IN_LINES = 18;
+
+    // Line width when using the monospace font:
+    final int LINE_WIDTH_IN_CHARACTERS = 50;
 
     // Global state:
     public static WilyTelemetry instance;
@@ -42,6 +46,7 @@ public class WilyTelemetry implements Telemetry {
     Canvas canvas;
     FontMetrics metrics;
     ArrayList<String> lineList = new ArrayList<>();
+    DisplayFormat displayFormat = DisplayFormat.CLASSIC; // HTML vs. monospace modes
 
     // Unit test:
     private void test(WilyTelemetry telemetry) {
@@ -64,7 +69,13 @@ public class WilyTelemetry implements Telemetry {
 
     // Return the width of the string with all trailing spaces removed:
     private int stringWidth(String string) {
-        return metrics.stringWidth(string.replaceAll("\\s+$", ""));
+        // Trim all trailing spaces:
+        string = string.replaceAll("\\s+$", "");
+        if (displayFormat == DisplayFormat.MONOSPACE) {
+            return string.length();
+        } else {
+            return metrics.stringWidth(string);
+        }
     }
 
     // PC constructor for a Telemetry object:
@@ -75,7 +86,7 @@ public class WilyTelemetry implements Telemetry {
         telemetryWindow.setVisible(true);
 
         canvas = telemetryWindow.getCanvas();
-        metrics = canvas.getBufferStrategy().getDrawGraphics().getFontMetrics(SIZING_FONT);
+        metrics = canvas.getBufferStrategy().getDrawGraphics().getFontMetrics(PROPORTIONAL_SIZING_FONT);
     }
 
     public Line addLine(String string) {
@@ -138,7 +149,7 @@ public class WilyTelemetry implements Telemetry {
 
     @Override
     public void setDisplayFormat(DisplayFormat displayFormat) {
-
+        this.displayFormat = displayFormat;
     }
 
     @Override
@@ -196,9 +207,16 @@ public class WilyTelemetry implements Telemetry {
     }
 
     public boolean update() {
+        int lineWidth;
         Graphics g = canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        g.setFont(DISPLAY_FONT);
+        if (displayFormat == DisplayFormat.MONOSPACE) {
+            g.setFont(MONOSPACE_FONT);
+            lineWidth = LINE_WIDTH_IN_CHARACTERS;
+        } else {
+            g.setFont(PROPORTIONAL_DISPLAY_FONT);
+            lineWidth = LINE_WIDTH_IN_FONT_UNITS;
+        }
 
         if (TEST) {
             System.out.println(stringWidth("123456789,123456789,123456789,123456789,12"));
@@ -211,12 +229,12 @@ public class WilyTelemetry implements Telemetry {
         for (String line : lineList) {
             while (lineCount < HEIGHT_IN_LINES) {
                 int lineBreak = line.length();
-                if (stringWidth(line) > WIDTH_IN_FONT_UNITS) {
+                if (stringWidth(line) > lineWidth) {
                     // If the line is too long, try and break at a space:
                     lineBreak = line.length() - 1;
                     while ((lineBreak > 0) &&
                            ((line.charAt(lineBreak - 1) != ' ') || // -1 to avoid space on next line
-                            (stringWidth(line.substring(0, lineBreak - 1)) > WIDTH_IN_FONT_UNITS)))
+                            (stringWidth(line.substring(0, lineBreak - 1)) > lineWidth)))
                         lineBreak--;
 
                     // If no line break was found using a space, simply break at any character
@@ -229,7 +247,7 @@ public class WilyTelemetry implements Telemetry {
                             if (((character & 0xfc00) != 0xdc00) &&
                                     (character != 0xfe0e) &&
                                     (character != 0xfe0f) &&
-                                    (stringWidth(line.substring(0, lineBreak)) <= WIDTH_IN_FONT_UNITS))
+                                    (stringWidth(line.substring(0, lineBreak)) <= lineWidth))
                                 break; // ====>
                             lineBreak--;
                         }

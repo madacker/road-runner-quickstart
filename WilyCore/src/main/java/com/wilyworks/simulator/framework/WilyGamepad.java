@@ -15,6 +15,11 @@ import java.awt.event.KeyEvent;
  * Windows hook for key presses.
  */
 class KeyDispatcher implements KeyEventDispatcher {
+    // Speed modifiers:
+    final float FAST_SPEED = 1.0f;
+    final float NORMAL_SPEED = 0.5f;
+    final float SLOW_SPEED = 0.2f;
+
     // Consecutive clicks must be this many seconds to activate double-click:
     final double DOUBLE_CLICK_DURATION = 0.5;
 
@@ -109,7 +114,7 @@ class KeyDispatcher implements KeyEventDispatcher {
         }
 
         // Speed is 20% of max when control is pressed, 100% when shift is pressed, 40% otherwise:
-        axisMultiplier = (ctrlPressed) ? 0.20f : ((shiftPressed) ? 1.0f : 0.4f);
+        axisMultiplier = (ctrlPressed) ? SLOW_SPEED : ((shiftPressed) ? FAST_SPEED : NORMAL_SPEED);
         return true;
     }
 }
