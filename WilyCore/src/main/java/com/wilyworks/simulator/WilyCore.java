@@ -1,5 +1,6 @@
 package com.wilyworks.simulator;
 
+import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 
@@ -15,6 +16,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.wilyworks.common.Wily;
 import com.wilyworks.common.WilyWorks;
+import com.wilyworks.simulator.framework.InputManager;
 import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -363,33 +365,6 @@ class Field {
     }
 }
 
-/**
- * This thread is tasked with regularly updating the Gamepad steate.
- */
-class GamepadThread extends Thread {
-    Gamepad gamepad1;
-    Gamepad gamepad2;
-
-    GamepadThread(Gamepad gamepad1, Gamepad gamepad2) {
-        this.gamepad1 = gamepad1;
-        this.gamepad2 = gamepad2;
-        // TODO: @@@ Need to add gamepad2 support
-        setName("Wily gamepad thread");
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            // Update the gamepad state every 10 milliseconds:
-            try {
-                sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            gamepad1.update();
-        }
-    }
-}
 
 /**
  * Core class for Wily Works. This provides the entry point to the simulator and is the
@@ -400,11 +375,11 @@ public class WilyCore {
 
     public static Gamepad gamepad1;
     public static Gamepad gamepad2;
+    public static InputManager inputManager;
     public static Telemetry telemetry;
     public static Simulation simulation;
     public static Field field;
     public static DashboardCanvas dashboardCanvas;
-    public static GamepadThread gamepadThread;
     public static OpModeThread opModeThread;
     public static Status status = new Status(State.STOPPED, null, null);
 
@@ -412,8 +387,8 @@ public class WilyCore {
     private static double lastUpdateTime = time(); // Time of last update() call, in seconds
 
     public static double time() {
-        return System.currentTimeMillis() / 1000.0;
-    }
+        return nanoTime() * 1e-9;
+    } // Elapsed time in seconds
 
     /**
      * Structure to communicate between the UI and the thread running the opMode.
@@ -653,12 +628,10 @@ public class WilyCore {
         dashboardCanvas = dashboardWindow.dashboardCanvas;
         simulation = new Simulation(getConfig(annotations.configKlass));
         field = new Field(simulation);
-        gamepad1 = new Gamepad();
-        gamepad2 = new Gamepad(); // @@@ Need to hook into
         telemetry = new WilyTelemetry();
-
-        gamepadThread = new GamepadThread(gamepad1, gamepad2);
-        gamepadThread.start();
+        gamepad1 = new Gamepad();
+        gamepad2 = new Gamepad();
+        inputManager = new InputManager(gamepad1, gamepad2);
 
         // Endlessly call opModes:
         while (true) {
