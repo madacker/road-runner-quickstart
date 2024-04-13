@@ -54,25 +54,25 @@ public class WilyWorks {
         /**
          * Structure used to describe April Tag cameras on the robot:
          */
-        public static class Camera {
+        static public class Camera {
             // Camera name as specified in the robot's configuration:
-            String name;
+            public String name;
 
             // Camera position in inches relative to the robot's center of rotation.
             // Positive 'x' is towards the front of the robot, negative towards the back.
             // Positive 'y' is towards the left of the robot, negative towards the right:
-            double x;
-            double y;
+            public double x;
+            public double y;
 
             // Orientation of the camera relative to the front of the robot, in radians. If zero,
             // the camera points straight forward; if Pi, the camera points straight backwards:
-            double orientation;
+            public double orientation;
 
             // Field of view of the camera, in radians. Can be zero which assigns a default:
-            double fieldOfView = 0;
+            public double fieldOfView = 0;
 
             // Latency of the April Tag processing for this camera, in seconds:
-            double latency = 0.200;
+            public double latency = 0.200;
 
             public Camera(String name, double x, double y, double orientation, double fieldOfView, double latency) {
                 this.name = name; this.x = x; this.y = y; this.orientation = orientation; this.fieldOfView = fieldOfView; this.latency = latency;
@@ -82,19 +82,19 @@ public class WilyWorks {
         /**
          * Structure used to describe distance sensors on the robot:
          */
-        public static class DistanceSensor {
+        static public class DistanceSensor {
             // Distance sensor name as specified in the robot's configuration:
-            String name;
+            public String name;
 
             // Sensor position in inches relative to the robot's center of rotation.
             // Positive 'x' is towards the front of the robot, negative towards the back.
             // Positive 'y' is towards the left of the robot, negative towards the right:
-            double x;
-            double y;
+            public double x;
+            public double y;
 
             // Orientation of the sensor relative to the front of the robot, in radians. If zero,
             // the sensor points straight forward; if Pi, the sensor points straight backwards:
-            double orientation;
+            public double orientation;
 
             public DistanceSensor(String name, double x, double y, double orientation) {
                 this.name = name; this.x = x; this.y = y; this.orientation = orientation;

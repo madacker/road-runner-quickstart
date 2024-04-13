@@ -46,6 +46,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -373,6 +376,7 @@ class Field {
 public class WilyCore {
     private static final double DELTA_T = 0.100; // 100ms
 
+    public static WilyWorks.Config config;
     public static Gamepad gamepad1;
     public static Gamepad gamepad2;
     public static InputManager inputManager;
@@ -541,10 +545,14 @@ public class WilyCore {
 
     // Allocate a configuration object. Use the specified class if provided, otherwise use a default.
     static WilyWorks.Config getConfig(Class<?> configKlass) {
-        if (configKlass == null) {
+        if (configKlass != null) {
             try {
-                return (WilyWorks.Config) configKlass.newInstance();
-            } catch (InstantiationException|IllegalAccessException e) {
+                // Make the constructor accessible so that the object doesn't have to be marked
+                // public:
+                Constructor<WilyWorks.Config> configConstructor = (Constructor<WilyWorks.Config>) configKlass.getDeclaredConstructor();
+                configConstructor.setAccessible(true);
+                return (WilyWorks.Config) configConstructor.newInstance();
+            } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
         }
@@ -625,8 +633,9 @@ public class WilyCore {
         DashboardWindow dashboardWindow = new DashboardWindow(annotations.opModeChoices, args);
         dashboardWindow.setVisible(true);
 
+        config = getConfig(annotations.configKlass);
         dashboardCanvas = dashboardWindow.dashboardCanvas;
-        simulation = new Simulation(getConfig(annotations.configKlass));
+        simulation = new Simulation(config);
         field = new Field(simulation);
         telemetry = new WilyTelemetry();
         gamepad1 = new Gamepad();

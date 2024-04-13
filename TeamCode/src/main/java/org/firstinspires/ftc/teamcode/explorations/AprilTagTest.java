@@ -205,7 +205,7 @@ public class AprilTagTest extends LinearOpMode {
 
         // Set the camera (webcam vs. built-in RC phone camera).
         if (USE_WEBCAM) {
-            builder.setCamera(hardwareMap.get(WebcamName.class, "webcam2"));
+            builder.setCamera(hardwareMap.get(WebcamName.class, "webcamfront"));
         } else {
             builder.setCamera(BuiltinCameraDirection.BACK);
         }

@@ -19,6 +19,7 @@ import com.qualcomm.robotcore.hardware.ServoController;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.SerialNumber;
 import com.wilyworks.common.WilyWorks;
+import com.wilyworks.simulator.WilyCore;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraCharacteristics;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -151,6 +152,18 @@ class WilyDistanceSensor extends WilyHardwareDevice implements DistanceSensor {
  * Wily Works named webcam implementation.
  */
 class WilyWebcam extends WilyHardwareDevice implements WebcamName {
+    WilyWorks.Config.Camera wilyCamera;
+
+    WilyWebcam(String deviceName) {
+        for (WilyWorks.Config.Camera camera: WilyCore.config.cameras) {
+            if (camera.name.equals(deviceName)) {
+                wilyCamera = camera;
+            }
+        }
+        if (wilyCamera == null) {
+            System.out.printf("WilyWorks: Couldn't find configuration data for camera '%s'", deviceName);
+        }
+    }
 
     @Override
     public boolean isWebcam() {
@@ -533,7 +546,7 @@ public class WilyHardwareMap implements Iterable<HardwareDevice> {
             device = new WilyDistanceSensor();
             distanceSensor.put(deviceName, (DistanceSensor) device);
         } else if (WebcamName.class.isAssignableFrom(klass)) {
-            device = new WilyWebcam();
+            device = new WilyWebcam(deviceName);
             webcamName.put(deviceName, (WebcamName) device);
         } else if (DigitalChannel.class.isAssignableFrom(klass)) {
             device = new WilyDigitalChannel();
