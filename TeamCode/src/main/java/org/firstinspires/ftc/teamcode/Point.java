@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode;
 
 import com.acmerobotics.roadrunner.Vector2d;
 
+import org.firstinspires.ftc.robotcore.external.matrices.VectorF;
+
 /**
  * Math helper for points and vectors:
  */
@@ -14,6 +16,10 @@ public class Point { // Can't derive from vector2d because it's marked as final 
     public Point(Vector2d vector) {
         x = vector.x;
         y = vector.y;
+    }
+    public Point(VectorF vector) {
+        x = vector.get(0);
+        y = vector.get(1);
     }
     Vector2d vector2d() { return new Vector2d(x, y); }
     public Point add(Point other) {
@@ -41,4 +47,5 @@ public class Point { // Can't derive from vector2d because it's marked as final 
     public double length() {
         return Math.hypot(x, y);
     }
+    public double atan2() { return Math.atan2(y, x); } // Rise over run
 }

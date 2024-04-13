@@ -465,7 +465,9 @@ public class WilyCore {
     }
 
     // Get the simulation's true pose and velocity:
-    static public Pose2d getPose() {
+    static public Pose2d getPose() { return getPose(0); }
+    static public Pose2d getPose(double secondsAgo) {
+        // @@@ Add support for 'secondsAgo'
         return simulation.pose;
     }
     static public PoseVelocity2d getPoseVelocity() {
@@ -602,7 +604,7 @@ public class WilyCore {
                 printWriter.flush();
                 String stackTrace = writer.toString().replace("\n", "\n    ");
                 String message = "Your program hit an unhandled exception:\n\n    " + stackTrace + "\n"
-                        + "You can also find this stacktrace in clickable form in the 'Debug/Console' or \n"
+                        + "You can also find this stack trace in clickable form in the 'Debug/Console' or \n"
                         + "'Run' tabs. Once there click on 'Create breakpoint' and re-run using the debug\n"
                         + "'bug' icon to stop the debugger at exactly the right spot.";
 
