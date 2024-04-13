@@ -9,6 +9,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Globals;
+import org.firstinspires.ftc.teamcode.Settings;
+import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -17,6 +19,8 @@ public class AprilTagAccuracy extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        Settings settings = new Settings(telemetry, gamepad1);
+        Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
