@@ -393,12 +393,15 @@ public class WilyCore {
     public static Status status = new Status(State.STOPPED, null, null);
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
-    private static double lastUpdateTime = time(); // Time of last update() call, in seconds
+    private static double lastUpdateClockTime = nanoTime() * 1e-9; // Clock time since last update() call, in seconds
     private static double lastRenderTime = 0; // Time of last render() call, in seconds
+    private static double elapsedTime = 0; // Elapsed time of simulation, in seconds
 
+    // Time, in seconds, that have elapsed in the simulation (which can be different from the
+    // real-time clock due to single-stepping):
     public static double time() {
-        return nanoTime() * 1e-9;
-    } // Elapsed time in seconds
+        return elapsedTime;
+    }
 
     /**
      * Structure to communicate between the UI and the thread running the opMode.
@@ -433,13 +436,12 @@ public class WilyCore {
     // class.
 
     // The guest can specify the delta-t (which is handy when single stepping):
-    static public void update(double deltaT) {
-        // If delta-t is zero then use the real-time clock:
-        double time = time();
+    static public void updateSimulation(double deltaT) {
         if (deltaT <= 0) {
-            deltaT = time - lastUpdateTime;
+            deltaT = nanoTime() * 1e-9 - lastUpdateClockTime;
         }
-        lastUpdateTime = time;
+        elapsedTime += deltaT;
+        lastUpdateClockTime = nanoTime() * 1e-9;
 
         // Advance the simulation:
         simulation.advance(deltaT);
@@ -455,7 +457,7 @@ public class WilyCore {
                                double xVelocity, double yVelocity, double headingVelocity) {
         // If the user didn't explicitly call the simulation update() API, do it now:
         if (!simulationUpdated)
-            update(0);
+            updateSimulation(0);
         simulation.setPose(
                 new Pose2d(x, y, heading),
                 new PoseVelocity2d(new Vector2d(xVelocity, yVelocity), headingVelocity));
@@ -477,7 +479,7 @@ public class WilyCore {
 
         // If the user didn't explicitly call the simulation update() API, do it now:
         if (!simulationUpdated)
-            update(0);
+            updateSimulation(0);
 
         simulation.setDrivePowers(stickVelocity, assistVelocity);
         simulationUpdated = false;

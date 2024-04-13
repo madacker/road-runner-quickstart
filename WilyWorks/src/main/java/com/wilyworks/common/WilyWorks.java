@@ -69,10 +69,10 @@ public class WilyWorks {
             public double orientation;
 
             // Field of view of the camera, in radians. Can be zero which assigns a default:
-            public double fieldOfView = 0;
+            public double fieldOfView;
 
             // Latency of the April Tag processing for this camera, in seconds:
-            public double latency = 0.200;
+            public double latency;
 
             public Camera(String name, double x, double y, double orientation, double fieldOfView, double latency) {
                 this.name = name; this.x = x; this.y = y; this.orientation = orientation; this.fieldOfView = fieldOfView; this.latency = latency;
@@ -106,7 +106,7 @@ public class WilyWorks {
     // Interaction
 
     // WilyLink class for communicating with the Wily Works simulator:
-    static private Class wilyCore = getWilyCore();
+    static private Class<?> wilyCore = getWilyCore();
 
     // Check this boolean to determine whether you're running on the real robot or in a simulation:
     static public boolean isSimulating = (wilyCore != null);
@@ -115,7 +115,7 @@ public class WilyWorks {
     // Implementation
 
     // Wrap WilyLink initialization with
-    static Class getWilyCore() {
+    static Class<?> getWilyCore() {
         try {
             return getSystemClassLoader().loadClass("com.wilyworks.simulator.WilyCore");
         } catch (ClassNotFoundException e) {
@@ -143,9 +143,10 @@ public class WilyWorks {
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // Road Runner control
+    // Control
 
     // Set the robot to a given pose and (optional) velocity in the simulation:
+    @SuppressWarnings("UnusedReturnValue")
     static public boolean setPose(Pose2d pose, PoseVelocity2d velocity) {
         if (wilyCore != null) {
             try {
@@ -214,7 +215,7 @@ public class WilyWorks {
             try {
                 Method getLocalization = wilyCore.getMethod("getLocalization");
                 double[] localization = (double[]) getLocalization.invoke(null);
-                return new Twist2dDual<Time>(new Vector2dDual<Time>(
+                return new Twist2dDual<>(new Vector2dDual<>(
                         new DualNum<Time>(new double[] { localization[0], localization[3] }),
                         new DualNum<Time>(new double[] { localization[1], localization[4] })),
                         new DualNum<Time>(new double[] { localization[2], localization[5] }));
@@ -224,5 +225,17 @@ public class WilyWorks {
             }
         }
         return null;
+    }
+
+    // Ask the simulation to update by a specified amount of time:
+    static public void updateSimulation(double deltaTime) {
+        if (wilyCore != null) {
+            try {
+                Method setDrivePowers = wilyCore.getMethod("updateSimulation", Double.class);
+                setDrivePowers.invoke(null, deltaTime);
+            } catch (InvocationTargetException|IllegalAccessException|NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

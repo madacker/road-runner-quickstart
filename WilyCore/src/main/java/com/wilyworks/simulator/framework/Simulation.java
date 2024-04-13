@@ -57,8 +57,8 @@ class Localizer {
  * Kinematic simulation for the robot's movement.
  */
 public class Simulation {
-    public Pose2d pose = new Pose2d(-48, 0, Math.toRadians(90)); // Robot's true pose
-    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(0, 60), Math.toRadians(0)); // Robot's true pose velocity
+    public Pose2d pose = new Pose2d(0, 0, Math.toRadians(0)); // Robot's true pose
+    public PoseVelocity2d poseVelocity = new PoseVelocity2d(new Vector2d(0, 0), Math.toRadians(0)); // Robot's true pose velocity
     public Dimension robotSize = new Dimension(16, 18); // Size in inches of user's robot
 
     private Localizer localizer;
