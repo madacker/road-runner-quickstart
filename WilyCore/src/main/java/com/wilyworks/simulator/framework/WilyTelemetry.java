@@ -8,6 +8,41 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Helper class for handling simplified HTML display.
+ */
+class Html {
+    static final Map<String, String> ENTITY_MAP = new HashMap<String, String>() {{
+        put("&nbsp;", " ");
+        put("&ensp;", "  ");
+        put("&emsp;", "    ");
+        put("&lt;", "<");
+        put("&gt;", ">");
+        put("&amp;", "&");
+        put("&quot;", "\"");
+        put("&apos;", "'");
+    }};
+
+    // Simple routine to strip all HTML-looking tags from a string.
+    public static String stripTags(String string) {
+        while (true) {
+            int tagStart = string.indexOf('<');
+            if (tagStart == -1)
+                return string;
+
+            int tagEnd = string.indexOf('>', tagStart);
+            if (tagEnd == -1)
+                return string;
+
+            String tag = string.substring(tagStart + 1, tagEnd).trim();
+            String substitution = (ENTITY_MAP.get(tag) != null) ? ENTITY_MAP.get(tag) : "";
+            string = string.substring(0, tagStart) + substitution + string.substring(tagEnd + 1);
+        }
+    }
+}
 
 /**
  * This class implements a lightweight emulation of FTC Telemetry that can run on the PC.
@@ -49,11 +84,12 @@ public class WilyTelemetry implements Telemetry {
     DisplayFormat displayFormat = DisplayFormat.CLASSIC; // HTML vs. monospace modes
 
     // Unit test:
+    @SuppressWarnings({"UnnecessaryUnicodeEscape", "StringConcatenationInLoop"})
     private void test(WilyTelemetry telemetry) {
         telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
         String emojis = ">";
         for (int i = 0; i < 30; i++) {
-            emojis += (true) ? "\uD83C\uDF1E" : "\u2744\uFE0F"; // Surrogate vs. variation selector
+            emojis += ((i & 1) != 0) ? "\uD83C\uDF1E" : "\u2744\uFE0F"; // Surrogate vs. variation selector
         }
         telemetry.addLine(emojis);
         telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
@@ -78,7 +114,7 @@ public class WilyTelemetry implements Telemetry {
         }
     }
 
-    // PC constructor for a Telemetry object:
+    // Wily Works constructor for a Telemetry object:
     public WilyTelemetry() {
         instance = this;
 
@@ -227,6 +263,10 @@ public class WilyTelemetry implements Telemetry {
         int y = HEIGHT_IN_LINES;
         int lineCount = 0;
         for (String line : lineList) {
+            if (displayFormat == DisplayFormat.HTML) {
+                line = Html.stripTags(line);
+            }
+
             while (lineCount < HEIGHT_IN_LINES) {
                 int lineBreak = line.length();
                 if (stringWidth(line) > lineWidth) {
