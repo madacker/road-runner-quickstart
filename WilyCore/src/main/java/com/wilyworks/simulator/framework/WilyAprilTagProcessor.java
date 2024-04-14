@@ -59,17 +59,17 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         double z = 0;
 
         // Add 90 degrees to the tag's angle to orient both angles in a consistent direction:
-        double yaw = cameraFieldAngle - (Math.PI/2 + tagOrientation.firstAngle);
+        double yaw = (tagOrientation.firstAngle + Math.PI/2) - cameraFieldAngle;
         double pitch = 0;
         double roll = 0;
         double range = cameraVectorToTag.length();
-        double bearing = Math.atan2(-x, y); // Yes, 'x' is rise, 'y' is run
+        double bearing = Math.atan2(x, y); // Yes, 'x' is rise, 'y' is run
         double elevation = 0;
 
         double yawInDegrees = Math.toDegrees(yaw);
         double bearingInDegrees = Math.toDegrees(bearing);
 
-        AprilTagPoseFtc ftcPose = new AprilTagPoseFtc(-x, y, z, yaw, pitch, roll, range, bearing, elevation);
+        AprilTagPoseFtc ftcPose = new AprilTagPoseFtc(-x, y, z, yawInDegrees, pitch, roll, range, bearingInDegrees, elevation);
 
         return new AprilTagDetection(tag.id, 0, 0, null, null,
                 tag, ftcPose, null, 0);

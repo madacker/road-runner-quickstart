@@ -111,7 +111,7 @@ public class AprilTagTest extends LinearOpMode {
         Settings settings = new Settings(telemetry, gamepad1);
         Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 36, 0), globals);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 36, Math.toRadians(-10)), globals);
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
