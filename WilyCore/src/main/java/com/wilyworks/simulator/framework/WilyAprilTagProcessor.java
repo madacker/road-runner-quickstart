@@ -51,7 +51,7 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         //     conceptually understand. And we use an angle order of XYZ, which results in the Z
         //     angle, being applied last (after X and Y rotations) and so representing the robot's
         //     heading on the field, which is often what is of most interest in robot navigation.
-        Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.XYZ, AngleUnit.DEGREES);
+        Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
 
         Point cameraVectorToTag = fieldVectorToTag.rotate(-cameraAngle);
         double x = cameraVectorToTag.y; // Yes, swap 'x' and 'y'
