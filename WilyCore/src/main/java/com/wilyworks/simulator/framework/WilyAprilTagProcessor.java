@@ -44,7 +44,7 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
     //   https://javadoc.io/doc/org.firstinspires.ftc/Vision/latest/org/firstinspires/ftc/vision/apriltag/AprilTagDetection.html
     // Most useful is the inline code documentation for the AprilTagDetection class.
     @SuppressWarnings("SuspiciousNameCombination")
-    AprilTagDetection createDetection(AprilTagMetadata tag, double cameraAngle, Point fieldVectorToTag) {
+    AprilTagDetection createDetection(AprilTagMetadata tag, double cameraFieldAngle, Point fieldVectorToTag) {
         // Via MatrixF.formatAsTransform():
         //     We report here using an extrinsic angle reference, meaning that all three angles are
         //     rotations in the (fixed) field coordinate system, as this is perhaps easiest to
@@ -53,18 +53,23 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         //     heading on the field, which is often what is of most interest in robot navigation.
         Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
 
-        Point cameraVectorToTag = fieldVectorToTag.rotate(-cameraAngle);
+        Point cameraVectorToTag = fieldVectorToTag.rotate(-cameraFieldAngle);
         double x = cameraVectorToTag.y; // Yes, swap 'x' and 'y'
         double y = cameraVectorToTag.x; // Yes, swap 'x' and 'y'
         double z = 0;
-        double yaw = tagOrientation.firstAngle - cameraAngle;
+
+        // Add 90 degrees to the tag's angle to orient both angles in a consistent direction:
+        double yaw = cameraFieldAngle - (Math.PI/2 + tagOrientation.firstAngle);
         double pitch = 0;
         double roll = 0;
         double range = cameraVectorToTag.length();
-        double bearing = Math.atan2(x, y); // Yes, 'x' is rise, 'y' is run
+        double bearing = Math.atan2(-x, y); // Yes, 'x' is rise, 'y' is run
         double elevation = 0;
 
-        AprilTagPoseFtc ftcPose = new AprilTagPoseFtc(x, y, z, yaw, pitch, roll, range, bearing, elevation);
+        double yawInDegrees = Math.toDegrees(yaw);
+        double bearingInDegrees = Math.toDegrees(bearing);
+
+        AprilTagPoseFtc ftcPose = new AprilTagPoseFtc(-x, y, z, yaw, pitch, roll, range, bearing, elevation);
 
         return new AprilTagDetection(tag.id, 0, 0, null, null,
                 tag, ftcPose, null, 0);
@@ -98,14 +103,17 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
             Point vectorToTag = new Point(tag.fieldPosition).subtract(new Point(pose.position));
             double tagAngle = vectorToTag.atan2();
 
-            double cameraAngle = pose.heading.log() + cameraDescriptor.orientation;
+            double cameraFieldAngle = pose.heading.log() + cameraDescriptor.orientation;
             double halfFov = (cameraDescriptor.fieldOfView / 2) * 1.3;
-            double rightAngle = cameraAngle - halfFov;
-            double leftAngle = cameraAngle + halfFov;
+            double rightAngle = cameraFieldAngle - halfFov;
+            double leftAngle = cameraFieldAngle + halfFov;
             double deltaRight = Globals.normalizeAngle(tagAngle - rightAngle);
             double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
             if ((deltaRight > 0) && (deltaLeft > 0)) {
-                detections.add(createDetection(tag, cameraAngle, vectorToTag));
+                detections.add(createDetection(tag, cameraFieldAngle, vectorToTag));
+
+
+                break; // @@@@@@@@
             }
         }
 

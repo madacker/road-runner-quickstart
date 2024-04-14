@@ -111,7 +111,7 @@ public class AprilTagTest extends LinearOpMode {
         Settings settings = new Settings(telemetry, gamepad1);
         Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 36, 0), globals);
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
@@ -257,8 +257,8 @@ public class AprilTagTest extends LinearOpMode {
         Pose2d recommendedPose = null;
 
         // Camera location on the robot:
-        final double CAMERA_OFFSET_X = 8.0; // 0.0;
-        final double CAMERA_OFFSET_Y = -5.75; // 8.0;
+        final double CAMERA_OFFSET_X = 0.0; // 8.0;
+        final double CAMERA_OFFSET_Y = 8.0; // -5.75;
 
         AprilTagLocation[] tagLocations = {
                 new AprilTagLocation(1,62.875,   42.750, 180, false), // Blue left backdrop, small
