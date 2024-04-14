@@ -7,11 +7,15 @@ import com.wilyworks.simulator.helpers.Globals;
 import com.wilyworks.simulator.helpers.Point;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
 import org.firstinspires.ftc.vision.apriltag.AprilTagLibrary;
 import org.firstinspires.ftc.vision.apriltag.AprilTagMetadata;
+import org.firstinspires.ftc.vision.apriltag.AprilTagPoseFtc;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.ArrayList;
@@ -34,8 +38,37 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         this.cameraDescriptor = wilyCamera;
     }
 
+    // Create a detection record for the specified tag. References for understanding these values:
+    //   https://ftc-docs.firstinspires.org/apriltag-detection-values
+    //   https://ftc-docs-cdn.ftclive.org/booklets/en/april_tags.pdf
+    //   https://javadoc.io/doc/org.firstinspires.ftc/Vision/latest/org/firstinspires/ftc/vision/apriltag/AprilTagDetection.html
+    // Most useful is the inline code documentation for the AprilTagDetection class.
+    @SuppressWarnings("SuspiciousNameCombination")
+    AprilTagDetection createDetection(AprilTagMetadata tag, double cameraAngle, Point fieldVectorToTag) {
+        // Via MatrixF.formatAsTransform():
+        //     We report here using an extrinsic angle reference, meaning that all three angles are
+        //     rotations in the (fixed) field coordinate system, as this is perhaps easiest to
+        //     conceptually understand. And we use an angle order of XYZ, which results in the Z
+        //     angle, being applied last (after X and Y rotations) and so representing the robot's
+        //     heading on the field, which is often what is of most interest in robot navigation.
+        Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.XYZ, AngleUnit.DEGREES);
 
+        Point cameraVectorToTag = fieldVectorToTag.rotate(-cameraAngle);
+        double x = cameraVectorToTag.y; // Yes, swap 'x' and 'y'
+        double y = cameraVectorToTag.x; // Yes, swap 'x' and 'y'
+        double z = 0;
+        double yaw = tagOrientation.firstAngle - cameraAngle;
+        double pitch = 0;
+        double roll = 0;
+        double range = cameraVectorToTag.length();
+        double bearing = Math.atan2(x, y); // Yes, 'x' is rise, 'y' is run
+        double elevation = 0;
 
+        AprilTagPoseFtc ftcPose = new AprilTagPoseFtc(x, y, z, yaw, pitch, roll, range, bearing, elevation);
+
+        return new AprilTagDetection(tag.id, 0, 0, null, null,
+                tag, ftcPose, null, 0);
+    }
 
     @Override
     public void setDecimation(float decimation) {}
@@ -72,7 +105,7 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
             double deltaRight = Globals.normalizeAngle(tagAngle - rightAngle);
             double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
             if ((deltaRight > 0) && (deltaLeft > 0)) {
-                // @@@ We got a hit!
+                detections.add(createDetection(tag, cameraAngle, vectorToTag));
             }
         }
 
