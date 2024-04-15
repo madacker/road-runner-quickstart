@@ -45,13 +45,7 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
     // Most useful is the inline code documentation for the AprilTagDetection class.
     @SuppressWarnings("SuspiciousNameCombination")
     AprilTagDetection createDetection(AprilTagMetadata tag, double cameraFieldAngle, Point fieldVectorToTag) {
-        // Via MatrixF.formatAsTransform():
-        //     We report here using an extrinsic angle reference, meaning that all three angles are
-        //     rotations in the (fixed) field coordinate system, as this is perhaps easiest to
-        //     conceptually understand. And we use an angle order of XYZ, which results in the Z
-        //     angle, being applied last (after X and Y rotations) and so representing the robot's
-        //     heading on the field, which is often what is of most interest in robot navigation.
-        Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
+        Orientation tagOrientation = tag.fieldOrientation.toOrientation(AxesReference.EXTRINSIC, AxesOrder.YXZ, AngleUnit.RADIANS);
 
         Point cameraVectorToTag = fieldVectorToTag.rotate(-cameraFieldAngle);
         double x = cameraVectorToTag.y; // Yes, swap 'x' and 'y'
@@ -59,7 +53,7 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         double z = 0;
 
         // Add 90 degrees to the tag's angle to orient both angles in a consistent direction:
-        double yaw = (tagOrientation.firstAngle + Math.PI/2) - cameraFieldAngle;
+        double yaw = (tagOrientation.thirdAngle + Math.PI/2) - cameraFieldAngle;
         double pitch = 0;
         double roll = 0;
         double range = cameraVectorToTag.length();
@@ -96,7 +90,6 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
             return null;
 
         // @@@ Check if enabled
-
         ArrayList<AprilTagDetection> detections = new ArrayList<>();
         Pose2d pose = WilyCore.getPose(cameraDescriptor.latency);
         for (AprilTagMetadata tag: tags) {
@@ -111,9 +104,6 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
             double deltaLeft = Globals.normalizeAngle(leftAngle - tagAngle);
             if ((deltaRight > 0) && (deltaLeft > 0)) {
                 detections.add(createDetection(tag, cameraFieldAngle, vectorToTag));
-
-
-                break; // @@@@@@@@
             }
         }
 
