@@ -26,7 +26,7 @@ public class WilyWorks {
     public static class Config {
         // Set these to the actual dimensions of your robot:
         public double robotWidth = 24.0;
-        public double robotHeight = 24.0;
+        public double robotLength = 24.0;
 
         // Maximum linear and rotational speeds in inches/s and radians/s, respectively:
         public double maxLinearSpeed = 60;

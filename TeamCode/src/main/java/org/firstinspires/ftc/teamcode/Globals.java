@@ -23,9 +23,10 @@ import org.jetbrains.annotations.Nullable;
 @Wily
 class WilyConfig extends WilyWorks.Config {
     WilyConfig() {
-        robotWidth = 3;
+        robotWidth = 16;
+        robotLength = 18;
         cameras = new Camera[]{
-            new Camera("webcamback", -5.75, -6, Math.PI, Math.toRadians(75), 0.190),
+            new Camera("webcamback", -5.75, -6, Math.PI, Math.toRadians(75), 0.5),
             new Camera("webcamfront", 7, -0.5, 0, Math.toRadians(70.4), 0.190)
         };
         distanceSensors = new DistanceSensor[]{

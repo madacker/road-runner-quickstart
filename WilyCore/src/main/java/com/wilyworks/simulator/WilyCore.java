@@ -336,11 +336,12 @@ class Field {
 
     // Render just the robot:
     void renderRobot(Graphics2D g) {
+        Pose2d simulationPose = simulation.getPose(0);
         AffineTransform imageTransform = new AffineTransform();
-        imageTransform.translate(simulation.pose.position.x, simulation.pose.position.y);
+        imageTransform.translate(simulationPose.position.x, simulationPose.position.y);
         imageTransform.scale(1.0 / ROBOT_IMAGE_WIDTH,1.0 / ROBOT_IMAGE_HEIGHT);
-        imageTransform.rotate(simulation.pose.heading.log() + Math.toRadians(90));
-        imageTransform.scale(simulation.robotSize.width, simulation.robotSize.height);
+        imageTransform.rotate(simulationPose.heading.log() + Math.toRadians(90));
+        imageTransform.scale(WilyCore.config.robotWidth, WilyCore.config.robotLength);
         imageTransform.translate(-ROBOT_IMAGE_HEIGHT / 2.0, -ROBOT_IMAGE_HEIGHT / 2.0);
         g.drawImage(robotImage, imageTransform, null);
     }
@@ -393,7 +394,7 @@ public class WilyCore {
     public static Status status = new Status(State.STOPPED, null, null);
 
     private static boolean simulationUpdated; // True if WilyCore.update() has been called since
-    private static double lastUpdateClockTime = nanoTime() * 1e-9; // Clock time since last update() call, in seconds
+    private static double lastUpdateWallClockTime = nanoTime() * 1e-9; // Clock time since last update() call, in seconds
     private static double lastRenderTime = 0; // Time of last render() call, in seconds
     private static double elapsedTime = 0; // Elapsed time of simulation, in seconds
 
@@ -438,10 +439,10 @@ public class WilyCore {
     // The guest can specify the delta-t (which is handy when single stepping):
     static public void updateSimulation(double deltaT) {
         if (deltaT <= 0) {
-            deltaT = nanoTime() * 1e-9 - lastUpdateClockTime;
+            deltaT = nanoTime() * 1e-9 - lastUpdateWallClockTime;
         }
         elapsedTime += deltaT;
-        lastUpdateClockTime = nanoTime() * 1e-9;
+        lastUpdateWallClockTime = nanoTime() * 1e-9;
 
         // Advance the simulation:
         simulation.advance(deltaT);
@@ -467,8 +468,7 @@ public class WilyCore {
     // Get the simulation's true pose and velocity:
     static public Pose2d getPose() { return getPose(0); }
     static public Pose2d getPose(double secondsAgo) {
-        // @@@ Add support for 'secondsAgo'
-        return simulation.pose;
+        return simulation.getPose(secondsAgo);
     }
     static public PoseVelocity2d getPoseVelocity() {
         return simulation.poseVelocity;
