@@ -49,6 +49,7 @@ public class Settings {
         public ToggleOption(String descriptor, boolean value, Consumer<Boolean> callback) {
             super(descriptor); this.value = value; this.callback = callback;
         }
+        /** @noinspection UnnecessaryUnicodeEscape*/
         public String string() {
             return (value ? "\u2612" : "\u2610") + " " + description; // checked-box, empty box
         }
@@ -60,6 +61,7 @@ public class Settings {
         public ListOption(String descriptor, int index, String[] list, BiConsumer<Integer, String> callback) {
             super(descriptor); this.index = index; this.list = list; this.callback = callback;
         }
+        /** @noinspection UnnecessaryUnicodeEscape*/
         public String string() {
             return "\u2194\uFE0F <b>" + list[index] + "</b>: " + description; // blue left/right arrow
         }
@@ -69,6 +71,7 @@ public class Settings {
         public ActivationOption(String descriptor, Function<Boolean, String> callback) {
             super(descriptor); this.callback = callback;
         }
+        /** @noinspection UnnecessaryUnicodeEscape*/
         public String string() {
             return "\u2757 " + callback.apply(false); // red exclamation mark
         }
@@ -162,7 +165,7 @@ public class Settings {
         // Now output the options:
         for (int i = 0; i < menu.options.size(); i++) {
             if (i == menu.current) // Draw the highlight:
-                output.append("<span style='background: #88285a'>" + menu.options.get(i).string() + "</span>\n");
+                output.append("<span style='background: #88285a'>--&gt;" + menu.options.get(i).string() + "</span>\n");
             else
                 output.append(menu.options.get(i).string() + "\n");
         }

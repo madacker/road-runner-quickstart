@@ -26,7 +26,24 @@ class Html {
         put("&apos;", "'");
     }};
 
-    // Simple routine to strip all HTML-looking tags from a string.
+    // Simple routine to substitute HTML entities into their displayable state:
+    public static String substituteEntities(String string) {
+        while (true) {
+            int tagStart = string.indexOf('&');
+            if (tagStart == -1)
+                return string;
+
+            int tagEnd = string.indexOf(';', tagStart);
+            if (tagEnd == -1)
+                return string;
+
+            String entity = string.substring(tagStart, tagEnd + 1).trim(); // Includes '&' and ';'
+            String substitution = (ENTITY_MAP.get(entity) != null) ? ENTITY_MAP.get(entity) : "";
+            string = string.substring(0, tagStart) + substitution + string.substring(tagEnd + 1);
+        }
+    }
+
+    // Simple routine to strip all HTML-looking tags from a string:
     public static String stripTags(String string) {
         while (true) {
             int tagStart = string.indexOf('<');
@@ -38,8 +55,7 @@ class Html {
                 return string;
 
             String tag = string.substring(tagStart + 1, tagEnd).trim();
-            String substitution = (ENTITY_MAP.get(tag) != null) ? ENTITY_MAP.get(tag) : "";
-            string = string.substring(0, tagStart) + substitution + string.substring(tagEnd + 1);
+            string = string.substring(0, tagStart) + string.substring(tagEnd + 1);
         }
     }
 }
@@ -265,6 +281,7 @@ public class WilyTelemetry implements Telemetry {
         for (String line : lineList) {
             if (displayFormat == DisplayFormat.HTML) {
                 line = Html.stripTags(line);
+                line = Html.substituteEntities(line);
             }
 
             while (lineCount < HEIGHT_IN_LINES) {

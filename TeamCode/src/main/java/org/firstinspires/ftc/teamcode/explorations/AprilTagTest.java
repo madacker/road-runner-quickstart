@@ -43,6 +43,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.Globals;
+import org.firstinspires.ftc.teamcode.Point;
 import org.firstinspires.ftc.teamcode.Settings;
 import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
@@ -205,7 +206,7 @@ public class AprilTagTest extends LinearOpMode {
 
         // Set the camera (webcam vs. built-in RC phone camera).
         if (USE_WEBCAM) {
-            builder.setCamera(hardwareMap.get(WebcamName.class, "webcamfront"));
+            builder.setCamera(hardwareMap.get(WebcamName.class, "webcamback"));
         } else {
             builder.setCamera(BuiltinCameraDirection.BACK);
         }
@@ -257,8 +258,8 @@ public class AprilTagTest extends LinearOpMode {
         Pose2d recommendedPose = null;
 
         // Camera location on the robot:
-        final double CAMERA_OFFSET_X = 0.0; // 8.0;
-        final double CAMERA_OFFSET_Y = 8.0; // -5.75;
+        final Point CAMERA_OFFSET = new Point(-5.75, -6);
+        final double CAMERA_ANGLE = Math.PI;
 
         AprilTagLocation[] tagLocations = {
                 new AprilTagLocation(1,62.875,   42.750, 180, false), // Blue left backdrop, small
@@ -286,16 +287,19 @@ public class AprilTagTest extends LinearOpMode {
                 }
 
                 Pose2d pose;
-                double dx = detection.ftcPose.x - CAMERA_OFFSET_X;
-                double dy = detection.ftcPose.y - CAMERA_OFFSET_Y;
+                double dx = detection.ftcPose.x;
+                double dy = detection.ftcPose.y;
                 double distance = Math.sqrt(dx * dx + dy * dy);
 
-                double gamma = -(Math.atan(dx / dy) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
-                double x = tag.x + Math.cos(gamma) * distance;
-                double y = tag.y + Math.sin(gamma) * distance;
+                double gamma = -(Math.atan(detection.ftcPose.x / detection.ftcPose.y) + Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
+                Point cameraPosition = new Point(tag.x + Math.cos(gamma) * distance, tag.y + Math.sin(gamma) * distance);
+                double cameraHeading = Math.PI - (Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees));
+                // pose = new Pose2d(cameraPosition.vector2d(), cameraHeading);
 
-                double theta = Math.toRadians(detection.ftcPose.yaw) + Math.toRadians(tag.degrees);
-                pose = new Pose2d(new Vector2d(x, y), Math.PI - theta);
+                double robotHeading = Globals.normalizeAngle(cameraHeading + CAMERA_ANGLE);
+                Point robotCenterToCameraOffset = CAMERA_OFFSET.rotate(robotHeading);
+                Point robotCenter = cameraPosition.subtract(robotCenterToCameraOffset);
+                pose = new Pose2d(robotCenter.vector2d(), robotHeading);
 
                 if (tag.large)
                     recommendedPose = pose;

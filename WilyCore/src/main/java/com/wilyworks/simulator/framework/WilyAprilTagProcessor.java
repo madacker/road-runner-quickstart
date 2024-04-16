@@ -93,10 +93,15 @@ public class WilyAprilTagProcessor extends AprilTagProcessor {
         ArrayList<AprilTagDetection> detections = new ArrayList<>();
         Pose2d pose = WilyCore.getPose(cameraDescriptor.latency);
         for (AprilTagMetadata tag: tags) {
-            Point vectorToTag = new Point(tag.fieldPosition).subtract(new Point(pose.position));
+            double poseHeading = pose.heading.log();
+            Point robotCameraOffset = new Point(cameraDescriptor.x, cameraDescriptor.y);
+            Point fieldCameraOffset = robotCameraOffset.rotate(poseHeading);
+            Point fieldCameraPosition = new Point(pose.position).add(fieldCameraOffset);
+
+            Point vectorToTag = new Point(tag.fieldPosition).subtract(fieldCameraPosition);
             double tagAngle = vectorToTag.atan2();
 
-            double cameraFieldAngle = pose.heading.log() + cameraDescriptor.orientation;
+            double cameraFieldAngle = poseHeading + cameraDescriptor.orientation;
             double halfFov = (cameraDescriptor.fieldOfView / 2) * 1.3;
             double rightAngle = cameraFieldAngle - halfFov;
             double leftAngle = cameraFieldAngle + halfFov;

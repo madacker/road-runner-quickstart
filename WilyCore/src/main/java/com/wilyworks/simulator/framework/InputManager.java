@@ -115,6 +115,10 @@ class KeyDispatcher implements KeyEventDispatcher {
             case KeyEvent.VK_QUOTE: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = pressed; break;
             case KeyEvent.VK_BRACELEFT: button[SDL.SDL_CONTROLLER_BUTTON_LEFTSTICK] = pressed; break;
             case KeyEvent.VK_BRACERIGHT: button[SDL.SDL_CONTROLLER_BUTTON_RIGHTSTICK] = pressed; break;
+
+            // Let the default dispatcher handle everything else so that basics like Alt-F4
+            // work to close the application:
+            default: return false;
         }
 
         // Speed is 20% of max when control is pressed, 100% when shift is pressed, 40% otherwise:
