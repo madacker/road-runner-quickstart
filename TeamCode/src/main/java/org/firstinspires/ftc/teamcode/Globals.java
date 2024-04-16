@@ -25,8 +25,7 @@ class WilyConfig extends WilyWorks.Config {
     WilyConfig() {
         robotWidth = 3;
         cameras = new Camera[]{
-            // new Camera("webcamback", -5.75, -6, Math.PI, Math.toRadians(75), 0.190),
-            new Camera("webcamback", 0, 0, Math.PI, Math.toRadians(75), 0.190),
+            new Camera("webcamback", -5.75, -6, Math.PI, Math.toRadians(75), 0.190),
             new Camera("webcamfront", 7, -0.5, 0, Math.toRadians(70.4), 0.190)
         };
         distanceSensors = new DistanceSensor[]{

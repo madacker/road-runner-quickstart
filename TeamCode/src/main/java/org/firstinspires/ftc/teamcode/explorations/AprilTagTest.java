@@ -261,17 +261,30 @@ public class AprilTagTest extends LinearOpMode {
         final Point CAMERA_OFFSET = new Point(-5.75, -6);
         final double CAMERA_ANGLE = Math.PI;
 
+//        AprilTagLocation[] tagLocations = {
+//                new AprilTagLocation(1,62.875,   42.750, 180, false), // Blue left backdrop, small
+//                new AprilTagLocation(2,62.875,   36.625, 180, false), // Blue middle backdrop, small
+//                new AprilTagLocation(3,62.875,   30.625, 180, false), // Blue right backdrop, small
+//                new AprilTagLocation(4,62.875,  -30.625, 180, false), // Red left backdrop, small
+//                new AprilTagLocation(5,62.875,  -36.750, 180, false), // Red middle backdrop, small
+//                new AprilTagLocation(6,62.875,  -42.625, 180, false), // Red right backdrop, small
+//                new AprilTagLocation(7,  -72, -43.0, 0, true),   // Red audience wall, large
+//                new AprilTagLocation(8,  -72, -37.5, 0, false),  // Red audience wall, small
+//                new AprilTagLocation(9,  -72,  37.5, 0, false),  // Blue audience wall, small
+//                new AprilTagLocation(10, -72,  43.0, 0, true),   // Blue audience wall, large
+//        };
+
         AprilTagLocation[] tagLocations = {
-                new AprilTagLocation(1,62.875,   42.750, 180, false), // Blue left backdrop, small
-                new AprilTagLocation(2,62.875,   36.625, 180, false), // Blue middle backdrop, small
-                new AprilTagLocation(3,62.875,   30.625, 180, false), // Blue right backdrop, small
-                new AprilTagLocation(4,62.875,  -30.625, 180, false), // Red left backdrop, small
-                new AprilTagLocation(5,62.875,  -36.750, 180, false), // Red middle backdrop, small
-                new AprilTagLocation(6,62.875,  -42.625, 180, false), // Red right backdrop, small
-                new AprilTagLocation(7,  -72, -43.0, 0, true),   // Red audience wall, large
-                new AprilTagLocation(8,  -72, -37.5, 0, false),  // Red audience wall, small
-                new AprilTagLocation(9,  -72,  37.5, 0, false),  // Blue audience wall, small
-                new AprilTagLocation(10, -72,  43.0, 0, true),   // Blue audience wall, large
+                new AprilTagLocation(1,60.25,   41.41, 180, false), // Blue left backdrop, small
+                new AprilTagLocation(2,60.25,   35.41, 180, false), // Blue middle backdrop, small
+                new AprilTagLocation(3,60.25,   29.41, 180, false), // Blue right backdrop, small
+                new AprilTagLocation(4,60.25,  -29.41, 180, false), // Red left backdrop, small
+                new AprilTagLocation(5,60.25,  -35.41, 180, false), // Red middle backdrop, small
+                new AprilTagLocation(6,60.25,  -41.41, 180, false), // Red right backdrop, small
+                new AprilTagLocation(7,  -70.25, -40.625, 0, true),   // Red audience wall, large
+                new AprilTagLocation(8,  -70.25, -35.125, 0, false),  // Red audience wall, small
+                new AprilTagLocation(9,  -70.25,  35.125, 0, false),  // Blue audience wall, small
+                new AprilTagLocation(10, -70.25,  40.652, 0, true),   // Blue audience wall, large
         };
 
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
