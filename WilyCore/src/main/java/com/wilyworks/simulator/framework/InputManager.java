@@ -43,9 +43,9 @@ class KeyDispatcher implements KeyEventDispatcher {
         switch (code) {
             case KeyEvent.VK_ALT:
                 if (pressed) {
-                    double time = WilyCore.time();
+                    double time = WilyCore.wallClockTime();
                     if ((altPressTime == 0) || (time - altPressTime > DOUBLE_CLICK_DURATION)) {
-                        altPressTime = WilyCore.time();
+                        altPressTime = WilyCore.wallClockTime();
                     } else {
                         // We detected an Alt double-click! Toggle the state:
                         altActivated = !altActivated;

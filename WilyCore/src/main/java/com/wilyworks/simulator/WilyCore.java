@@ -404,6 +404,9 @@ public class WilyCore {
         return elapsedTime;
     }
 
+    // Wall-clock real elapsed time:
+    public static double wallClockTime() { return nanoTime() * 1e-9; }
+
     /**
      * Structure to communicate between the UI and the thread running the opMode.
      */
@@ -522,7 +525,7 @@ public class WilyCore {
                 String className = klass.getName();
                 className = className.substring(className.lastIndexOf(".") + 1); // Skip the dot itself
                 String givenName = className;
-                String fullName = className;
+                String groupName = null;
 
                 // Override the name if an annotation exists:
                 TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
@@ -531,7 +534,7 @@ public class WilyCore {
                         givenName = teleOpAnnotation.name();
                     }
                     if (!teleOpAnnotation.group().equals("")) {
-                        fullName = teleOpAnnotation.group() + ": " + givenName;
+                        groupName = teleOpAnnotation.group();
                     }
                 }
                 Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
@@ -540,9 +543,10 @@ public class WilyCore {
                         givenName = autonomousAnnotation.name();
                     }
                     if (!autonomousAnnotation.group().equals("")) {
-                        fullName = autonomousAnnotation.group() + ": " + givenName;
+                        groupName = autonomousAnnotation.group();
                     }
                 }
+                String fullName = (groupName == null) ? givenName : groupName + ": " + givenName;
                 choices.add(new OpModeChoice(klass, fullName, givenName, className));
             }
         }
