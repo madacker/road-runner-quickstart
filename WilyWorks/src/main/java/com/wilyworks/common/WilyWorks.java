@@ -39,9 +39,6 @@ public class WilyWorks {
         // Maximum angular acceleration and deceleration, in radians/s/s:
         public double maxAngularAcceleration = Math.PI;
 
-        // If 'true', add error to all sensor measurements to simulate real life:
-        public boolean addError = true;
-
         // Fill this out to describe cameras on the robot:
         public Camera[] cameras = {
             // new Camera("CameraExample", 3, 4, 0, Math.toRadians(120), 0.120)
