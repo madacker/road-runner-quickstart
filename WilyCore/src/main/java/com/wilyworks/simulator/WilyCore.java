@@ -420,8 +420,9 @@ public class WilyCore {
         }
     }
 
+    // Render the field:
     static public void render() {
-        // Don't render the the start screen at more than 30 fps:
+        // Don't render the start screen at more than 30 fps:
         if ((status.state == State.INITIALIZED) && (time() - lastRenderTime < 0.030))
             return;
         lastRenderTime = time();
@@ -666,6 +667,9 @@ public class WilyCore {
         // Endlessly call opModes
         // noinspection InfiniteLoopStatement
         while (true) {
+            // Render the field once and then wait for input:
+            render();
+
             // Wait for the DashboardWindow UI to tell us what opMode to run:
             while (status.state == State.STOPPED) {
                 try {
