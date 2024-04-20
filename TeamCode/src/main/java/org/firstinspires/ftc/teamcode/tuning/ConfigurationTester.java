@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.tuning;
 
+import android.annotation.SuppressLint;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -50,9 +52,7 @@ class Buttons {
 public class ConfigurationTester extends LinearOpMode {
     ArrayList<String> deviceNames = new ArrayList<>();
     Buttons buttons;
-    /**
-     *
-     */
+    /** @noinspection SameParameterValue*/
     int menu(String header, List<String> options, int current, boolean topmost) {
         while (isActive()) {
             if (header != null) {
@@ -87,6 +87,7 @@ public class ConfigurationTester extends LinearOpMode {
         telemetry.update();
         return isActive() && !buttons.cancel();
     }
+    @SuppressLint("DefaultLocale")
     void commonHeader(String deviceName, HardwareDevice device) {
         telemetry.addLine(String.format("Name: %s", deviceName));
         telemetry.addLine(device.getDeviceName());
@@ -94,6 +95,7 @@ public class ConfigurationTester extends LinearOpMode {
         telemetry.addLine(String.format("Version: %d", device.getVersion()));
         telemetry.addLine(String.format("Manufacturer: %s", device.getManufacturer().name()));
     }
+    @SuppressLint("DefaultLocale")
     void testMotor(String deviceName) {
         DcMotor motor = (DcMotor) hardwareMap.get(deviceName);
         motor.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -106,6 +108,7 @@ public class ConfigurationTester extends LinearOpMode {
             motor.setPower(power);
         } while (notCancelled());
     }
+    @SuppressLint("DefaultLocale")
     void testDistance(String deviceName) {
         DistanceSensor distance = (DistanceSensor) hardwareMap.get(deviceName);
         do {
@@ -119,6 +122,7 @@ public class ConfigurationTester extends LinearOpMode {
             commonHeader(deviceName, device);
         } while (notCancelled());
     }
+    @SuppressLint("DefaultLocale")
     void testIMU(String deviceName) {
         IMU imu = (IMU) hardwareMap.get(deviceName);
         do {
@@ -162,7 +166,8 @@ public class ConfigurationTester extends LinearOpMode {
             }
         }
         waitForStart();
-        // We can now initialized the gamepad tracker:
+
+        // We can now initialize the gamepad tracker:
         buttons = new Buttons(gamepad1);
         ArrayList<String> options = new ArrayList<>();
         for (String name: deviceNames) {
