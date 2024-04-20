@@ -142,12 +142,34 @@ public class WilyWorks {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Control
 
-    // Set the robot to a given pose and (optional) velocity in the simulation:
+    // Set the robot to a given pose and (optional) velocity in the simulation. The
+    // localizer will not register a move.
     @SuppressWarnings("UnusedReturnValue")
-    static public boolean setPose(Pose2d pose, PoseVelocity2d velocity) {
+    static public boolean setStartPose(Pose2d pose, PoseVelocity2d velocity) {
         if (wilyCore != null) {
             try {
-                Method setPose = wilyCore.getMethod("setPose",
+                Method setPose = wilyCore.getMethod("setStartPose",
+                        double.class, double.class, double.class,
+                        double.class, double.class, double.class);
+                setPose.invoke(null,
+                        pose.position.x, pose.position.y, pose.heading.log(),
+                        velocity.linearVel.x, velocity.linearVel.y, velocity.angVel);
+                return true; // ====>
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return false;
+    }
+
+    // MecanumDrive uses this while running a trajectory to update the simulator as to its
+    // current intermediate pose and velocity. This update will be reflected in the localizer
+    // results.
+    @SuppressWarnings("UnusedReturnValue")
+    static public boolean runTo(Pose2d pose, PoseVelocity2d velocity) {
+        if (wilyCore != null) {
+            try {
+                Method setPose = wilyCore.getMethod("runTo",
                         double.class, double.class, double.class,
                         double.class, double.class, double.class);
                 setPose.invoke(null,

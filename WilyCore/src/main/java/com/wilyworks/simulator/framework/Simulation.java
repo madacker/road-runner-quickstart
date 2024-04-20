@@ -268,9 +268,15 @@ public class Simulation {
     public double[] localizerUpdate() { return localizer.update(); }
 
     // Entry point to set the pose and velocity, both in field coordinates:
-    public void setPose(Pose2d pose, PoseVelocity2d poseVelocity) {
+    public void runTo(Pose2d pose, PoseVelocity2d poseVelocity) {
         recordPose(WilyCore.time(), pose);
         this.poseVelocity = poseVelocity;
+    }
+
+    // Entry point to set the pose and velocity, both in field coordinates:
+    public void setStartPose(Pose2d pose, PoseVelocity2d poseVelocity) {
+        runTo(pose, poseVelocity);
+        // Recreate the localizer so that it doesn't register a move:
         this.localizer = new Localizer(this);
     }
 }

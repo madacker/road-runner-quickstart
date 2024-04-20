@@ -457,17 +457,29 @@ public class WilyCore {
         simulationUpdated = true;
     }
 
-    // Guest call to set the pose and velocity:
-    static public void setPose(double x, double y, double heading,
-                               double xVelocity, double yVelocity, double headingVelocity) {
+    // Set the robot to a given pose and (optional) velocity in the simulation. The
+    // localizer will not register a move.
+    static public void setStartPose(double x, double y, double heading,
+             double xVelocity, double yVelocity, double headingVelocity) {
+        simulation.setStartPose(
+                new Pose2d(x, y, heading),
+                new PoseVelocity2d(new Vector2d(xVelocity, yVelocity), headingVelocity));
+    }
+
+    // MecanumDrive uses this while running a trajectory to update the simulator as to its
+    // current intermediate pose and velocity. This update will be reflected in the localizer
+    // results.
+    static public void runTo(double x, double y, double heading,
+             double xVelocity, double yVelocity, double headingVelocity) {
         // If the user didn't explicitly call the simulation update() API, do it now:
         if (!simulationUpdated)
             updateSimulation(0);
-        simulation.setPose(
+        simulation.runTo(
                 new Pose2d(x, y, heading),
                 new PoseVelocity2d(new Vector2d(xVelocity, yVelocity), headingVelocity));
         simulationUpdated = false;
     }
+
 
     // Get the simulation's true pose and velocity:
     static public Pose2d getPose() { return getPose(0); }
@@ -529,7 +541,7 @@ public class WilyCore {
                 String groupName = null;
 
                 // Override the name if an annotation exists:
-                TeleOp teleOpAnnotation = (TeleOp) klass.getAnnotation(TeleOp.class);
+                TeleOp teleOpAnnotation = klass.getAnnotation(TeleOp.class);
                 if (teleOpAnnotation != null) {
                     if (!teleOpAnnotation.name().equals("")) {
                         givenName = teleOpAnnotation.name();
@@ -538,7 +550,7 @@ public class WilyCore {
                         groupName = teleOpAnnotation.group();
                     }
                 }
-                Autonomous autonomousAnnotation = (Autonomous) klass.getAnnotation(Autonomous.class);
+                Autonomous autonomousAnnotation = klass.getAnnotation(Autonomous.class);
                 if (autonomousAnnotation != null) {
                     if (!autonomousAnnotation.name().equals("")) {
                         givenName = autonomousAnnotation.name();
@@ -571,7 +583,7 @@ public class WilyCore {
                 // noinspection unchecked
                 Constructor<WilyWorks.Config> configConstructor = (Constructor<WilyWorks.Config>) configKlass.getDeclaredConstructor();
                 configConstructor.setAccessible(true);
-                return (WilyWorks.Config) configConstructor.newInstance();
+                return configConstructor.newInstance();
             } catch (InstantiationException|IllegalAccessException|NoSuchMethodException|InvocationTargetException e) {
                 throw new RuntimeException(e);
             }

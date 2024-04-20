@@ -217,12 +217,10 @@ public final class MecanumDrive {
 
             lastHeading = heading;
 
-            Twist2dDual<Time> result = new Twist2dDual<>(
+            return new Twist2dDual<>(
                     twist.line,
                     DualNum.cons(headingDelta, twist.angle.drop(1))
             );
-
-            return result;
         }
     }
 
@@ -230,7 +228,7 @@ public final class MecanumDrive {
     public MecanumDrive(HardwareMap hardwareMap, Pose2d pose, Globals globals) {
         this.pose = pose;
 
-        WilyWorks.setPose(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
+        WilyWorks.setStartPose(pose, new PoseVelocity2d(new Vector2d(0, 0), 0));
 
         LynxFirmware.throwIfModulesAreOutdated(hardwareMap);
 
@@ -454,7 +452,7 @@ public final class MecanumDrive {
                     .compute(txWorldTarget, pose, robotVelRobot);
 
             // Enlighten Wily Works as to where we should be:
-            WilyWorks.setPose(txWorldTarget.value(), txWorldTarget.velocity().value());
+            WilyWorks.runTo(txWorldTarget.value(), txWorldTarget.velocity().value());
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
             double voltage = Globals.getVoltage();
@@ -477,6 +475,9 @@ public final class MecanumDrive {
 
             c.setStroke("#4CAF50");
             drawRobot(c, txWorldTarget.value()); // Draw target pose
+
+            c.setStroke("#3F51B5");
+            drawRobot(c, pose);
 
             // Preview the path:
             c.setStroke("#4CAF50FF");
@@ -535,7 +536,7 @@ public final class MecanumDrive {
                     .compute(txWorldTarget, pose, robotVelRobot);
 
             // Enlighten Wily Works as to where we should be:
-            WilyWorks.setPose(txWorldTarget.value(), txWorldTarget.velocity().value());
+            WilyWorks.runTo(txWorldTarget.value(), txWorldTarget.velocity().value());
 
             MecanumKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
             double voltage = Globals.getVoltage();
@@ -551,6 +552,12 @@ public final class MecanumDrive {
 
             c.setStroke("#4CAF50");
             drawRobot(c, txWorldTarget.value());
+
+            c.setStroke("#3F51B5");
+            drawRobot(c, pose);
+
+            c.setStroke("#7C4DFFFF");
+            c.fillCircle(turn.beginPose.position.x, turn.beginPose.position.y, 2);
 
             return true;
         }
