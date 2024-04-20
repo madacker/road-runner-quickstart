@@ -20,6 +20,7 @@ import com.wilyworks.simulator.framework.InputManager;
 import com.wilyworks.simulator.framework.Simulation;
 import com.wilyworks.simulator.framework.WilyTelemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.wilyworks.simulator.helpers.Point;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.reflections.Reflections;
@@ -34,10 +35,12 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.Transparency;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Line2D;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -346,11 +349,9 @@ class Field {
         g.drawImage(robotImage, imageTransform, null);
     }
 
-    // Render the field, the robot, and the field overlay:
-    void render(Graphics2D g, WilyCore.State state) {
-        // Lay down the background image without needing a transform:
-        g.drawImage(backgroundImage, FIELD_VIEW.x + FIELD_INSET, FIELD_VIEW.y + FIELD_INSET, null);
-
+    // Set the transform to use inches and have the origin at the center of field. This
+    // returns the current transform to restore via Graphics2D.setTransform() once done:
+    AffineTransform setFieldTransform(Graphics2D g) {
         // Prime the viewport/transform and the clipping for field and overlay rendering:
         AffineTransform oldTransform = g.getTransform();
         g.setClip(FIELD_VIEW.x, FIELD_VIEW.y, FIELD_VIEW.width, FIELD_VIEW.height);
@@ -359,21 +360,44 @@ class Field {
                 0, -FIELD_SURFACE_DIMENSION / 144.0,
                 FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET,
                 FIELD_SURFACE_DIMENSION / 2.0 + FIELD_INSET));
+        return oldTransform;
+    }
 
+    // Render the field, the robot, and the field overlay:
+    void render(Graphics2D g) {
+        // Lay down the background image without needing a transform:
+        g.drawImage(backgroundImage, FIELD_VIEW.x + FIELD_INSET, FIELD_VIEW.y + FIELD_INSET, null);
+
+        AffineTransform oldTransform = setFieldTransform(g);
         renderRobot(g);
         if (FtcDashboard.fieldOverlay != null)
             FtcDashboard.fieldOverlay.renderAndClear(g);
-
-        // Restore the robot's transform:
         g.setTransform(oldTransform);
+    }
 
-        // Render additional stuff while waiting for start to be pressed:
-        if (state != WilyCore.State.STARTED) {
-            g.drawImage(compassImage, 20, 20, null);
+    // Render the field-of-view lines:
+    void renderFieldOfView(Graphics2D g, Point origin, double orientation, double fov) {
+        double LENGTH = 48;
+        Point p1 = new Point(LENGTH, 0).rotate(orientation + fov / 2);
+        Point p2 = new Point(LENGTH, 0).rotate(orientation - fov / 2);
+        Line2D.Double l1 = new Line2D.Double(origin.x, origin.y, p1.x, p1.y);
+        Line2D.Double l2 = new Line2D.Double(origin.x, origin.y, p2.x, p2.y);
+        g.draw(l1);
+        g.draw(l2);
+    }
+
+    // For the start screen, render an overlay over the initial field image:
+    void renderStartScreenOverlay(Graphics2D g) {
+        g.drawImage(compassImage, 20, 20, null);
+
+        AffineTransform oldTransform = setFieldTransform(g);
+        for (WilyWorks.Config.Camera camera: WilyCore.config.cameras) {
+            g.setColor(new Color(0xffffff));
+            renderFieldOfView(g, new Point(camera.x, camera.y), camera.orientation, camera.fieldOfView);
         }
+        g.setTransform(oldTransform);
     }
 }
-
 
 /**
  * Core class for Wily Works. This provides the entry point to the simulator and is the
@@ -420,18 +444,22 @@ public class WilyCore {
         }
     }
 
-    // Render the field:
-    static public void render() {
-        // Don't render the start screen at more than 30 fps:
+    // Render the field during steady state:
+    static public void render() { render(false); }
+    static public void render(boolean startScreenOverlay) {
+        // Don't update the screen at more than 30 fps while waiting for the Start button to press:
         if ((status.state == State.INITIALIZED) && (time() - lastRenderTime < 0.030))
             return;
         lastRenderTime = time();
 
         // All Graphics objects can be cast to Graphics2D:
         Graphics2D g = (Graphics2D) dashboardCanvas.getBufferStrategy().getDrawGraphics();
-
         g.clearRect(0, 0, dashboardCanvas.getWidth(), dashboardCanvas.getHeight());
-        field.render(g, status.state);
+
+        field.render(g);
+        if (startScreenOverlay)
+            field.renderStartScreenOverlay(g);
+
         g.dispose();
         dashboardCanvas.getBufferStrategy().show();
     }
@@ -452,7 +480,7 @@ public class WilyCore {
         simulation.advance(deltaT);
 
         // Render everything:
-        render();
+        render(false);
 
         simulationUpdated = true;
     }
@@ -676,12 +704,12 @@ public class WilyCore {
         gamepad2 = new Gamepad();
         inputManager = new InputManager(gamepad1, gamepad2);
 
+        // Render the field once and then wait for input:
+        render(true);
+
         // Endlessly call opModes
         // noinspection InfiniteLoopStatement
         while (true) {
-            // Render the field once and then wait for input:
-            render();
-
             // Wait for the DashboardWindow UI to tell us what opMode to run:
             while (status.state == State.STOPPED) {
                 try {
