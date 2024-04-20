@@ -25,6 +25,7 @@ import com.wilyworks.simulator.helpers.Point;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.reflections.Reflections;
 
+import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Choice;
 import java.awt.Color;
@@ -40,6 +41,7 @@ import java.awt.Transparency;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
@@ -375,15 +377,27 @@ class Field {
         g.setTransform(oldTransform);
     }
 
-    // Render the field-of-view lines:
+    // Set the global alpha in the range [0.0, 1.0]:
+    void setAlpha(Graphics2D g, double alpha) {
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) alpha));
+    }
+
+    // Render a field-of-view polygon:
     void renderFieldOfView(Graphics2D g, Point origin, double orientation, double fov) {
         double LENGTH = 48;
-        Point p1 = new Point(LENGTH, 0).rotate(orientation + fov / 2);
-        Point p2 = new Point(LENGTH, 0).rotate(orientation - fov / 2);
-        Line2D.Double l1 = new Line2D.Double(origin.x, origin.y, p1.x, p1.y);
-        Line2D.Double l2 = new Line2D.Double(origin.x, origin.y, p2.x, p2.y);
-        g.draw(l1);
-        g.draw(l2);
+        Point p1 = new Point(LENGTH, 0).rotate(orientation + fov / 2).add(origin);
+        Point p2 = new Point(LENGTH, 0).rotate(orientation - fov / 2).add(origin);
+
+        // Create a polygon:
+        GeneralPath path = new GeneralPath();
+        path.moveTo(origin.x, origin.y);
+        path.lineTo(p1.x, p1.y);
+        path.lineTo(p2.x, p2.y);
+
+        // Draw the polygon:
+        setAlpha(g, 0.3);
+        g.fill(path);
+        setAlpha(g, 1.0);
     }
 
     // For the start screen, render an overlay over the initial field image:
