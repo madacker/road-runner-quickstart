@@ -39,6 +39,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.wilyworks.common.WilyWorks;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -113,6 +114,7 @@ public class AprilTagTest extends LinearOpMode {
         Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 36, Math.toRadians(-10)), globals);
+        double previousTime = Globals.time();
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
@@ -123,6 +125,12 @@ public class AprilTagTest extends LinearOpMode {
 
         while (opModeIsActive()) {
             durationSplit.startSplit();
+
+            double time = Globals.time();
+            double deltaTime = time - previousTime;
+            previousTime = time;
+
+            WilyWorks.updateSimulation(deltaTime);
 
             drive.setDrivePowers(new PoseVelocity2d(
                     new Vector2d(
