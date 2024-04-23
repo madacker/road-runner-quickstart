@@ -7,14 +7,40 @@ import java.awt.Canvas;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.font.FontRenderContext;
+import java.awt.font.LineBreakMeasurer;
+import java.awt.font.TextAttribute;
+import java.awt.font.TextLayout;
+import java.text.AttributedCharacterIterator;
+import java.text.AttributedString;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Helper class for handling simplified HTML display.
  */
 class Html {
+    Graphics2D graphics; // Graphics context
+//
+//    // Every horizontal line is composed of one or more snippets:
+//    static class Snippet {
+//        String string; // Snippet string (no tags or entities)
+//        Font font; // Font to be used for this snippet
+//        double x; // Offset from the start of the line for this snippet
+//        double yOffset; // Vertical offset from the baseline
+//    }
+//
+//    // List of snippets describing the current line:
+//    ArrayList<Snippet> snippets = new ArrayList<>();
+
+    // Current font size:
+    int currentFontSize = WilyTelemetry.instance.DISPLAY_FONT_SIZE;
+
+    // List of supported HTML entities and their translations:
     static final Map<String, String> ENTITY_MAP = new HashMap<String, String>() {{
         put("&nbsp;", " ");
         put("&ensp;", "  ");
@@ -26,8 +52,82 @@ class Html {
         put("&apos;", "'");
     }};
 
+    Html(Graphics2D graphics) {
+        this.graphics = graphics;
+    }
+
+    // Word wrap the specified string. The string has no tags in it but does have entities
+    // such as "&ensp":
+    private void flow(String string) {
+        // Remove entity encodings:
+        string = fixupEntities(string);
+    }
+
+    public void layout(List<String> lines) {
+//        AttributedString string = new AttributedString("This is a test!");
+//        string.addAttribute(TextAttribute.SUPERSCRIPT, TextAttribute.SUPERSCRIPT_SUPER, 5, 8);
+//        graphics.drawString(string.getIterator(), 0.0f, 20.0f);
+
+//        String text = "Your long text here: All good men must come to the aid of their party!";
+//        AttributedString attributedString = new AttributedString(text);
+//        attributedString.addAttribute(TextAttribute.FONT, new Font("Arial", Font.PLAIN, 14));
+//        // Set font attributes if needed
+//
+//        // Create a TextLayout
+//        FontRenderContext frc = new FontRenderContext(null, true, true);
+//        TextLayout layout = new TextLayout(attributedString.getIterator(), frc);
+//
+//        // Set the desired wrapping width
+//        float wrappingWidth = 20; // Adjust as needed
+//
+//        // Create a LineBreakMeasurer
+//        AttributedCharacterIterator charIterator = attributedString.getIterator();
+//        LineBreakMeasurer measurer = new LineBreakMeasurer(charIterator, frc);
+//
+//        // Iterate through the text and break lines
+//        while (measurer.getPosition() < charIterator.getEndIndex()) {
+//            layout = measurer.nextLayout(wrappingWidth);
+//            graphics.drawString(layout.)
+//            // Handle each line layout as needed
+//            // ...
+//        }
+
+        String text = "This is a long text that needs to be wrapped into multiple lines. " +
+                "We want to handle line breaks gracefully.";
+
+        // Create a font (you can customize this)
+        Font font = new Font("Arial", Font.PLAIN, 10);
+
+        // Create an AttributedString from the text
+        AttributedString attributedString = new AttributedString(text);
+        attributedString.addAttribute(TextAttribute.FONT, font);
+
+        // Create a LineBreakMeasurer
+        FontRenderContext frc = new FontRenderContext(null, true, true);
+        AttributedCharacterIterator charIterator = attributedString.getIterator();
+        LineBreakMeasurer measurer = new LineBreakMeasurer(charIterator, frc);
+
+        // Set the desired wrapping width
+        float wrappingWidth = 30; // Adjust as needed
+
+        // Initialize variables for layout
+        int startPos = 0;
+        int endPos;
+        int y = 50;
+
+        // Draw each line
+        while ((endPos = measurer.nextOffset(wrappingWidth)) != BreakIterator.DONE) {
+            TextLayout layout = measurer.nextLayout(wrappingWidth, endPos, false);
+            if (layout == null)
+                break;
+            layout.draw(graphics, 10, y);
+            y += layout.getAscent();
+            startPos = endPos;
+        }
+    }
+
     // Simple routine to substitute HTML entities into their displayable state:
-    public static String substituteEntities(String string) {
+    public static String fixupEntities(String string) {
         while (true) {
             int tagStart = string.indexOf('&');
             if (tagStart == -1)
@@ -69,7 +169,7 @@ public class WilyTelemetry implements Telemetry {
 
     // Use this font for display on the PC. It's different from the sizing font because the
     // sizing font doesn't support the full unicode character set (like emojis):
-    final int DISPLAY_FONT_SIZE = 16;
+    public final int DISPLAY_FONT_SIZE = 16;
     final Font PROPORTIONAL_DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
     final Font MONOSPACE_FONT = new Font(Font.MONOSPACED, Font.PLAIN, DISPLAY_FONT_SIZE);
 
@@ -258,10 +358,8 @@ public class WilyTelemetry implements Telemetry {
 
     }
 
-    public boolean update() {
+    private void simpleFlow(Graphics g) {
         int lineWidth;
-        Graphics g = canvas.getBufferStrategy().getDrawGraphics();
-        g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
         if (displayFormat == DisplayFormat.MONOSPACE) {
             g.setFont(MONOSPACE_FONT);
             lineWidth = LINE_WIDTH_IN_CHARACTERS;
@@ -270,18 +368,12 @@ public class WilyTelemetry implements Telemetry {
             lineWidth = LINE_WIDTH_IN_FONT_UNITS;
         }
 
-        if (TEST) {
-            System.out.println(stringWidth("123456789,123456789,123456789,123456789,12"));
-            System.out.println(stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
-            test(this);
-        }
-
         int y = HEIGHT_IN_LINES;
         int lineCount = 0;
         for (String line : lineList) {
             if (displayFormat == DisplayFormat.HTML) {
                 line = Html.stripTags(line);
-                line = Html.substituteEntities(line);
+                line = Html.fixupEntities(line);
             }
 
             while (lineCount < HEIGHT_IN_LINES) {
@@ -290,8 +382,8 @@ public class WilyTelemetry implements Telemetry {
                     // If the line is too long, try and break at a space:
                     lineBreak = line.length() - 1;
                     while ((lineBreak > 0) &&
-                           ((line.charAt(lineBreak - 1) != ' ') || // -1 to avoid space on next line
-                            (stringWidth(line.substring(0, lineBreak - 1)) > lineWidth)))
+                            ((line.charAt(lineBreak - 1) != ' ') || // -1 to avoid space on next line
+                                    (stringWidth(line.substring(0, lineBreak - 1)) > lineWidth)))
                         lineBreak--;
 
                     // If no line break was found using a space, simply break at any character
@@ -319,6 +411,25 @@ public class WilyTelemetry implements Telemetry {
                     break; // ====>
             }
         }
+    }
+
+    public boolean update() {
+        Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
+        g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+        if (TEST) {
+            System.out.println(stringWidth("123456789,123456789,123456789,123456789,12"));
+            System.out.println(stringWidth("WWWWWWWWW,WWWWWWWWW,WWWWWWWW"));
+            test(this);
+        }
+
+        if (displayFormat == DisplayFormat.HTML) {
+            Html html = new Html(g);
+            html.layout(null);
+        } else {
+            simpleFlow(g);
+        }
+
         g.dispose();
         canvas.getBufferStrategy().show();
         lineList.clear();
