@@ -99,13 +99,16 @@ class Html {
         Font font = new Font("Arial", Font.PLAIN, 15);
 
         // Create an AttributedString from the text
-        AttributedString attributedString = new AttributedString(text);
-        attributedString.addAttribute(TextAttribute.FONT, font);
+        AttributedString richString = new AttributedString(text);
+        // richString.addAttribute(TextAttribute.FONT, font);
+        richString.addAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, 11, text.length());
+        richString.addAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_LIGHT, 20, text.length());
+        richString.addAttribute(TextAttribute.SUPERSCRIPT, TextAttribute.SUPERSCRIPT_SUPER, 5, text.length());
 
         // Create a LineBreakMeasurer
-        FontRenderContext frc = new FontRenderContext(null, true, true);
-        AttributedCharacterIterator charIterator = attributedString.getIterator();
-        LineBreakMeasurer measurer = new LineBreakMeasurer(charIterator, frc);
+        LineBreakMeasurer measurer = new LineBreakMeasurer(
+                richString.getIterator(),
+                new FontRenderContext(null, true, true));
 
         // Set the desired wrapping width
         float wrappingWidth = 150; // Adjust as needed
