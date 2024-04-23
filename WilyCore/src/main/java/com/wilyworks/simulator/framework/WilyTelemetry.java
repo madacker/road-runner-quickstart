@@ -12,9 +12,12 @@ import java.awt.font.FontRenderContext;
 import java.awt.font.LineBreakMeasurer;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
+import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,16 @@ class Layout {
     static final int LINE_WIDTH = 239; // Line width, in pixel units
     Graphics2D graphics; // Graphics context
     Telemetry.DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
+
+    static class Tag {
+        AttributedCharacterIterator.Attribute attribute; // addAttribute() attribute
+        Object value; // addAttribute() value
+        int pos; // Index into text post-tag-removal but pre-entity-removal
+
+        public Tag(AttributedCharacterIterator.Attribute attribute, Object value, int pos) {
+            this.attribute = attribute; this.value = value; this.pos = pos;
+        }
+    }
 
     // List of supported HTML entities and their translations:
     static final Map<String, String> ENTITY_MAP = new HashMap<String, String>() {{
@@ -43,46 +56,105 @@ class Layout {
         this.displayFormat = displayFormat;
     }
 
-    void addHtmlAttributes(String text, AttributedString string) {
-        int stringPos = 0;
-        int textPos = 0;
-        while (textPos < text.length()) {
-            switch (text.charAt(textPos)) {
-            default:
-                stringPos++;
-                textPos++;
-                break;
 
-            case '&':
-                int entityEnd = text.indexOf(';', textPos);
-                if (entityEnd == -1) {
-                    stringPos++;
-                    textPos++;
-                } else {
-                    String entity = text.substring(textPos, entityEnd + 1).trim(); // Includes '&' and ';'
-                    String substitution = (ENTITY_MAP.get(entity) != null) ? ENTITY_MAP.get(entity) : "";
-                    stringPos += substitution.length();
-                    textPos = entityEnd + 1;
-                }
-                break;
+    // Transform @@@
+    private static AttributedString getAttributedString(String text, ArrayList<Tag> tags) {
+        AttributedString string = new AttributedString(text);
+        for (Tag tag: tags) {
+            string.addAttribute(tag.attribute, tag.value, tag.pos, text.length());
+        }
+        return string;
+    }
 
-            case '>':
-                int tagEnd = text.indexOf('>', textPos);
-                if (tagEnd == -1) {
-                    stringPos++;
-                    textPos++;
-                } else {
-                    String tag = text.substring(textPos, tagEnd + 1).trim(); // Includes '&' and ';'
-                    switch (tag) {
-                        case "<br>": break;
+    // Transform all entities, fixing the tags to account for the adding and removal of
+    // characters:
+    private static String transformEntities(String text, ArrayList<Tag> tags) {
+        StringBuilder builder = new StringBuilder();
+        int loopStart = 0; // Index into input text to start the next loop iteration
+        int addedCount = 0; // Running total of characters that have been added from substitutions
+        int tagIndex = 0; // Current tag index for fixups
 
-                    }
-                }
+        while (loopStart < text.length()) {
+            int entityStart = text.indexOf('&', loopStart);
+            int entityEnd = text.indexOf(';', entityStart) + 1; // Make it exclusive
+            if ((entityStart == -1) || (entityEnd == 0)) {
+                // A valid entity wasn't found so set the conditions so that the loop terminates:
+                entityStart = text.length();
+                entityEnd = text.length();
+            }
+            builder.append(text.substring(loopStart, entityStart));
+            loopStart = entityEnd; // Prepare for next loop iteration
+
+            // Fix up all tags to this point:
+            while (tagIndex < tags.size()) {
+                Tag tag = tags.get(tagIndex);
+                if (tag.pos >= entityStart)
+                    break; // ===>
+                tag.pos += addedCount;
+                tagIndex++;
+            }
+
+            // Now do the actual entity substitution:
+            String entity = text.substring(entityStart, entityEnd).trim(); // Includes '&' and ';'
+            addedCount -= entity.length(); // Remove all of the entity characters
+            String substitution = ENTITY_MAP.get(entity);
+            if (substitution != null) {
+                addedCount += substitution.length(); // Account for new characters we're adding
+                builder.append(substitution);
+            }
+        }
+        return builder.toString();
+    }
+
+    // Returns true if the current line is empty:
+    boolean isEmptyLine(StringBuilder builder) {
+        // @@@ Need to strip when adding? Maybe that's true in general anyway?
+        return (builder.length() == 0) ? true : (builder.charAt(builder.length() - 1) == '\n');
+    }
+
+    ArrayList<Tag> getTags(String text) {
+        StringBuilder builder = new StringBuilder();
+        ArrayList<Tag> tags = null;
+
+        int loopStart = 0;
+        while (loopStart < text.length()) {
+            int tagStart = text.indexOf('<', loopStart);
+            int tagEnd = text.indexOf('>', tagStart) + 1; // Make it exclusive
+            if ((tagStart == -1) || (tagEnd == 0)) {
+                tagStart = text.length();
+                tagEnd = text.length();
+            }
+            builder.append(text.substring(loopStart, tagStart));
+            loopStart = tagEnd; // Prepare for next loop iteration
+
+            String tag = text.substring(tagStart, tagEnd).trim(); // Includes '<' and '>'
+            String element = tag;
+            int space = text.indexOf(' ');
+            if (space != -1)
+                element = tag.substring(0, space);
+
+            // https://docs.oracle.com/javase/8/docs/api/java/awt/font/TextAttribute.html#SIZE
+            switch (tag) {
+                case "<br>": builder.append("\n"); break;
+                case "<tt>": tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", builder.length())); break;
+                case "</tt>": tags.add(new Tag(TextAttribute.FAMILY, "SANS_SERIF", builder.length())); break; // @@@ Initialize?
+                case "<div>":
+                    if (!isEmptyLine(builder))
+                        builder.append("\n");
+                    break;
+                case "</div>": builder.append("\n"); break;
+                case "<font":
+
+
+
             }
         }
     }
 
     public void render(String text) {
+        // Want to parse before converting entities
+        // Entity removal needs to remap everything
+
         String plainText = text;
         if (displayFormat == Telemetry.DisplayFormat.HTML) {
             plainText = stripTags(transformEntities(text));
@@ -94,7 +166,7 @@ class Layout {
             string.addAttribute(TextAttribute.FAMILY, "MONOSPACED");
         }
         if (displayFormat == Telemetry.DisplayFormat.HTML) {
-            addHtmlAttributes(text, string);
+            // addHtmlAttributes(text, string);
         }
 
         LineBreakMeasurer measurer = new LineBreakMeasurer(
