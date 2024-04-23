@@ -12,9 +12,7 @@ import java.awt.font.FontRenderContext;
 import java.awt.font.LineBreakMeasurer;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
-import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
-import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,22 +21,10 @@ import java.util.Map;
 /**
  * Helper class for handling simplified HTML display.
  */
-class Html {
+class Layout {
+    static final int LINE_WIDTH = 239; // Line width, in pixel units
     Graphics2D graphics; // Graphics context
-//
-//    // Every horizontal line is composed of one or more snippets:
-//    static class Snippet {
-//        String string; // Snippet string (no tags or entities)
-//        Font font; // Font to be used for this snippet
-//        double x; // Offset from the start of the line for this snippet
-//        double yOffset; // Vertical offset from the baseline
-//    }
-//
-//    // List of snippets describing the current line:
-//    ArrayList<Snippet> snippets = new ArrayList<>();
-
-    // Current font size:
-    int currentFontSize = WilyTelemetry.instance.DISPLAY_FONT_SIZE;
+    Telemetry.DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
 
     // List of supported HTML entities and their translations:
     static final Map<String, String> ENTITY_MAP = new HashMap<String, String>() {{
@@ -52,15 +38,87 @@ class Html {
         put("&apos;", "'");
     }};
 
-    Html(Graphics2D graphics) {
+    Layout(Graphics2D graphics, Telemetry.DisplayFormat displayFormat) {
         this.graphics = graphics;
+        this.displayFormat = displayFormat;
     }
 
-    // Word wrap the specified string. The string has no tags in it but does have entities
-    // such as "&ensp":
-    private void flow(String string) {
-        // Remove entity encodings:
-        string = fixupEntities(string);
+    void addHtmlAttributes(String text, AttributedString string) {
+        int stringPos = 0;
+        int textPos = 0;
+        while (textPos < text.length()) {
+            switch (text.charAt(textPos)) {
+            default:
+                stringPos++;
+                textPos++;
+                break;
+
+            case '&':
+                int entityEnd = text.indexOf(';', textPos);
+                if (entityEnd == -1) {
+                    stringPos++;
+                    textPos++;
+                } else {
+                    String entity = text.substring(textPos, entityEnd + 1).trim(); // Includes '&' and ';'
+                    String substitution = (ENTITY_MAP.get(entity) != null) ? ENTITY_MAP.get(entity) : "";
+                    stringPos += substitution.length();
+                    textPos = entityEnd + 1;
+                }
+                break;
+
+            case '>':
+                int tagEnd = text.indexOf('>', textPos);
+                if (tagEnd == -1) {
+                    stringPos++;
+                    textPos++;
+                } else {
+                    String tag = text.substring(textPos, tagEnd + 1).trim(); // Includes '&' and ';'
+                    switch (tag) {
+                        case "<br>": break;
+
+                    }
+                }
+            }
+        }
+    }
+
+    public void render(String text) {
+        String plainText = text;
+        if (displayFormat == Telemetry.DisplayFormat.HTML) {
+            plainText = stripTags(transformEntities(text));
+        }
+
+        AttributedString string = new AttributedString(plainText);
+        string.addAttribute(TextAttribute.SIZE, WilyTelemetry.instance.DISPLAY_FONT_SIZE);
+        if (displayFormat == Telemetry.DisplayFormat.MONOSPACE) {
+            string.addAttribute(TextAttribute.FAMILY, "MONOSPACED");
+        }
+        if (displayFormat == Telemetry.DisplayFormat.HTML) {
+            addHtmlAttributes(text, string);
+        }
+
+        LineBreakMeasurer measurer = new LineBreakMeasurer(
+                string.getIterator(),
+                new FontRenderContext(null, true, true));
+
+        // Draw each line
+        int y = 0;
+        while (true) {
+            int endPos = measurer.nextOffset(LINE_WIDTH);
+            if (endPos == -1)
+                break;
+            for (int i = measurer.getPosition(); i < endPos; i++) {
+                if (text.charAt(i) == '\n') {
+                    endPos = i + 1;
+                    break;
+                }
+            }
+            TextLayout layout = measurer.nextLayout(LINE_WIDTH, endPos, false);
+            if (layout == null)
+                break;
+            y += layout.getAscent();
+            layout.draw(graphics, 10, y);
+        }
     }
 
     public void layout(List<String> lines) {
@@ -92,8 +150,13 @@ class Html {
 //            // ...
 //        }
 
-        String text = "This\nis a long text that needs to be wrapped into multiple lines. " +
+        String text = "This\nis a long text that needs to be wrapped into multiple\n\nlines. " +
                 "We want to handle line breaks gracefully.";
+
+        if (true) {
+            render(text);
+            return;
+        }
 
         // Create a font (you can customize this)
         Font font = new Font("Arial", Font.PLAIN, 15);
@@ -101,7 +164,7 @@ class Html {
         // Create an AttributedString from the text
         AttributedString richString = new AttributedString(text);
         // richString.addAttribute(TextAttribute.FONT, font);
-        richString.addAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, 11, text.length());
+        richString.addAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD); // , 11, text.length());
         richString.addAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_LIGHT, 20, text.length());
         richString.addAttribute(TextAttribute.SUPERSCRIPT, TextAttribute.SUPERSCRIPT_SUPER, 5, text.length());
 
@@ -113,10 +176,8 @@ class Html {
         // Set the desired wrapping width
         float wrappingWidth = 150; // Adjust as needed
 
-        // Initialize variables for layout
-        int y = 50;
-
         // Draw each line
+        int y = 0;
         while (true) {
             int endPos = measurer.nextOffset(wrappingWidth);
             if (endPos == -1)
@@ -130,13 +191,13 @@ class Html {
             TextLayout layout = measurer.nextLayout(wrappingWidth, endPos, false);
             if (layout == null)
                 break;
-            layout.draw(graphics, 10, y);
             y += layout.getAscent();
+            layout.draw(graphics, 10, y);
         }
     }
 
     // Simple routine to substitute HTML entities into their displayable state:
-    public static String fixupEntities(String string) {
+    public static String transformEntities(String string) {
         while (true) {
             int tagStart = string.indexOf('&');
             if (tagStart == -1)
@@ -381,8 +442,8 @@ public class WilyTelemetry implements Telemetry {
         int lineCount = 0;
         for (String line : lineList) {
             if (displayFormat == DisplayFormat.HTML) {
-                line = Html.stripTags(line);
-                line = Html.fixupEntities(line);
+                line = Layout.stripTags(line);
+                line = Layout.transformEntities(line);
             }
 
             while (lineCount < HEIGHT_IN_LINES) {
@@ -433,7 +494,7 @@ public class WilyTelemetry implements Telemetry {
         }
 
         if (displayFormat == DisplayFormat.HTML) {
-            Html html = new Html(g);
+            Layout html = new Layout(g, displayFormat);
             html.layout(null);
         } else {
             simpleFlow(g);
