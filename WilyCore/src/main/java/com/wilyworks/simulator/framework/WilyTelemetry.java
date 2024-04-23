@@ -92,11 +92,11 @@ class Html {
 //            // ...
 //        }
 
-        String text = "This is a long text that needs to be wrapped into multiple lines. " +
+        String text = "This\nis a long text that needs to be wrapped into multiple lines. " +
                 "We want to handle line breaks gracefully.";
 
         // Create a font (you can customize this)
-        Font font = new Font("Arial", Font.PLAIN, 10);
+        Font font = new Font("Arial", Font.PLAIN, 15);
 
         // Create an AttributedString from the text
         AttributedString attributedString = new AttributedString(text);
@@ -108,21 +108,27 @@ class Html {
         LineBreakMeasurer measurer = new LineBreakMeasurer(charIterator, frc);
 
         // Set the desired wrapping width
-        float wrappingWidth = 30; // Adjust as needed
+        float wrappingWidth = 150; // Adjust as needed
 
         // Initialize variables for layout
-        int startPos = 0;
-        int endPos;
         int y = 50;
 
         // Draw each line
-        while ((endPos = measurer.nextOffset(wrappingWidth)) != BreakIterator.DONE) {
+        while (true) {
+            int endPos = measurer.nextOffset(wrappingWidth);
+            if (endPos == -1)
+                break;
+            for (int i = measurer.getPosition(); i < endPos; i++) {
+                if (text.charAt(i) == '\n') {
+                    endPos = i + 1;
+                    break;
+                }
+            }
             TextLayout layout = measurer.nextLayout(wrappingWidth, endPos, false);
             if (layout == null)
                 break;
             layout.draw(graphics, 10, y);
             y += layout.getAscent();
-            startPos = endPos;
         }
     }
 
