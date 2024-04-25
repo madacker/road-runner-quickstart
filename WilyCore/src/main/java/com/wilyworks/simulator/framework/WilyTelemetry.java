@@ -1,5 +1,7 @@
 package com.wilyworks.simulator.framework;
 
+import static org.firstinspires.ftc.robotcore.external.Telemetry.DisplayFormat;
+
 import org.firstinspires.ftc.robotcore.external.Func;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -15,27 +17,41 @@ import java.awt.font.TextLayout;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Helper class for handling simplified HTML display.
  */
 class Layout {
+    static final int FONT_SIZE = 16;
     static final int LINE_WIDTH = 239; // Line width, in pixel units
     Graphics2D graphics; // Graphics context
     Telemetry.DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
 
+    // Track tag attributes as we accumulate the string buffer:
     static class Tag {
         AttributedCharacterIterator.Attribute attribute; // addAttribute() attribute
         Object value; // addAttribute() value
-        int pos; // Index into text post-tag-removal but pre-entity-removal
+        int pos; // Position in the buffer
 
         public Tag(AttributedCharacterIterator.Attribute attribute, Object value, int pos) {
             this.attribute = attribute; this.value = value; this.pos = pos;
+        }
+    }
+
+    // Track line breaks as we accumulate the string buffer:
+    static class LineBreak {
+        int pos; // Position in the buffer
+        int offset; // Vertical offset, zero is the default
+
+        public LineBreak(int pos, int offset) {
+            this.pos = pos; this.offset = offset;
         }
     }
 
@@ -57,54 +73,44 @@ class Layout {
     }
 
 
-    // Transform @@@
-    private static AttributedString getAttributedString(String text, ArrayList<Tag> tags) {
-        AttributedString string = new AttributedString(text);
-        for (Tag tag: tags) {
-            string.addAttribute(tag.attribute, tag.value, tag.pos, text.length());
-        }
-        return string;
-    }
+//    // Transform @@@
+//    private static AttributedString getAttributedString(String text, ArrayList<Tag> tags) {
+//        AttributedString string = new AttributedString(text);
+//        for (Tag tag: tags) {
+//            string.addAttribute(tag.attribute, tag.value, tag.pos, text.length());
+//        }
+//        return string;
+//    }
 
-    // Transform all entities, fixing the tags to account for the adding and removal of
-    // characters:
-    private static String transformEntities(String text, ArrayList<Tag> tags) {
-        StringBuilder builder = new StringBuilder();
-        int loopStart = 0; // Index into input text to start the next loop iteration
-        int addedCount = 0; // Running total of characters that have been added from substitutions
-        int tagIndex = 0; // Current tag index for fixups
-
-        while (loopStart < text.length()) {
-            int entityStart = text.indexOf('&', loopStart);
-            int entityEnd = text.indexOf(';', entityStart) + 1; // Make it exclusive
-            if ((entityStart == -1) || (entityEnd == 0)) {
-                // A valid entity wasn't found so set the conditions so that the loop terminates:
-                entityStart = text.length();
-                entityEnd = text.length();
-            }
-            builder.append(text.substring(loopStart, entityStart));
-            loopStart = entityEnd; // Prepare for next loop iteration
-
-            // Fix up all tags to this point:
-            while (tagIndex < tags.size()) {
-                Tag tag = tags.get(tagIndex);
-                if (tag.pos >= entityStart)
-                    break; // ===>
-                tag.pos += addedCount;
-                tagIndex++;
-            }
-
-            // Now do the actual entity substitution:
-            String entity = text.substring(entityStart, entityEnd).trim(); // Includes '&' and ';'
-            addedCount -= entity.length(); // Remove all of the entity characters
-            String substitution = ENTITY_MAP.get(entity);
-            if (substitution != null) {
-                addedCount += substitution.length(); // Account for new characters we're adding
-                builder.append(substitution);
-            }
-        }
-        return builder.toString();
-    }
+//    // Transform all HTML 'entities' (like &nbsp; into a space character):
+//    private static String substituteEntities(String text) {
+//        StringBuilder builder = new StringBuilder();
+//        int loopStart = 0; // Index into input text to start the next loop iteration
+//        int addedCount = 0; // Running total of characters that have been added from substitutions
+//        int tagIndex = 0; // Current tag index for fixups
+//
+//        while (loopStart < text.length()) {
+//            int entityStart = text.indexOf('&', loopStart);
+//            int entityEnd = text.indexOf(';', entityStart) + 1; // Make it exclusive
+//            if ((entityStart == -1) || (entityEnd == 0)) {
+//                // A valid entity wasn't found so set conditions to terminate the loop:
+//                entityStart = text.length();
+//                entityEnd = text.length();
+//            }
+//            builder.append(text.substring(loopStart, entityStart));
+//            loopStart = entityEnd; // Prepare for next loop iteration
+//
+//            // Now do the actual entity substitution:
+//            String entity = text.substring(entityStart, entityEnd).trim(); // Includes '&' and ';'
+//            addedCount -= entity.length(); // Remove all of the entity characters
+//            String substitution = ENTITY_MAP.get(entity);
+//            if (substitution != null) {
+//                addedCount += substitution.length(); // Account for new characters we're adding
+//                builder.append(substitution);
+//            }
+//        }
+//        return builder.toString();
+//    }
 
     // Returns true if the current line is empty:
     boolean isEmptyLine(StringBuilder builder) {
@@ -112,85 +118,230 @@ class Layout {
         return (builder.length() == 0) ? true : (builder.charAt(builder.length() - 1) == '\n');
     }
 
-    ArrayList<Tag> getTags(String text) {
-        StringBuilder builder = new StringBuilder();
-        ArrayList<Tag> tags = null;
+//    ArrayList<Tag> getTags(String text) {
+//        StringBuilder builder = new StringBuilder();
+//        ArrayList<Tag> tags = null;
+//
+//        int loopStart = 0;
+//        while (loopStart < text.length()) {
+//            int tagStart = text.indexOf('<', loopStart);
+//            int tagEnd = text.indexOf('>', tagStart) + 1; // Make it exclusive
+//            if ((tagStart == -1) || (tagEnd == 0)) {
+//                tagStart = text.length();
+//                tagEnd = text.length();
+//            }
+//            builder.append(text.substring(loopStart, tagStart));
+//            loopStart = tagEnd; // Prepare for next loop iteration
+//
+//            String tag = text.substring(tagStart, tagEnd).trim(); // Includes '<' and '>'
+//            String element = tag;
+//            int space = text.indexOf(' ');
+//            if (space != -1)
+//                element = tag.substring(0, space);
+//
+//            // https://docs.oracle.com/javase/8/docs/api/java/awt/font/TextAttribute.html#SIZE
+//            switch (tag) {
+//                case "<br>": builder.append("\n"); break;
+//                case "<tt>": tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", builder.length())); break;
+//                case "</tt>": tags.add(new Tag(TextAttribute.FAMILY, "SANS_SERIF", builder.length())); break; // @@@ Initialize?
+//                case "<div>":
+//                    if (!isEmptyLine(builder))
+//                        builder.append("\n");
+//                    break;
+//                case "</div>": builder.append("\n"); break;
+//                case "<font":
+//
+//
+//
+//            }
+//        }
+//    }
 
-        int loopStart = 0;
-        while (loopStart < text.length()) {
-            int tagStart = text.indexOf('<', loopStart);
-            int tagEnd = text.indexOf('>', tagStart) + 1; // Make it exclusive
-            if ((tagStart == -1) || (tagEnd == 0)) {
-                tagStart = text.length();
-                tagEnd = text.length();
-            }
-            builder.append(text.substring(loopStart, tagStart));
-            loopStart = tagEnd; // Prepare for next loop iteration
+//    public void render(String text) {
+//        // Want to parse before converting entities
+//        // Entity removal needs to remap everything
+//
+//        String plainText = text;
+//        if (displayFormat == HTML) {
+//            plainText = stripTags(transformEntities(text));
+//        }
+//
+//        AttributedString string = new AttributedString(plainText);
+//        string.addAttribute(TextAttribute.SIZE, WilyTelemetry.instance.DISPLAY_FONT_SIZE);
+//        if (displayFormat == Telemetry.DisplayFormat.MONOSPACE) {
+//            string.addAttribute(TextAttribute.FAMILY, "MONOSPACED");
+//        }
+//        if (displayFormat == HTML) {
+//            // addHtmlAttributes(text, string);
+//        }
+//
+//        LineBreakMeasurer measurer = new LineBreakMeasurer(
+//                string.getIterator(),
+//                new FontRenderContext(null, true, true));
+//
+//        // Draw each line
+//        int y = 0;
+//        while (true) {
+//            int endPos = measurer.nextOffset(LINE_WIDTH);
+//            if (endPos == -1)
+//                break;
+//            for (int i = measurer.getPosition(); i < endPos; i++) {
+//                if (text.charAt(i) == '\n') {
+//                    endPos = i + 1;
+//                    break;
+//                }
+//            }
+//            TextLayout layout = measurer.nextLayout(LINE_WIDTH, endPos, false);
+//            if (layout == null)
+//                break;
+//            y += layout.getAscent();
+//            layout.draw(graphics, 10, y);
+//        }
+//    }
 
-            String tag = text.substring(tagStart, tagEnd).trim(); // Includes '<' and '>'
-            String element = tag;
-            int space = text.indexOf(' ');
-            if (space != -1)
-                element = tag.substring(0, space);
-
-            // https://docs.oracle.com/javase/8/docs/api/java/awt/font/TextAttribute.html#SIZE
-            switch (tag) {
-                case "<br>": builder.append("\n"); break;
-                case "<tt>": tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", builder.length())); break;
-                case "</tt>": tags.add(new Tag(TextAttribute.FAMILY, "SANS_SERIF", builder.length())); break; // @@@ Initialize?
-                case "<div>":
-                    if (!isEmptyLine(builder))
-                        builder.append("\n");
-                    break;
-                case "</div>": builder.append("\n"); break;
-                case "<font":
-
-
-
-            }
+    // Render what we've accumulated:
+    private void renderText() {
+        // Convert our accumulation buffer to an AttributeString:
+        String text = buffer.toString();
+        AttributedString attributedString = new AttributedString(text);
+        for (Tag tag: tags) {
+            attributedString.addAttribute(tag.attribute, tag.value, tag.pos, text.length());
         }
-    }
 
-    public void render(String text) {
-        // Want to parse before converting entities
-        // Entity removal needs to remap everything
-
-        String plainText = text;
-        if (displayFormat == Telemetry.DisplayFormat.HTML) {
-            plainText = stripTags(transformEntities(text));
-        }
-
-        AttributedString string = new AttributedString(plainText);
-        string.addAttribute(TextAttribute.SIZE, WilyTelemetry.instance.DISPLAY_FONT_SIZE);
-        if (displayFormat == Telemetry.DisplayFormat.MONOSPACE) {
-            string.addAttribute(TextAttribute.FAMILY, "MONOSPACED");
-        }
-        if (displayFormat == Telemetry.DisplayFormat.HTML) {
-            // addHtmlAttributes(text, string);
-        }
-
+        // Render with word wrapping:
         LineBreakMeasurer measurer = new LineBreakMeasurer(
-                string.getIterator(),
+                attributedString.getIterator(),
                 new FontRenderContext(null, true, true));
 
-        // Draw each line
-        int y = 0;
+        Iterator<LineBreak> iterator = lineBreaks.iterator();
+        LineBreak nextLineBreak = iterator.next();
+        int yCurrent = 0;
+
         while (true) {
+            // Find where the measurer wants to put the next line break and compare that to
+            // where we want to put the next line break:
             int endPos = measurer.nextOffset(LINE_WIDTH);
-            if (endPos == -1)
-                break;
-            for (int i = measurer.getPosition(); i < endPos; i++) {
-                if (text.charAt(i) == '\n') {
-                    endPos = i + 1;
-                    break;
-                }
+            int offset = 0;
+            if (endPos > nextLineBreak.pos) {
+                endPos = nextLineBreak.pos;
+                offset = nextLineBreak.offset;
+                nextLineBreak = iterator.next();
             }
+
             TextLayout layout = measurer.nextLayout(LINE_WIDTH, endPos, false);
             if (layout == null)
                 break;
-            y += layout.getAscent();
-            layout.draw(graphics, 10, y);
+            yCurrent += layout.getAscent() + offset;
+            layout.draw(graphics, 0, yCurrent);
         }
+    }
+
+    Telemetry.DisplayFormat format;
+    StringBuilder buffer; //
+    ArrayList<Tag> tags;
+    ArrayList<LineBreak> lineBreaks;
+    public void parseAndRender(Graphics2D graphics, Telemetry.DisplayFormat format, String text) {
+        this.graphics = graphics;
+        this.format = format;
+        this.buffer = new StringBuilder();
+        this.tags = new ArrayList<>();
+
+        double fontSize = FONT_SIZE;
+
+        tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
+        if (displayFormat == Telemetry.DisplayFormat.MONOSPACE) {
+            tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACED", 0));
+        }
+
+        int plainTextStart = 0; // The start index for the current plain-text run
+        for (int pos = 0; pos < text.length(); pos++) {
+            char c = text.charAt(pos);
+            if ((c != '\n') && ((displayFormat != DisplayFormat.HTML) || ((c != '&') && (c != '<')))) {
+                buffer.append(c);
+            } else {
+                if (c == '\n') {
+                    lineBreaks.add(new LineBreak(buffer.length(), 0));
+                } else if (c == '&') {
+                    // Substitute HTML entities (like a space for &nbsp;):
+                    int end = text.indexOf(';', pos);
+                    if (end != -1) {
+                        String entity = text.substring(pos, end + 1).trim(); // Includes '&' and ';'
+                        pos = end; // Advance for next iteration of the loop
+                        String substitution = ENTITY_MAP.get(entity);
+                        if (substitution != null) {
+                            buffer.append(substitution);
+                        }
+                    }
+                } else if (c == '<') {
+                    // Handle all HTML tags:
+                    int end = text.indexOf('>', pos);
+                    if (end != -1) {
+                        String tag = text.substring(pos + 1, end).trim(); // Excludes '<' and '>'
+                        pos = end; // Advance for next iteration of the loop
+
+                        // Determine the element and its argument string:
+                        String element = tag;
+                        String arguments = "";
+                        int spacePos = tag.indexOf(" ");
+                        if (spacePos != -1) {
+                            element = element.substring(0, spacePos);
+                            arguments = element.substring(spacePos).trim();
+                        }
+                        // https://docs.oracle.com/javase/8/docs/api/java/awt/font/TextAttribute.html#SIZE
+                        switch (element) {
+                            // Line tags:
+                            case "br":
+                                lineBreaks.add(new LineBreak(buffer.length(), 0));
+                                break;
+                            case "div":
+                                if (!isEmptyLine(buffer))
+                                    lineBreaks.add(new LineBreak(buffer.length(), 0));
+                                break;
+                            case "/div":
+                                lineBreaks.add(new LineBreak(buffer.length(), 0));
+                                break;
+
+                            // Character tags:
+                            case "big":
+                            case "/small":
+                                fontSize *= 1.25;
+                                tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
+                                break;
+                            case "/big":
+                            case "small":
+                                fontSize *= 0.8;
+                                tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
+                                break;
+
+                            case "span":
+                                // <span style='color: 0xffffff; background: gray;'>
+                                Pattern pattern = Pattern.compile(arguments, Pattern.CASE_INSENSITIVE);
+                                Matcher color = pattern.matcher("style\\s*=\\s*['\"]\\s*color\\s:\\s*");
+
+
+                                tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", buffer.length()));
+
+
+                                break;
+
+                            case "font":
+
+
+
+                            case "<tt>":
+                                tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", buffer.length()));
+                                break;
+                            case "</tt>":
+                                tags.add(new Tag(TextAttribute.FAMILY, "SANS_SERIF", buffer.length()));
+                                break; // @@@ Initialize?
+                        }
+                    }
+                }
+            }
+        }
+
+        lineBreaks.add(new LineBreak(buffer.length(), 0));
+        renderText();
     }
 
     public void layout(List<String> lines) {
@@ -226,7 +377,7 @@ class Layout {
                 "We want to handle line breaks gracefully.";
 
         if (true) {
-            render(text);
+            parseAndRender(graphics, displayFormat, text);
             return;
         }
 
