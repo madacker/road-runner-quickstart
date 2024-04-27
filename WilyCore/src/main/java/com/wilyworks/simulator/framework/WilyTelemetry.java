@@ -7,6 +7,8 @@ import static java.awt.font.TextAttribute.WEIGHT_REGULAR;
 import org.firstinspires.ftc.robotcore.external.Func;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+import static org.firstinspires.ftc.robotcore.external.Telemetry.DisplayFormat;
+
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Font;
@@ -27,6 +29,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,15 +40,15 @@ class Layout {
     static final int FONT_SIZE = 16;
     static final int LINE_WIDTH = 239; // Line width, in pixel units
     Graphics2D graphics; // Graphics context
-    Telemetry.DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
+    DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
 
     // Track tag attributes as we accumulate the string buffer:
-    static class Tag {
+    static class Attribute {
         AttributedCharacterIterator.Attribute attribute; // addAttribute() attribute
         Object value; // addAttribute() value
         int pos; // Position in the buffer
 
-        public Tag(AttributedCharacterIterator.Attribute attribute, Object value, int pos) {
+        public Attribute(AttributedCharacterIterator.Attribute attribute, Object value, int pos) {
             this.attribute = attribute; this.value = value; this.pos = pos;
         }
     }
@@ -72,7 +75,7 @@ class Layout {
         put("&apos;", "'");
     }};
 
-    Layout(Graphics2D graphics, Telemetry.DisplayFormat displayFormat) {
+    Layout(Graphics2D graphics, DisplayFormat displayFormat) {
         this.graphics = graphics;
         this.displayFormat = displayFormat;
     }
@@ -209,8 +212,8 @@ class Layout {
         // Convert our accumulation buffer to an AttributeString:
         String text = buffer.toString();
         AttributedString attributedString = new AttributedString(text);
-        for (Tag tag: tags) {
-            attributedString.addAttribute(tag.attribute, tag.value, tag.pos, text.length());
+        for (Attribute attribute : attributes) {
+            attributedString.addAttribute(attribute.attribute, attribute.value, attribute.pos, text.length());
         }
 
         // Render with word wrapping:
@@ -241,9 +244,9 @@ class Layout {
         }
     }
 
-    Telemetry.DisplayFormat format;
+    DisplayFormat format;
     StringBuilder buffer; //
-    ArrayList<Tag> tags;
+    ArrayList<Attribute> attributes;
     ArrayList<LineBreak> lineBreaks;
 
     // History structure for tags:
@@ -256,11 +259,11 @@ class Layout {
         }
     }
 
-    public void parseAndRender(Graphics2D graphics, Telemetry.DisplayFormat format, String text) {
+    public void parseAndRender(Graphics2D graphics, DisplayFormat format, String text) {
         this.graphics = graphics;
         this.format = format;
         this.buffer = new StringBuilder();
-        this.tags = new ArrayList<>();
+        this.attributes = new ArrayList<>();
 
         // \n
         Pattern newlineSearchPattern = Pattern.compile("(\\n)");
@@ -278,20 +281,18 @@ class Layout {
         Pattern fontColorPattern = Pattern.compile(
             "<font.+?color\\s*?=\\s*?[\\'|\\\"](?:0x|#)([0-9[a-f[A-F]]]+).*?>");
 
-
-
-        Pattern searchPattern = htmlSearchPattern; // @@@
+        Pattern searchPattern = (displayFormat == DisplayFormat.HTML) ? htmlSearchPattern : newlineSearchPattern;
 
         LinkedList<String> familyStack = new LinkedList<>();
         LinkedList<Float> weightStack = new LinkedList<>();
         LinkedList<Float> postureStack = new LinkedList<>();
-        // sizeStack isn't needed
+        LinkedList<Float> sizeStack = new LinkedList<>();
         LinkedList<Integer> superscriptStack = new LinkedList<>();
         LinkedList<ColorRecord> colorStack = new LinkedList<>();
         LinkedList<Integer> underlineStack = new LinkedList<>();
         LinkedList<Boolean> strikeThroughStack = new LinkedList<>();
 
-        String family = (displayFormat == Telemetry.DisplayFormat.MONOSPACE) ? MONOSPACED : "Default";
+        String family = (displayFormat == DisplayFormat.MONOSPACE) ? MONOSPACED : "Default";
         float weight = WEIGHT_REGULAR;
         float posture = POSTURE_REGULAR;
         float size = FONT_SIZE;
@@ -301,15 +302,22 @@ class Layout {
         int underline = -1;
         boolean strikeThrough = false;
 
-        tags.add(new Tag(TextAttribute.FAMILY, family, 0));
-        tags.add(new Tag(TextAttribute.WEIGHT, weight, 0));
-        tags.add(new Tag(TextAttribute.POSTURE, posture, 0));
-        tags.add(new Tag(TextAttribute.SIZE, size, 0));
-        tags.add(new Tag(TextAttribute.SUPERSCRIPT, superscript, 0));
-        tags.add(new Tag(TextAttribute.FOREGROUND, foreground, 0));
-        tags.add(new Tag(TextAttribute.BACKGROUND, background, 0));
-        tags.add(new Tag(TextAttribute.UNDERLINE, underline, 0));
-        tags.add(new Tag(TextAttribute.STRIKETHROUGH, strikeThrough, 0));
+        // Some lambda function helpers:
+        BiConsumer setAttribute = (attribute, value) -> attributes.add(new Attribute((TextAttribute) attribute, value, buffer.length()));
+
+
+
+        setAttribute.accept(TextAttribute.FAMILY, family);
+
+        attributes.add(new Attribute(TextAttribute.FAMILY, family, 0));
+        attributes.add(new Attribute(TextAttribute.WEIGHT, weight, 0));
+        attributes.add(new Attribute(TextAttribute.POSTURE, posture, 0));
+        attributes.add(new Attribute(TextAttribute.SIZE, size, 0));
+        attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, 0));
+        attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, 0));
+        attributes.add(new Attribute(TextAttribute.BACKGROUND, background, 0));
+        attributes.add(new Attribute(TextAttribute.UNDERLINE, underline, 0));
+        attributes.add(new Attribute(TextAttribute.STRIKETHROUGH, strikeThrough, 0));
 
         // Clear the background using the default background color:
         graphics.setPaint(background);
@@ -357,13 +365,13 @@ class Layout {
                             if (spanColorMatch.find()) {
                                 BigInteger rgb = new BigInteger(spanColorMatch.group(), 16);
                                 foreground = new Color(rgb.intValue());
-                                tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                                attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
                             }
                             Matcher spanBackgroundMatch = spanColorPattern.matcher(tagArguments);
                             if (spanBackgroundMatch.find()) {
                                 BigInteger rgb = new BigInteger(spanBackgroundMatch.group(), 16);
                                 background = new Color(rgb.intValue());
-                                tags.add(new Tag(TextAttribute.BACKGROUND, background, buffer.length()));
+                                attributes.add(new Attribute(TextAttribute.BACKGROUND, background, buffer.length()));
                             }
                             break;
                         case "font":
@@ -372,36 +380,47 @@ class Layout {
                             if (fontColorMatch.find()) {
                                 BigInteger rgb = new BigInteger(fontColorMatch.group(), 16);
                                 foreground = new Color(rgb.intValue());
-                                tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                                attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
                             }
                             break;
                         case "/span":
                         case "/font":
-                            ColorRecord node = colorStack.remove(0);
-                            foreground = node.foreground;
-                            background = node.background;
-                            tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
-                            tags.add(new Tag(TextAttribute.BACKGROUND, background, buffer.length()));
+                            if (colorStack.size() != 0) {
+                                ColorRecord node = colorStack.remove(0);
+                                foreground = node.foreground;
+                                background = node.background;
+                                attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                                attributes.add(new Attribute(TextAttribute.BACKGROUND, background, buffer.length()));
+                            }
                             break;
+
+
 
                         case "big":
-                        case "/small":
+                            sizeStack.add(0, size);
                             size *= 1.25;
-                            tags.add(new Tag(TextAttribute.SIZE, size, 0));
+                            attributes.add(new Attribute(TextAttribute.SIZE, size, 0));
+                            break;
+                        case "small":
+                            sizeStack.add(0, size);
+                            size *= 0.8;
+                            attributes.add(new Attribute(TextAttribute.SIZE, size, 0));
+                            break;
+                        case "/small":
+                            size *= 0.8;
                             break;
                         case "/big":
-                        case "small":
-                            size *= 0.8;
-                            tags.add(new Tag(TextAttribute.SIZE, size, 0));
+                            size *= 1.25;
                             break;
-
                         case "<tt>":
                             familyStack.add(0, family);
                             family = MONOSPACED;
-                            tags.add(new Tag(TextAttribute.FAMILY, family, buffer.length()));
+                            attributes.add(new Attribute(TextAttribute.FAMILY, family, buffer.length()));
+                            // family = pushAttribute.apply(TextAttribute.FAMILY, MONOSPACED);
                             break;
                         case "</tt>":
-                            tags.add(new Tag(TextAttribute.FAMILY, familyStack.remove(0), buffer.length()));
+                            attributes.add(new Attribute(TextAttribute.FAMILY, familyStack.remove(0), buffer.length()));
+                            // family = popAttribute.apply(TextAttribute.FAMILY);
                             break;
 
                         // <i> - italics
