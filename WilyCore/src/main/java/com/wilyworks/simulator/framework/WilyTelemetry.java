@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,10 +36,13 @@ import java.util.regex.Pattern;
  * Helper class for handling simplified HTML display.
  */
 class Layout {
-    static final int FONT_SIZE = 16;
-    static final int LINE_WIDTH = 239; // Line width, in pixel units
-    Graphics2D graphics; // Graphics context
-    DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
+    private static final int LINE_WIDTH = 239; // Line width, in pixel units
+    private static final int FONT_SIZE = 16; // Default font size
+    private static final float[] HEADING_MULTIPLES = { // Heading size multiples
+            1.5f, 1.4f, 1.3f, 1.2f, 1.1f, 1f,
+    };
+    private Graphics2D graphics; // Graphics context
+    private DisplayFormat displayFormat; // CLASSIC, MONOSPACE or HTML
 
     // Track tag attributes as we accumulate the string buffer:
     static class Attribute {
@@ -56,10 +58,10 @@ class Layout {
     // Track line breaks as we accumulate the string buffer:
     static class LineBreak {
         int pos; // Position in the buffer
-        int offset; // Vertical offset, zero is the default
+        int verticalOffset; // Vertical offset, zero is the default
 
-        public LineBreak(int pos, int offset) {
-            this.pos = pos; this.offset = offset;
+        public LineBreak(int pos, int verticalOffset) {
+            this.pos = pos; this.verticalOffset = verticalOffset;
         }
     }
 
@@ -232,7 +234,7 @@ class Layout {
             int offset = 0;
             if (endPos > nextLineBreak.pos) {
                 endPos = nextLineBreak.pos;
-                offset = nextLineBreak.offset;
+                offset = nextLineBreak.verticalOffset;
                 nextLineBreak = iterator.next();
             }
 
@@ -349,9 +351,21 @@ class Layout {
                         case "/div":
                             lineBreaks.add(new LineBreak(buffer.length(), 0));
                             break;
+                        case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+                            sizeStack.push(size);
+                            size = HEADING_MULTIPLES[element.charAt(1) - '1'] * FONT_SIZE;
+                            attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
+                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            break;
+                        case "/h1": case "/h2": case "/h3": case "/h4": case "/h5": case "/h6":
+                            if (sizeStack.size() != 0) {
+                                size = sizeStack.pop();
+                                attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
+                                lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            }
+                            break;
 
                         // Text attributes:
-
                         case "span":
                             colorStack.push(new ColorRecord(foreground, background));
                             Matcher spanColorMatch = spanColorPattern.matcher(tagArguments);
