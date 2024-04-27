@@ -271,17 +271,18 @@ class Layout {
         Pattern newlineSearchPattern = Pattern.compile("(\\n)");
 
         // <big>, &nbsp;, \n
-        Pattern htmlSearchPattern = Pattern.compile("(\\n|<.*?>|&.*?;)");
+        // For a tag, group2 = element name, group3 = arguments (needs trimming)
+        Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<\\s*?(\\w+)(.*?)>)");
 
-        // <span style='color: 0xffffff; background: gray;'>
+        // style='color: 0xffffff; background: gray;'
         Pattern spanColorPattern = Pattern.compile(
-            "<span\\s+?style\\s*?=\\s*?[\\'|\\\"].*?color\\s*?:\\s*?(?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+            "\\s*?style\\s*?=\\s*?['|\"].*?color\\s*?:\\s*?(?:0x|#)([0-9a-fA-F]+)");
         Pattern spanBackgroundPattern = Pattern.compile(
-            "<span\\s+?style\\s*?=\\s*?[\\'|\\\"].*?background\\s*?:\\s*?(?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+            "\\s*?style\\s*?=\\s*?['|\"].*?background\\s*?:\\s*?(?:0x|#)([0-9a-fA-F]+)");
 
         // <font color='#00ff00'>
         Pattern fontColorPattern = Pattern.compile(
-            "<font.+?color\\s*?=\\s*?[\\'|\\\"](?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+            "\\s*scolor\\s*?=\\s*?['|\"](?:0x|#)([0-9a-fA-F]+)>");
 
         Pattern searchPattern = (displayFormat == DisplayFormat.HTML) ? htmlSearchPattern : newlineSearchPattern;
 
@@ -337,8 +338,8 @@ class Layout {
                     break;
 
                 case '<':
-                    String element = matcher.group(1);
-                    String tagArguments = matcher.group(2);
+                    String element = matcher.group(2);
+                    String tagArguments = matcher.group(3);
                     switch (element) {
                         // Line tags:
                         case "br":
