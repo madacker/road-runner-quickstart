@@ -1,27 +1,32 @@
 package com.wilyworks.simulator.framework;
 
-import static org.firstinspires.ftc.robotcore.external.Telemetry.DisplayFormat;
+import static java.awt.Font.MONOSPACED;
+import static java.awt.font.TextAttribute.POSTURE_REGULAR;
+import static java.awt.font.TextAttribute.WEIGHT_REGULAR;
 
 import org.firstinspires.ftc.robotcore.external.Func;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.awt.Canvas;
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Paint;
 import java.awt.font.FontRenderContext;
 import java.awt.font.LineBreakMeasurer;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
+import java.math.BigInteger;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -115,7 +120,7 @@ class Layout {
     // Returns true if the current line is empty:
     boolean isEmptyLine(StringBuilder builder) {
         // @@@ Need to strip when adding? Maybe that's true in general anyway?
-        return (builder.length() == 0) ? true : (builder.charAt(builder.length() - 1) == '\n');
+        return builder.length() == 0 || (builder.charAt(builder.length() - 1) == '\n');
     }
 
 //    ArrayList<Tag> getTags(String text) {
@@ -240,106 +245,176 @@ class Layout {
     StringBuilder buffer; //
     ArrayList<Tag> tags;
     ArrayList<LineBreak> lineBreaks;
+
+    // History structure for tags:
+    static public class ColorRecord {
+        Paint foreground;
+        Paint background;
+
+        public ColorRecord(Paint foregroundColor, Paint backgroundColor) {
+            this.foreground = foregroundColor; this.background = backgroundColor;
+        }
+    }
+
     public void parseAndRender(Graphics2D graphics, Telemetry.DisplayFormat format, String text) {
         this.graphics = graphics;
         this.format = format;
         this.buffer = new StringBuilder();
         this.tags = new ArrayList<>();
 
-        double fontSize = FONT_SIZE;
+        // \n
+        Pattern newlineSearchPattern = Pattern.compile("(\\n)");
 
-        tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
-        if (displayFormat == Telemetry.DisplayFormat.MONOSPACE) {
-            tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACED", 0));
-        }
+        // <big>, &nbsp;, \n
+        Pattern htmlSearchPattern = Pattern.compile("(\\n|<.*?>|&.*?;)");
 
-        int plainTextStart = 0; // The start index for the current plain-text run
-        for (int pos = 0; pos < text.length(); pos++) {
-            char c = text.charAt(pos);
-            if ((c != '\n') && ((displayFormat != DisplayFormat.HTML) || ((c != '&') && (c != '<')))) {
-                buffer.append(c);
-            } else {
-                if (c == '\n') {
+        // <span style='color: 0xffffff; background: gray;'>
+        Pattern spanColorPattern = Pattern.compile(
+            "<span\\s+?style\\s*?=\\s*?[\\'|\\\"].*?color\\s*?:\\s*?(?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+        Pattern spanBackgroundPattern = Pattern.compile(
+            "<span\\s+?style\\s*?=\\s*?[\\'|\\\"].*?background\\s*?:\\s*?(?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+
+        // <font color='#00ff00'>
+        Pattern fontColorPattern = Pattern.compile(
+            "<font.+?color\\s*?=\\s*?[\\'|\\\"](?:0x|#)([0-9[a-f[A-F]]]+).*?>");
+
+
+
+        Pattern searchPattern = htmlSearchPattern; // @@@
+
+        LinkedList<String> familyStack = new LinkedList<>();
+        LinkedList<Float> weightStack = new LinkedList<>();
+        LinkedList<Float> postureStack = new LinkedList<>();
+        // sizeStack isn't needed
+        LinkedList<Integer> superscriptStack = new LinkedList<>();
+        LinkedList<ColorRecord> colorStack = new LinkedList<>();
+        LinkedList<Integer> underlineStack = new LinkedList<>();
+        LinkedList<Boolean> strikeThroughStack = new LinkedList<>();
+
+        String family = (displayFormat == Telemetry.DisplayFormat.MONOSPACE) ? MONOSPACED : "Default";
+        float weight = WEIGHT_REGULAR;
+        float posture = POSTURE_REGULAR;
+        float size = FONT_SIZE;
+        int superscript = 0;
+        Paint foreground = new Color(0xffffff); // The standard text color
+        Paint background = new Color(0x390708); // The reddish-brown of the driver station
+        int underline = -1;
+        boolean strikeThrough = false;
+
+        tags.add(new Tag(TextAttribute.FAMILY, family, 0));
+        tags.add(new Tag(TextAttribute.WEIGHT, weight, 0));
+        tags.add(new Tag(TextAttribute.POSTURE, posture, 0));
+        tags.add(new Tag(TextAttribute.SIZE, size, 0));
+        tags.add(new Tag(TextAttribute.SUPERSCRIPT, superscript, 0));
+        tags.add(new Tag(TextAttribute.FOREGROUND, foreground, 0));
+        tags.add(new Tag(TextAttribute.BACKGROUND, background, 0));
+        tags.add(new Tag(TextAttribute.UNDERLINE, underline, 0));
+        tags.add(new Tag(TextAttribute.STRIKETHROUGH, strikeThrough, 0));
+
+        // Clear the background using the default background color:
+        graphics.setPaint(background);
+        graphics.fillRect(0, 0, 10000, 10000);
+
+        // Start parsing!
+        Matcher matcher = searchPattern.matcher(text);
+        int previousSearchEnd = 0;
+        while (matcher.find()) {
+            buffer.append(text.substring(previousSearchEnd, matcher.start()));
+            previousSearchEnd = matcher.end();
+            switch (matcher.group().charAt(0)) {
+                case '\n':
                     lineBreaks.add(new LineBreak(buffer.length(), 0));
-                } else if (c == '&') {
-                    // Substitute HTML entities (like a space for &nbsp;):
-                    int end = text.indexOf(';', pos);
-                    if (end != -1) {
-                        String entity = text.substring(pos, end + 1).trim(); // Includes '&' and ';'
-                        pos = end; // Advance for next iteration of the loop
-                        String substitution = ENTITY_MAP.get(entity);
-                        if (substitution != null) {
-                            buffer.append(substitution);
-                        }
+                    break;
+
+                case '&':
+                    String entitySubstitution = ENTITY_MAP.get(matcher.group());
+                    if (entitySubstitution != null) {
+                        buffer.append(entitySubstitution);
                     }
-                } else if (c == '<') {
-                    // Handle all HTML tags:
-                    int end = text.indexOf('>', pos);
-                    if (end != -1) {
-                        String tag = text.substring(pos + 1, end).trim(); // Excludes '<' and '>'
-                        pos = end; // Advance for next iteration of the loop
+                    break;
 
-                        // Determine the element and its argument string:
-                        String element = tag;
-                        String arguments = "";
-                        int spacePos = tag.indexOf(" ");
-                        if (spacePos != -1) {
-                            element = element.substring(0, spacePos);
-                            arguments = element.substring(spacePos).trim();
-                        }
-                        // https://docs.oracle.com/javase/8/docs/api/java/awt/font/TextAttribute.html#SIZE
-                        switch (element) {
-                            // Line tags:
-                            case "br":
+                case '<':
+                    String element = matcher.group(1);
+                    String tagArguments = matcher.group(2);
+                    switch (element) {
+                        // Line tags:
+                        case "br":
+                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            break;
+                        case "div":
+                            if (!isEmptyLine(buffer))
                                 lineBreaks.add(new LineBreak(buffer.length(), 0));
-                                break;
-                            case "div":
-                                if (!isEmptyLine(buffer))
-                                    lineBreaks.add(new LineBreak(buffer.length(), 0));
-                                break;
-                            case "/div":
-                                lineBreaks.add(new LineBreak(buffer.length(), 0));
-                                break;
+                            break;
+                        case "/div":
+                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            break;
 
-                            // Character tags:
-                            case "big":
-                            case "/small":
-                                fontSize *= 1.25;
-                                tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
-                                break;
-                            case "/big":
-                            case "small":
-                                fontSize *= 0.8;
-                                tags.add(new Tag(TextAttribute.SIZE, fontSize, 0));
-                                break;
+                        // Text attributes:
 
-                            case "span":
-                                // <span style='color: 0xffffff; background: gray;'>
-                                Pattern pattern = Pattern.compile(arguments, Pattern.CASE_INSENSITIVE);
-                                Matcher color = pattern.matcher("style\\s*=\\s*['\"]\\s*color\\s:\\s*");
+                        case "span":
+                            colorStack.add(0, new ColorRecord(foreground, background));
+                            Matcher spanColorMatch = spanColorPattern.matcher(tagArguments);
+                            if (spanColorMatch.find()) {
+                                BigInteger rgb = new BigInteger(spanColorMatch.group(), 16);
+                                foreground = new Color(rgb.intValue());
+                                tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                            }
+                            Matcher spanBackgroundMatch = spanColorPattern.matcher(tagArguments);
+                            if (spanBackgroundMatch.find()) {
+                                BigInteger rgb = new BigInteger(spanBackgroundMatch.group(), 16);
+                                background = new Color(rgb.intValue());
+                                tags.add(new Tag(TextAttribute.BACKGROUND, background, buffer.length()));
+                            }
+                            break;
+                        case "font":
+                            colorStack.add(0, new ColorRecord(foreground, background));
+                            Matcher fontColorMatch = fontColorPattern.matcher(tagArguments);
+                            if (fontColorMatch.find()) {
+                                BigInteger rgb = new BigInteger(fontColorMatch.group(), 16);
+                                foreground = new Color(rgb.intValue());
+                                tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                            }
+                            break;
+                        case "/span":
+                        case "/font":
+                            ColorRecord node = colorStack.remove(0);
+                            foreground = node.foreground;
+                            background = node.background;
+                            tags.add(new Tag(TextAttribute.FOREGROUND, foreground, buffer.length()));
+                            tags.add(new Tag(TextAttribute.BACKGROUND, background, buffer.length()));
+                            break;
 
+                        case "big":
+                        case "/small":
+                            size *= 1.25;
+                            tags.add(new Tag(TextAttribute.SIZE, size, 0));
+                            break;
+                        case "/big":
+                        case "small":
+                            size *= 0.8;
+                            tags.add(new Tag(TextAttribute.SIZE, size, 0));
+                            break;
 
-                                tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", buffer.length()));
+                        case "<tt>":
+                            familyStack.add(0, family);
+                            family = MONOSPACED;
+                            tags.add(new Tag(TextAttribute.FAMILY, family, buffer.length()));
+                            break;
+                        case "</tt>":
+                            tags.add(new Tag(TextAttribute.FAMILY, familyStack.remove(0), buffer.length()));
+                            break;
 
-
-                                break;
-
-                            case "font":
-
-
-
-                            case "<tt>":
-                                tags.add(new Tag(TextAttribute.FAMILY, "MONOSPACE", buffer.length()));
-                                break;
-                            case "</tt>":
-                                tags.add(new Tag(TextAttribute.FAMILY, "SANS_SERIF", buffer.length()));
-                                break; // @@@ Initialize?
-                        }
+                        // <i> - italics
+                        // <b> - bold
+                        // <u> - underline
+                        // <strike> - strikethrough
+                        // <sup>
+                        // <sub>
                     }
-                }
             }
         }
 
+        buffer.append(text.substring(0, previousSearchEnd));
         lineBreaks.add(new LineBreak(buffer.length(), 0));
         renderText();
     }
@@ -376,7 +451,7 @@ class Layout {
         String text = "This\nis a long text that needs to be wrapped into multiple\n\nlines. " +
                 "We want to handle line breaks gracefully.";
 
-        if (true) {
+        if (false) {
             parseAndRender(graphics, displayFormat, text);
             return;
         }
@@ -464,7 +539,7 @@ public class WilyTelemetry implements Telemetry {
     // sizing font doesn't support the full unicode character set (like emojis):
     public final int DISPLAY_FONT_SIZE = 16;
     final Font PROPORTIONAL_DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
-    final Font MONOSPACE_FONT = new Font(Font.MONOSPACED, Font.PLAIN, DISPLAY_FONT_SIZE);
+    final Font MONOSPACE_FONT = new Font(MONOSPACED, Font.PLAIN, DISPLAY_FONT_SIZE);
 
     // Try to emulate the same line width as the REV Driver Station in its horizontal
     // configuration. Because the DS uses a proportional font, and because we don't have
