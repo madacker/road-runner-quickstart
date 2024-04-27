@@ -302,13 +302,6 @@ class Layout {
         int underline = -1;
         boolean strikeThrough = false;
 
-        // Some lambda function helpers:
-        BiConsumer setAttribute = (attribute, value) -> attributes.add(new Attribute((TextAttribute) attribute, value, buffer.length()));
-
-
-
-        setAttribute.accept(TextAttribute.FAMILY, family);
-
         attributes.add(new Attribute(TextAttribute.FAMILY, family, 0));
         attributes.add(new Attribute(TextAttribute.WEIGHT, weight, 0));
         attributes.add(new Attribute(TextAttribute.POSTURE, posture, 0));
@@ -327,7 +320,7 @@ class Layout {
         Matcher matcher = searchPattern.matcher(text);
         int previousSearchEnd = 0;
         while (matcher.find()) {
-            buffer.append(text.substring(previousSearchEnd, matcher.start()));
+            buffer.append(text, previousSearchEnd, matcher.start());
             previousSearchEnd = matcher.end();
             switch (matcher.group().charAt(0)) {
                 case '\n':
@@ -360,7 +353,7 @@ class Layout {
                         // Text attributes:
 
                         case "span":
-                            colorStack.add(0, new ColorRecord(foreground, background));
+                            colorStack.push(new ColorRecord(foreground, background));
                             Matcher spanColorMatch = spanColorPattern.matcher(tagArguments);
                             if (spanColorMatch.find()) {
                                 BigInteger rgb = new BigInteger(spanColorMatch.group(), 16);
@@ -375,7 +368,7 @@ class Layout {
                             }
                             break;
                         case "font":
-                            colorStack.add(0, new ColorRecord(foreground, background));
+                            colorStack.push(new ColorRecord(foreground, background));
                             Matcher fontColorMatch = fontColorPattern.matcher(tagArguments);
                             if (fontColorMatch.find()) {
                                 BigInteger rgb = new BigInteger(fontColorMatch.group(), 16);
@@ -386,7 +379,7 @@ class Layout {
                         case "/span":
                         case "/font":
                             if (colorStack.size() != 0) {
-                                ColorRecord node = colorStack.remove(0);
+                                ColorRecord node = colorStack.pop();
                                 foreground = node.foreground;
                                 background = node.background;
                                 attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
@@ -394,33 +387,34 @@ class Layout {
                             }
                             break;
 
-
-
                         case "big":
-                            sizeStack.add(0, size);
+                            sizeStack.push(size);
                             size *= 1.25;
-                            attributes.add(new Attribute(TextAttribute.SIZE, size, 0));
+                            attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
                             break;
                         case "small":
-                            sizeStack.add(0, size);
+                            sizeStack.push(size);
                             size *= 0.8;
-                            attributes.add(new Attribute(TextAttribute.SIZE, size, 0));
+                            attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
                             break;
                         case "/small":
-                            size *= 0.8;
-                            break;
                         case "/big":
-                            size *= 1.25;
+                            if (sizeStack.size() != 0) {
+                                size = sizeStack.pop();
+                                attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
+                            }
                             break;
+
                         case "<tt>":
-                            familyStack.add(0, family);
+                            familyStack.push(family);
                             family = MONOSPACED;
                             attributes.add(new Attribute(TextAttribute.FAMILY, family, buffer.length()));
-                            // family = pushAttribute.apply(TextAttribute.FAMILY, MONOSPACED);
                             break;
                         case "</tt>":
-                            attributes.add(new Attribute(TextAttribute.FAMILY, familyStack.remove(0), buffer.length()));
-                            // family = popAttribute.apply(TextAttribute.FAMILY);
+                            if (familyStack.size() != 0) {
+                                family = familyStack.pop();
+                                attributes.add(new Attribute(TextAttribute.FAMILY, familyStack.pop(), buffer.length()));
+                            }
                             break;
 
                         // <i> - italics
@@ -433,7 +427,7 @@ class Layout {
             }
         }
 
-        buffer.append(text.substring(0, previousSearchEnd));
+        buffer.append(text, previousSearchEnd, text.length());
         lineBreaks.add(new LineBreak(buffer.length(), 0));
         renderText();
     }
