@@ -241,17 +241,21 @@ class Layout {
 
             // If the explicitly requested newline happens to be the same as the natural
             // layout line-end, we can ignore the explicit request:
-            if (layoutEndPos == lineBreak.pos) {
+            if (lineBreak.pos == layoutEndPos) {
                 lineBreak = iterator.next();
             }
+            if (lineBreak.pos <= layoutEndPos) {
+                // We always advance by one line so start the count negative:
+                extraLineCount = -1;
 
-            // If the explicitly requested newline comes before the natural layout line-end,
-            // then make that the new line. Use a loop to handle multiple explicit newlines
-            // in a row:
-            while (lineBreak.pos <= layoutEndPos) {
-                layoutEndPos = lineBreak.pos;
-                extraLineCount += lineBreak.lineCount;
-                lineBreak = iterator.next();
+                // If the explicitly requested newline comes before the natural layout line-end,
+                // then make that the new line. Use a loop to handle multiple explicit newlines
+                // in a row:
+                while (lineBreak.pos <= layoutEndPos) {
+                    layoutEndPos = lineBreak.pos;
+                    extraLineCount += lineBreak.lineCount;
+                    lineBreak = iterator.next();
+                }
             }
 
             TextLayout layout = measurer.nextLayout(LINE_WIDTH, layoutEndPos, false);
@@ -290,7 +294,7 @@ class Layout {
         this.attributes = new ArrayList<>();
         this.lineBreaks = new ArrayList<>();
 
-// text = "This is a <b>long</b> and <big><big>big</big></big> text that needs to be wrapped into multiple lines.   \n\n" + "We want to handle line breaks gracefully.";
+// text = "This\n\nis a <b>long</b> and <big><big>big</big></big> text that needs to be wrapped into multiple lines.   \n\n" + "We want to handle line breaks gracefully.";
 
         // \n
         Pattern newlineSearchPattern = Pattern.compile("(\\n)");
@@ -307,7 +311,7 @@ class Layout {
 
         // <font color='#00ff00'>
         Pattern fontColorPattern = Pattern.compile(
-            "\\s*scolor\\s*?=\\s*?['|\"](?:0x|#)([0-9a-fA-F]+)>");
+            "\\s*?color\\s*?=\\s*?['|\"](?:0x|#)([0-9a-fA-F]+)");
 
         Pattern searchPattern = (displayFormat == DisplayFormat.HTML) ? htmlSearchPattern : newlineSearchPattern;
 
@@ -352,7 +356,7 @@ class Layout {
             previousSearchEnd = matcher.end();
             switch (matcher.group().charAt(0)) {
                 case '\n':
-                    lineBreaks.add(new LineBreak(buffer.length(), 0));
+                    lineBreaks.add(new LineBreak(buffer.length(), 1));
                     break;
 
                 case '&':
@@ -377,6 +381,13 @@ class Layout {
                         case "/div":
                             lineBreaks.add(new LineBreak(buffer.length(), 1));
                             break;
+                        case "p":
+                            if (!isEmptyLine(buffer, lineBreaks))
+                                lineBreaks.add(new LineBreak(buffer.length(), 1));
+                            break;
+                        case "/p":
+                            lineBreaks.add(new LineBreak(buffer.length(), 1));
+                            break;
                         case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
                             sizeStack.push(size);
                             size *= HEADING_MULTIPLES[element.charAt(1) - '1'];
@@ -397,13 +408,13 @@ class Layout {
                             colorStack.push(new ColorRecord(foreground, background));
                             Matcher spanColorMatch = spanColorPattern.matcher(tagArguments);
                             if (spanColorMatch.find()) {
-                                BigInteger rgb = new BigInteger(spanColorMatch.group(), 16);
+                                BigInteger rgb = new BigInteger(spanColorMatch.group(1), 16);
                                 foreground = new Color(rgb.intValue());
                                 attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
                             }
                             Matcher spanBackgroundMatch = spanColorPattern.matcher(tagArguments);
                             if (spanBackgroundMatch.find()) {
-                                BigInteger rgb = new BigInteger(spanBackgroundMatch.group(), 16);
+                                BigInteger rgb = new BigInteger(spanBackgroundMatch.group(1), 16);
                                 background = new Color(rgb.intValue());
                                 attributes.add(new Attribute(TextAttribute.BACKGROUND, background, buffer.length()));
                             }
@@ -412,7 +423,7 @@ class Layout {
                             colorStack.push(new ColorRecord(foreground, background));
                             Matcher fontColorMatch = fontColorPattern.matcher(tagArguments);
                             if (fontColorMatch.find()) {
-                                BigInteger rgb = new BigInteger(fontColorMatch.group(), 16);
+                                BigInteger rgb = new BigInteger(fontColorMatch.group(1), 16);
                                 foreground = new Color(rgb.intValue());
                                 attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
                             }
@@ -470,12 +481,65 @@ class Layout {
                             }
                             break;
 
-                        // <i> - italics
-                        // <b> - bold
-                        // <u> - underline
-                        // <strike> - strikethrough
-                        // <sup>
-                        // <sub>
+                        case "i":
+                            postureStack.push(posture);
+                            posture = TextAttribute.POSTURE_OBLIQUE;
+                            attributes.add(new Attribute(TextAttribute.POSTURE, posture, buffer.length()));
+                            break;
+                        case "/i":
+                            if (postureStack.size() != 0) {
+                                posture = postureStack.pop();
+                                attributes.add(new Attribute(TextAttribute.POSTURE, posture, buffer.length()));
+                            }
+                            break;
+
+                        case "u":
+                            underlineStack.push(underline);
+                            underline = TextAttribute.UNDERLINE_ON;
+                            attributes.add(new Attribute(TextAttribute.UNDERLINE, underline, buffer.length()));
+                            break;
+                        case "/u":
+                            if (underlineStack.size() != 0) {
+                                underline = underlineStack.pop();
+                                attributes.add(new Attribute(TextAttribute.UNDERLINE, underline, buffer.length()));
+                            }
+                            break;
+
+                        case "strike":
+                            strikeThroughStack.push(strikeThrough);
+                            strikeThrough = TextAttribute.STRIKETHROUGH_ON;
+                            attributes.add(new Attribute(TextAttribute.STRIKETHROUGH, strikeThrough, buffer.length()));
+                            break;
+                        case "/strike":
+                            if (strikeThroughStack.size() != 0) {
+                                strikeThrough = strikeThroughStack.pop();
+                                attributes.add(new Attribute(TextAttribute.STRIKETHROUGH, strikeThrough, buffer.length()));
+                            }
+                            break;
+
+                        case "sup":
+                            superscriptStack.push(superscript);
+                            superscript = TextAttribute.SUPERSCRIPT_SUPER;
+                            attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
+                            break;
+                        case "/sup":
+                            if (superscriptStack.size() != 0) {
+                                superscript = superscriptStack.pop();
+                                attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
+                            }
+                            break;
+
+                        case "sub":
+                            superscriptStack.push(superscript);
+                            superscript = TextAttribute.SUPERSCRIPT_SUB;
+                            attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
+                            break;
+                        case "/sub":
+                            if (superscriptStack.size() != 0) {
+                                superscript = superscriptStack.pop();
+                                attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
+                            }
+                            break;
                     }
             }
         }

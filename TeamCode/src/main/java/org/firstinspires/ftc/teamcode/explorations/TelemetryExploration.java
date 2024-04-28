@@ -28,9 +28,7 @@ public class TelemetryExploration extends LinearOpMode {
     private void htmlTest(Telemetry telemetry) {
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.HTML);
         telemetry.addLine("This is <b>bold</b>, this is <i>italics</i>, this is <u>underline</u>.");
-        telemetry.addLine("<font face='monospace' size='7'>IWWO1M..B</font>");
-        telemetry.addLine("<font color='#00ff00'>IWWO1M..B</font>");
-        telemetry.addLine("<font face='monospace' color='#a0a0a0' size='7'>747</font>");
+        telemetry.addLine("<font color='#00ff00'>Green</font> ");
         telemetry.addLine("<h1>The</h1> <h2>quick</h2> <h3>brown</h3> <h4>fox</h4>");
 
         // Failures:
