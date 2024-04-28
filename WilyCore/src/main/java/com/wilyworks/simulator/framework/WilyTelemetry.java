@@ -9,6 +9,8 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.robotcore.external.Telemetry.DisplayFormat;
 
+import android.annotation.SuppressLint;
+
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Font;
@@ -123,9 +125,12 @@ class Layout {
 //    }
 
     // Returns true if the current line is empty:
-    boolean isEmptyLine(StringBuilder builder) {
-        // @@@ Need to strip when adding? Maybe that's true in general anyway?
-        return builder.length() == 0 || (builder.charAt(builder.length() - 1) == '\n');
+    boolean isEmptyLine(StringBuilder builder, List<LineBreak> lineBreaks) {
+        if ((builder.length() == 0) || (lineBreaks.size() == 0))
+            return true;
+
+        LineBreak lastBreak = lineBreaks.get(lineBreaks.size() - 1);
+        return lastBreak.pos == builder.length();
     }
 
 //    ArrayList<Tag> getTags(String text) {
@@ -274,7 +279,7 @@ class Layout {
         // For a tag, group2 = element name, group3 = arguments (needs trimming)
         Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<\\s*?(\\w+)(.*?)>)");
 
-        // style='color: 0xffffff; background: gray;'
+        // style='color: 0xffffff; background: 0x3e3e3e;'
         Pattern spanColorPattern = Pattern.compile(
             "\\s*?style\\s*?=\\s*?['|\"].*?color\\s*?:\\s*?(?:0x|#)([0-9a-fA-F]+)");
         Pattern spanBackgroundPattern = Pattern.compile(
@@ -346,7 +351,7 @@ class Layout {
                             lineBreaks.add(new LineBreak(buffer.length(), 0));
                             break;
                         case "div":
-                            if (!isEmptyLine(buffer))
+                            if (!isEmptyLine(buffer, lineBreaks))
                                 lineBreaks.add(new LineBreak(buffer.length(), 0));
                             break;
                         case "/div":
@@ -479,7 +484,7 @@ class Layout {
         String text = "This\nis a long text that needs to be wrapped into multiple\n\nlines. " +
                 "We want to handle line breaks gracefully.";
 
-        if (false) {
+        if (true) {
             parseAndRender(graphics, displayFormat, text);
             return;
         }
@@ -596,6 +601,7 @@ public class WilyTelemetry implements Telemetry {
     DisplayFormat displayFormat = DisplayFormat.CLASSIC; // HTML vs. monospace modes
 
     // Unit test:
+    @SuppressLint("DefaultLocale")
     @SuppressWarnings({"UnnecessaryUnicodeEscape", "StringConcatenationInLoop"})
     private void test(WilyTelemetry telemetry) {
         telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
