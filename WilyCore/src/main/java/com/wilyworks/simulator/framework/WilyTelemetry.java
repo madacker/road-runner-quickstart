@@ -60,10 +60,10 @@ class Layout {
     // Track line breaks as we accumulate the string buffer:
     static class LineBreak {
         int pos; // Position in the buffer
-        int verticalOffset; // Vertical offset, zero is the default
+        float lineCount; // Count of lines to advance, can be fractional
 
-        public LineBreak(int pos, int verticalOffset) {
-            this.pos = pos; this.verticalOffset = verticalOffset;
+        public LineBreak(int pos, float lineCount) {
+            this.pos = pos; this.lineCount = lineCount;
         }
     }
 
@@ -230,25 +230,18 @@ class Layout {
 
         Iterator<LineBreak> iterator = lineBreaks.iterator();
         LineBreak lineBreak = iterator.next();
-        float yCurrent = -1.0f;
+        float yCurrent = 0;
 
         while (true) {
             // Find where the measurer wants to put the next line break and compare that to
             // where we want to put the next line break:
             int layoutEndPos = measurer.nextOffset(LINE_WIDTH);
-            int newLines = 0;
-            int verticalOffset = 0;
+            float extraLineCount = 0;
 
-            // If the layout line-end is less than the next explicitly requested newline, then
-            // add one implicit newline:
-            if (lineBreak.pos >= layoutEndPos) {
-                newLines = 1;
-
-                // If the explicitly requested newline happens to be the same as the natural
-                // layout line-end, we can ignore the explicit request:
-                if (layoutEndPos == lineBreak.pos) {
-                    lineBreak = iterator.next();
-                }
+            // If the explicitly requested newline happens to be the same as the natural
+            // layout line-end, we can ignore the explicit request:
+            if (layoutEndPos == lineBreak.pos) {
+                lineBreak = iterator.next();
             }
 
             // If the explicitly requested newline comes before the natural layout line-end,
@@ -256,8 +249,7 @@ class Layout {
             // in a row:
             while (lineBreak.pos <= layoutEndPos) {
                 layoutEndPos = lineBreak.pos;
-                verticalOffset += lineBreak.verticalOffset;
-                newLines++;
+                extraLineCount += lineBreak.lineCount;
                 lineBreak = iterator.next();
             }
 
@@ -265,16 +257,13 @@ class Layout {
             if (layout == null)
                 break;
 
-            // Handle the offset for the very first line:
-            if (yCurrent == -1.0f)
-                yCurrent = layout.getAscent();
-
-            // Draw the text:
+            // Handle y offset for the line:
+            yCurrent += layout.getAscent();
             layout.draw(graphics, 0, yCurrent);
+            yCurrent += layout.getDescent();
 
-            // Advance 'y' for the next line:
-            float leading = layout.getAscent() + layout.getDescent();
-            yCurrent += newLines * leading + verticalOffset;
+            // Handle extra lines:
+            yCurrent += extraLineCount * (layout.getAscent() + layout.getDescent());
         }
     }
 
@@ -300,8 +289,7 @@ class Layout {
         this.attributes = new ArrayList<>();
         this.lineBreaks = new ArrayList<>();
 
-text = "This is a <b>long</b> text that needs to be wrapped into multiple lines.   \n\n" +
-        "We want to handle line breaks gracefully.";
+// text = "This is a <b>long</b> and <big><big>big</big></big> text that needs to be wrapped into multiple lines.   \n\n" + "We want to handle line breaks gracefully.";
 
         // \n
         Pattern newlineSearchPattern = Pattern.compile("(\\n)");
@@ -379,26 +367,27 @@ text = "This is a <b>long</b> text that needs to be wrapped into multiple lines.
                     switch (element) {
                         // Line tags:
                         case "br":
-                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            lineBreaks.add(new LineBreak(buffer.length(), 1));
                             break;
                         case "div":
                             if (!isEmptyLine(buffer, lineBreaks))
-                                lineBreaks.add(new LineBreak(buffer.length(), 0));
+                                lineBreaks.add(new LineBreak(buffer.length(), 1));
                             break;
                         case "/div":
-                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            lineBreaks.add(new LineBreak(buffer.length(), 1));
                             break;
                         case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
                             sizeStack.push(size);
-                            size = HEADING_MULTIPLES[element.charAt(1) - '1'] * FONT_SIZE;
+                            size *= HEADING_MULTIPLES[element.charAt(1) - '1'];
                             attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
-                            lineBreaks.add(new LineBreak(buffer.length(), 0));
+                            if (!isEmptyLine(buffer, lineBreaks))
+                                lineBreaks.add(new LineBreak(buffer.length(), 1));
                             break;
                         case "/h1": case "/h2": case "/h3": case "/h4": case "/h5": case "/h6":
                             if (sizeStack.size() != 0) {
                                 size = sizeStack.pop();
                                 attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
-                                lineBreaks.add(new LineBreak(buffer.length(), 0));
+                                lineBreaks.add(new LineBreak(buffer.length(), 1));
                             }
                             break;
 
