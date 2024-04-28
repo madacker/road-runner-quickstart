@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  */
 class Layout {
     private static final int LINE_WIDTH = 239; // Line width, in pixel units
-    private static final int FONT_SIZE = 16; // Default font size
+    private static final int FONT_SIZE = 10; // Default font size
     private static final float[] HEADING_MULTIPLES = { // Heading size multiples
             1.5f, 1.4f, 1.3f, 1.2f, 1.1f, 1f,
     };
@@ -221,7 +221,8 @@ class Layout {
         String text = buffer.toString();
         AttributedString attributedString = new AttributedString(text);
         for (Attribute attribute : attributes) {
-            attributedString.addAttribute(attribute.attribute, attribute.value, attribute.pos, text.length());
+            if (attribute.pos != text.length())
+                attributedString.addAttribute(attribute.attribute, attribute.value, attribute.pos, text.length());
         }
 
         // Render with word wrapping:
@@ -269,6 +270,8 @@ class Layout {
 
             // Handle extra lines:
             yCurrent += extraLineCount * (layout.getAscent() + layout.getDescent());
+
+            // @@@ Need to vertically clip
         }
     }
 
@@ -399,7 +402,7 @@ class Layout {
                             if (sizeStack.size() != 0) {
                                 size = sizeStack.pop();
                                 attributes.add(new Attribute(TextAttribute.SIZE, size, buffer.length()));
-                                lineBreaks.add(new LineBreak(buffer.length(), 1));
+                                lineBreaks.add(new LineBreak(buffer.length(), 1.5f));
                             }
                             break;
 
@@ -412,7 +415,7 @@ class Layout {
                                 foreground = new Color(rgb.intValue());
                                 attributes.add(new Attribute(TextAttribute.FOREGROUND, foreground, buffer.length()));
                             }
-                            Matcher spanBackgroundMatch = spanColorPattern.matcher(tagArguments);
+                            Matcher spanBackgroundMatch = spanBackgroundPattern.matcher(tagArguments);
                             if (spanBackgroundMatch.find()) {
                                 BigInteger rgb = new BigInteger(spanBackgroundMatch.group(1), 16);
                                 background = new Color(rgb.intValue());
@@ -522,18 +525,12 @@ class Layout {
                             superscript = TextAttribute.SUPERSCRIPT_SUPER;
                             attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
                             break;
-                        case "/sup":
-                            if (superscriptStack.size() != 0) {
-                                superscript = superscriptStack.pop();
-                                attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
-                            }
-                            break;
-
                         case "sub":
                             superscriptStack.push(superscript);
                             superscript = TextAttribute.SUPERSCRIPT_SUB;
                             attributes.add(new Attribute(TextAttribute.SUPERSCRIPT, superscript, buffer.length()));
                             break;
+                        case "/sup":
                         case "/sub":
                             if (superscriptStack.size() != 0) {
                                 superscript = superscriptStack.pop();
@@ -582,6 +579,7 @@ class Layout {
         StringBuilder textBuilder = new StringBuilder();
         for (String line: lines) {
             textBuilder.append(line);
+            textBuilder.append("\n");
         }
         String text = textBuilder.toString();
 
