@@ -130,7 +130,8 @@ class Layout {
             return true;
 
         LineBreak lastBreak = lineBreaks.get(lineBreaks.size() - 1);
-        return lastBreak.pos == builder.length();
+        String lastLine = builder.substring(lastBreak.pos).trim();
+        return lastLine.equals("");
     }
 
 //    ArrayList<Tag> getTags(String text) {
@@ -296,7 +297,7 @@ class Layout {
 
         // <big>, &nbsp;, \n
         // For a tag, group2 = element name, group3 = arguments (needs trimming)
-        Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<\\s*?([/\\w]+)(.*?)>)");
+        Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<([/\\w]+)(.*?)>)");
 
         // style='color: 0xffffff; background: 0x3e3e3e;'
         Pattern spanColorPattern = Pattern.compile(
