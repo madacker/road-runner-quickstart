@@ -229,8 +229,8 @@ class Layout {
                 new FontRenderContext(null, true, true));
 
         Iterator<LineBreak> iterator = lineBreaks.iterator();
-        LineBreak nextLineBreak = iterator.next();
-        int yCurrent = 0;
+        LineBreak lineBreak = iterator.next();
+        float yCurrent = -1.0f;
 
         while (true) {
             // Find where the measurer wants to put the next line break and compare that to
@@ -241,33 +241,40 @@ class Layout {
 
             // If the layout line-end is less than the next explicitly requested newline, then
             // add one implicit newline:
-            if (layoutEndPos <= nextLineBreak.pos) {
+            if (lineBreak.pos >= layoutEndPos) {
                 newLines = 1;
 
                 // If the explicitly requested newline happens to be the same as the natural
                 // layout line-end, we can ignore the explicit request:
-                if (layoutEndPos == nextLineBreak.pos) {
-                    nextLineBreak = iterator.next();
+                if (layoutEndPos == lineBreak.pos) {
+                    lineBreak = iterator.next();
                 }
-            } else {
-                // If the explicitly requested newline comes before the natural layout line-end,
-                // then make that the new line. Use a loop to handle multiple explicit newlines
-                // in a row:
-                while (layoutEndPos >= nextLineBreak.pos) {
-                    layoutEndPos = nextLineBreak.pos;
-                    verticalOffset += nextLineBreak.verticalOffset;
-                    newLines++;
-                    nextLineBreak = iterator.next();
-                }
+            }
+
+            // If the explicitly requested newline comes before the natural layout line-end,
+            // then make that the new line. Use a loop to handle multiple explicit newlines
+            // in a row:
+            while (lineBreak.pos <= layoutEndPos) {
+                layoutEndPos = lineBreak.pos;
+                verticalOffset += lineBreak.verticalOffset;
+                newLines++;
+                lineBreak = iterator.next();
             }
 
             TextLayout layout = measurer.nextLayout(LINE_WIDTH, layoutEndPos, false);
             if (layout == null)
                 break;
 
+            // Handle the offset for the very first line:
+            if (yCurrent == -1.0f)
+                yCurrent = layout.getAscent();
+
+            // Draw the text:
+            layout.draw(graphics, 0, yCurrent);
+
+            // Advance 'y' for the next line:
             float leading = layout.getAscent() + layout.getDescent();
             yCurrent += newLines * leading + verticalOffset;
-            layout.draw(graphics, 0, yCurrent);
         }
     }
 
@@ -293,7 +300,7 @@ class Layout {
         this.attributes = new ArrayList<>();
         this.lineBreaks = new ArrayList<>();
 
-text = "This is a long text that needs to be wrapped into multiple lines.\n\n" +
+text = "This is a <b>long</b> text that needs to be wrapped into multiple lines.   \n\n" +
         "We want to handle line breaks gracefully.";
 
         // \n
@@ -449,15 +456,27 @@ text = "This is a long text that needs to be wrapped into multiple lines.\n\n" +
                             }
                             break;
 
-                        case "<tt>":
+                        case "tt":
                             familyStack.push(family);
                             family = MONOSPACED;
                             attributes.add(new Attribute(TextAttribute.FAMILY, family, buffer.length()));
                             break;
-                        case "</tt>":
+                        case "/tt":
                             if (familyStack.size() != 0) {
                                 family = familyStack.pop();
                                 attributes.add(new Attribute(TextAttribute.FAMILY, familyStack.pop(), buffer.length()));
+                            }
+                            break;
+
+                        case "b":
+                            weightStack.push(weight);
+                            weight = TextAttribute.WEIGHT_BOLD;
+                            attributes.add(new Attribute(TextAttribute.WEIGHT, weight, buffer.length()));
+                            break;
+                        case "/b":
+                            if (weightStack.size() != 0) {
+                                weight = weightStack.pop();
+                                attributes.add(new Attribute(TextAttribute.WEIGHT, weight, buffer.length()));
                             }
                             break;
 
