@@ -235,18 +235,38 @@ class Layout {
         while (true) {
             // Find where the measurer wants to put the next line break and compare that to
             // where we want to put the next line break:
-            int endPos = measurer.nextOffset(LINE_WIDTH);
-            int offset = 0;
-            if (endPos > nextLineBreak.pos) {
-                endPos = nextLineBreak.pos;
-                offset = nextLineBreak.verticalOffset;
-                nextLineBreak = iterator.next();
+            int layoutEndPos = measurer.nextOffset(LINE_WIDTH);
+            int newLines = 0;
+            int verticalOffset = 0;
+
+            // If the layout line-end is less than the next explicitly requested newline, then
+            // add one implicit newline:
+            if (layoutEndPos <= nextLineBreak.pos) {
+                newLines = 1;
+
+                // If the explicitly requested newline happens to be the same as the natural
+                // layout line-end, we can ignore the explicit request:
+                if (layoutEndPos == nextLineBreak.pos) {
+                    nextLineBreak = iterator.next();
+                }
+            } else {
+                // If the explicitly requested newline comes before the natural layout line-end,
+                // then make that the new line. Use a loop to handle multiple explicit newlines
+                // in a row:
+                while (layoutEndPos >= nextLineBreak.pos) {
+                    layoutEndPos = nextLineBreak.pos;
+                    verticalOffset += nextLineBreak.verticalOffset;
+                    newLines++;
+                    nextLineBreak = iterator.next();
+                }
             }
 
-            TextLayout layout = measurer.nextLayout(LINE_WIDTH, endPos, false);
+            TextLayout layout = measurer.nextLayout(LINE_WIDTH, layoutEndPos, false);
             if (layout == null)
                 break;
-            yCurrent += layout.getAscent() + offset;
+
+            float leading = layout.getAscent() + layout.getDescent();
+            yCurrent += newLines * leading + verticalOffset;
             layout.draw(graphics, 0, yCurrent);
         }
     }
@@ -271,6 +291,10 @@ class Layout {
         this.format = format;
         this.buffer = new StringBuilder();
         this.attributes = new ArrayList<>();
+        this.lineBreaks = new ArrayList<>();
+
+text = "This is a long text that needs to be wrapped into multiple lines.\n\n" +
+        "We want to handle line breaks gracefully.";
 
         // \n
         Pattern newlineSearchPattern = Pattern.compile("(\\n)");
@@ -448,7 +472,8 @@ class Layout {
         }
 
         buffer.append(text, previousSearchEnd, text.length());
-        lineBreaks.add(new LineBreak(buffer.length(), 0));
+        lineBreaks.add(new LineBreak(text.length(), 0));
+        lineBreaks.add(new LineBreak(Integer.MAX_VALUE, 0)); // Terminator
         renderText();
     }
 
@@ -481,8 +506,11 @@ class Layout {
 //            // ...
 //        }
 
-        String text = "This\nis a long text that needs to be wrapped into multiple\n\nlines. " +
-                "We want to handle line breaks gracefully.";
+        StringBuilder textBuilder = new StringBuilder();
+        for (String line: lines) {
+            textBuilder.append(line);
+        }
+        String text = textBuilder.toString();
 
         if (true) {
             parseAndRender(graphics, displayFormat, text);
@@ -827,7 +855,7 @@ public class WilyTelemetry implements Telemetry {
 
         if (displayFormat == DisplayFormat.HTML) {
             Layout html = new Layout(g, displayFormat);
-            html.layout(null);
+            html.layout(lineList);
         } else {
             simpleFlow(g);
         }
