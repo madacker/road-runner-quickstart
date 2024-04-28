@@ -308,7 +308,7 @@ text = "This is a <b>long</b> text that needs to be wrapped into multiple lines.
 
         // <big>, &nbsp;, \n
         // For a tag, group2 = element name, group3 = arguments (needs trimming)
-        Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<\\s*?(\\w+)(.*?)>)");
+        Pattern htmlSearchPattern = Pattern.compile("(\\n|&.*?;|<\\s*?([/\\w]+)(.*?)>)");
 
         // style='color: 0xffffff; background: 0x3e3e3e;'
         Pattern spanColorPattern = Pattern.compile(
