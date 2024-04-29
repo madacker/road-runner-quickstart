@@ -9,11 +9,8 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.robotcore.external.Telemetry.DisplayFormat;
 
-import android.annotation.SuppressLint;
-
 import java.awt.Canvas;
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Paint;
 import java.awt.font.FontRenderContext;
@@ -36,7 +33,8 @@ import java.util.regex.Pattern;
  * Helper class for handling simplified HTML display.
  */
 class Layout {
-    private static final int LINE_WIDTH = 239; // Line width, in pixel units
+    public static final int TELEMETRY_WIDTH = 237; // Line width, in pixel units
+    public static final int TELEMETRY_HEIGHT = 237;
     private static final int FONT_SIZE = 10; // Default font size
     private static final float[] HEADING_MULTIPLES = { // Heading size multiples
             1.5f, 1.4f, 1.3f, 1.2f, 1.1f, 1f,
@@ -126,7 +124,7 @@ class Layout {
         while (true) {
             // Find where the measurer wants to put the next line break and compare that to
             // where we want to put the next line break:
-            int layoutEndPos = measurer.nextOffset(LINE_WIDTH);
+            int layoutEndPos = measurer.nextOffset(TELEMETRY_WIDTH);
             float extraLineCount = 0;
 
             // If the explicitly requested newline happens to be the same as the natural
@@ -148,7 +146,7 @@ class Layout {
                 }
             }
 
-            TextLayout layout = measurer.nextLayout(LINE_WIDTH, layoutEndPos, false);
+            TextLayout layout = measurer.nextLayout(TELEMETRY_WIDTH, layoutEndPos, false);
             if (layout == null)
                 break;
 
@@ -159,11 +157,8 @@ class Layout {
 
             // Handle extra lines:
             yCurrent += extraLineCount * (layout.getAscent() + layout.getDescent());
-
-            // @@@ Need to vertically clip
         }
     }
-
 
     // History structure for tags:
     static public class ColorRecord {
@@ -175,6 +170,7 @@ class Layout {
         }
     }
 
+    // Workhorse routine to parse the HTML and render it:
     public void parseAndRender(Graphics2D graphics, DisplayFormat format, List<String> lines) {
         StringBuilder buffer= new StringBuilder();
         ArrayList<Attribute> attributes = new ArrayList<>();
@@ -224,6 +220,7 @@ class Layout {
         // Clear the background using the default background color:
         graphics.setPaint(background);
         graphics.fillRect(0, 0, 10000, 10000);
+        graphics.setClip(0, 0, TELEMETRY_WIDTH, TELEMETRY_HEIGHT);
 
         // Start parsing!
         Matcher matcher = searchPattern.matcher(text);
@@ -419,30 +416,7 @@ class Layout {
  * This class implements a lightweight emulation of FTC Telemetry that can run on the PC.
  */
 public class WilyTelemetry implements Telemetry {
-    // Enable unit test:
-    final boolean TEST = false;
-
-    // Use this font for display on the PC. It's different from the sizing font because the
-    // sizing font doesn't support the full unicode character set (like emojis):
-    public final int DISPLAY_FONT_SIZE = 16;
-    final Font PROPORTIONAL_DISPLAY_FONT = new Font(null, Font.PLAIN, DISPLAY_FONT_SIZE);
-    final Font MONOSPACE_FONT = new Font(MONOSPACED, Font.PLAIN, DISPLAY_FONT_SIZE);
-
-    // Try to emulate the same line width as the REV Driver Station in its horizontal
-    // configuration. Because the DS uses a proportional font, and because we don't have
-    // access to the source code, we can't precisely replicate the DS behavior when a
-    // single line is too wide for the DS and has to be broken into multiple lines. So
-    // we use a different proportional font for measuring the text and just kind of guess.
-    // We try to use a font that supplies similar proportions for different strings,
-    // settling on the following and measuring its width using the strings
-    // "123456789,123456789,123456789,123456789,1" and "WWWWWWWWW,WWWWWWWWW,WWWWWWW" which
-    // are each as wide as can be displayed on the REV Control Hub without wrapping:
-    final Font PROPORTIONAL_SIZING_FONT = new Font(null, Font.PLAIN, 10);
-    final int LINE_WIDTH_IN_FONT_UNITS = 239;
-    final int HEIGHT_IN_LINES = 18;
-
-    // Line width when using the monospace font:
-    final int LINE_WIDTH_IN_CHARACTERS = 50;
+    final int MAX_LINES = 36; // It's 18 with a regular sized font
 
     // Global state:
     public static WilyTelemetry instance;
@@ -457,37 +431,14 @@ public class WilyTelemetry implements Telemetry {
     // Wily Works constructor for a Telemetry object:
     public WilyTelemetry() {
         instance = this;
-
-        telemetryWindow = new TelemetryWindow("Telemetry", 400);
+        telemetryWindow = new TelemetryWindow("Telemetry",
+                Layout.TELEMETRY_WIDTH + 5, Layout.TELEMETRY_HEIGHT + 5);
         telemetryWindow.setVisible(true);
-
         canvas = telemetryWindow.getCanvas();
-
-    }
-
-    // Unit test:
-    @SuppressLint("DefaultLocale")
-    @SuppressWarnings({"UnnecessaryUnicodeEscape", "StringConcatenationInLoop"})
-    private void test(WilyTelemetry telemetry) {
-        telemetry.addLine("This\uD83C\uDF85\uD83C\uDFFEhas\uD83D\uDD25emojis\uD83C\uDF1Ebetween\u2744\uFE0Fevery\uD83D\uDC14word");
-        String emojis = ">";
-        for (int i = 0; i < 30; i++) {
-            emojis += ((i & 1) != 0) ? "\uD83C\uDF1E" : "\u2744\uFE0F"; // Surrogate vs. variation selector
-        }
-        telemetry.addLine(emojis);
-        telemetry.addLine("This is\nmultiple\nlines followed by an empty line");
-        telemetry.addLine("");
-        telemetry.addData("Value", 123.0);
-        telemetry.addLine("The quick brown fox jumps over the lazy dog. Now is the time for all good men to come to the aid of their party.");
-        telemetry.addLine("123456789,123456789,123456789,123456789,12");
-        telemetry.addLine("WWWWWWWWW,WWWWWWWWW,WWWWWWWW");
-        for (int i = 0; i < 40; i++) {
-            telemetry.addLine(String.format("Line %d", i));
-        }
     }
 
     public Line addLine(String string) {
-        if (lineList.size() <= HEIGHT_IN_LINES) {
+        if (lineList.size() <= MAX_LINES) {
             int newLineIndex;
             while ((newLineIndex = string.indexOf("\n")) != -1) {
                 String line = string.substring(0, newLineIndex);
@@ -594,17 +545,11 @@ public class WilyTelemetry implements Telemetry {
     public boolean update() {
         Graphics2D g = (Graphics2D) canvas.getBufferStrategy().getDrawGraphics();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-
-        if (TEST) {
-            test(this);
-        }
-
         layout.parseAndRender(g, displayFormat, lineList);
-
         g.dispose();
+
         canvas.getBufferStrategy().show();
         lineList.clear();
-
-        return true; // The transmission occurred successfully
+        return true;
     }
 }

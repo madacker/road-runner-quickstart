@@ -13,9 +13,9 @@ import kotlin.system.exitProcess
 /**
  * Wrapper for the Telemetry window frame.
  */
-class TelemetryWindow(title: String, windowSize: Int) : JFrame() {
-    var internalWidth = windowSize
-    var internalHeight = windowSize
+class TelemetryWindow(title: String, width: Int, height: Int) : JFrame() {
+    var internalWidth = width
+    var internalHeight = height
 
     val canvas = MainCanvas(internalWidth, internalHeight)
     val canvasPanel = JPanel()
