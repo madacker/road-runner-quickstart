@@ -148,6 +148,8 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
     {
         super(i2cDeviceSynchSimple, deviceClientIsOwned);
 
+        System.out.println("*** SparkFunOTOS *** initialization");
+
         deviceClient.setI2cAddress(I2cAddr.create7bit(kOtosDefaultAddress));
 
         // Set default units to inches and degrees
@@ -203,7 +205,9 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
             // delayMs(2);
 
             // Read the gryo calibration register value
+            System.out.println("*** Reading calibration...");
             calibrationValue = deviceClient.read8(kOtosRegImuCalib);
+            System.out.printf("...read: %08x\n", calibrationValue);
         }
     }
 
@@ -407,3 +411,4 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
         return rawData;
     }
 }
+
