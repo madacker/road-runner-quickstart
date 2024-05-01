@@ -29,7 +29,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
     boolean aPressed = false;
     boolean bPressed = false;
-    double tickDistance = 0; // @@@ Bug?
+    double distanceTraveled = 0; // @@@ Bug?
 
     TimeSplitter readTime = TimeSplitter.create("getMotion");
 
@@ -82,11 +82,12 @@ public class OpticalTrackingTuner extends LinearOpMode {
             telemetry.update();
             while (opModeIsActive() && !buttonA()) {
                 if (buttonB()) {
-                    return new Calibration(0.001035, Math.toRadians(90.78));
+                    // Assume a reasonable default value:
+                    return new Calibration(1.0, 0);
                 }
             }
 
-            Calibration result = new Calibration(0, 0);
+            Calibration result = new Calibration(1.0, 0);
             optical.resetTracking(); // Reset the sensor
 
             while (opModeIsActive() && !buttonA()) {
@@ -183,7 +184,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
     @SuppressLint("DefaultLocale")
     CenterOfRotation measureCenterOfRotation(SparkFunOTOS optical, MecanumDrive drive, Calibration calibration) {
         while (opModeIsActive()) {
-            telemetry.addLine(String.format("InchesPerTick: %f\n", calibration.distanceMultiplier));
+            telemetry.addLine(String.format("Distance multiplier: %f\n", calibration.distanceMultiplier));
             telemetry.addLine("Now ready for the center-of-rotation test.");
             telemetry.addLine("The robot will need room to spin.\n");
             telemetry.addLine("Press A to start, B to skip");
@@ -202,14 +203,15 @@ public class OpticalTrackingTuner extends LinearOpMode {
             double rotationTotal = 0;
             double rotationTarget = REVOLUTION_COUNT * 2 * Math.PI;
 
-            double farthestDistance = 0;
-            Point farthestPoint = new Point(0, 0);
-            Point currentPoint = new Point(0, 0);
-            tickDistance = 0;
-
             // Reset the two sensors:
             Globals.getImu().resetYaw();
             optical.resetTracking();
+
+            double farthestDistance = 0;
+            Point farthestPoint = new Point(0, 0);
+            Point currentPoint = new Point(0, 0);
+            SparkFunOTOS.otos_pose2d_t previousPose = optical.getPosition();
+            distanceTraveled = 0;
 
             double lastYaw = Globals.getYaw();
             while (opModeIsActive() && (rotationTotal < rotationTarget)) {
@@ -226,11 +228,14 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
                 currentPoint = new Point(pose.x, pose.y);
                 points.add(currentPoint);
-                double currentDistance = Math.hypot(currentPoint.x, currentPoint.y);
-                if (currentDistance > farthestDistance) {
-                    farthestDistance = currentDistance;
+                double distanceFromOrigin = Math.hypot(currentPoint.x, currentPoint.y);
+                if (distanceFromOrigin > farthestDistance) {
+                    farthestDistance = distanceFromOrigin;
                     farthestPoint = currentPoint;
                 }
+
+                distanceTraveled += Math.hypot(pose.x - previousPose.x, pose.y - previousPose.y) * calibration.distanceMultiplier;
+                previousPose = pose;
 
                 // Update the telemetry:
                 double rotationsRemaining = (rotationTarget - rotationTotal) / (2 * Math.PI);
@@ -255,13 +260,13 @@ public class OpticalTrackingTuner extends LinearOpMode {
 
             CenterOfRotation circleFit = fitCircle(points, farthestPoint.x / 2, farthestPoint.y / 2);
 
-            double inchesPerTick = calibration.distanceMultiplier;
             double resultX = farthestPoint.x / 2;
             double resultY = farthestPoint.y / 2;
             double farthestPointRadius = farthestDistance / 2;
-            double traveledRadius = tickDistance * inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI);
+            double traveledRadius = distanceTraveled / (2 * REVOLUTION_COUNT * Math.PI);
 
-            telemetry.addLine(String.format("InchesPerTick: %f, tickDistance: %f, farthestPoint.x: %f, farthestPoint.y: %f, traveledRadius: %f\n", inchesPerTick, tickDistance, farthestPoint.x, farthestPoint.y, tickDistance * inchesPerTick / (2 * REVOLUTION_COUNT * Math.PI)));
+            telemetry.addLine(String.format("Distance multiplier: %f, distance traveled: %f, farthestPoint.x: %f, farthestPoint.y: %f, traveledRadius: %f\n",
+                    calibration.distanceMultiplier, distanceTraveled, farthestPoint.x, farthestPoint.y, traveledRadius));
             telemetry.addLine(String.format("Test result...\nOffset from center of rotation (inches): (%.2f, %.2f), samples: %d",
                     resultX, resultY, points.size()));
             telemetry.addLine(String.format("Farthest point radius: %.2f, Traveled radius: %.2f", farthestPointRadius, traveledRadius));
