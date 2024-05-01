@@ -1,4 +1,6 @@
-package org.firstinspires.ftc.teamcode.opticaltracking;
+package org.firstinspires.ftc.teamcode.sparkfun;
+
+import android.annotation.SuppressLint;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
@@ -56,16 +58,17 @@ public class OpticalTrackingTuner extends LinearOpMode {
     }
 
     static class Calibration {
-        double inchesPerTick;
+        double distanceMultiplier;
         double correctionAngle; // Radians
 
-        public Calibration(double inchesPerTick, double correctionAngle) {
-            this.inchesPerTick = inchesPerTick;
+        public Calibration(double distanceMultiplier, double correctionAngle) {
+            this.distanceMultiplier = distanceMultiplier;
             this.correctionAngle = correctionAngle;
         }
     }
 
-    Calibration measureCalibration(OpticalTrackingPaa5100 optical, MecanumDrive drive) {
+    @SuppressLint("DefaultLocale")
+    Calibration measureCalibration(SparkFunOTOS optical, MecanumDrive drive) {
         while (opModeIsActive()) {
             drive.leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
             drive.leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
@@ -84,25 +87,22 @@ public class OpticalTrackingTuner extends LinearOpMode {
             long xTotal = 0;
             long yTotal = 0;
             Calibration result = new Calibration(0, 0);
-            optical.getMotion(); // Reset the sensor
+            optical.resetTracking(); // Reset the sensor
 
             while (opModeIsActive() && !buttonA()) {
                 // Query the push results:
-                OpticalTrackingPaa5100.Motion motion = optical.getMotion();
-                xTotal += motion.x;
-                yTotal += motion.y;
+                SparkFunOTOS.otos_pose2d_t pose = optical.getPosition();
 
-                double tickDistance = Math.hypot(xTotal, yTotal);
-
-                result.inchesPerTick = PUSH_INCHES / tickDistance;
+                double measuredDistance = Math.hypot(pose.x, pose.y);
                 result.correctionAngle = -Math.atan2(yTotal, xTotal); // Rise over run
+                result.distanceMultiplier = (measuredDistance == 0) ? 0 : PUSH_INCHES / measuredDistance;
 
-                telemetry.addLine(String.format("Accumulated ticks: (%d, %d), angle: %.2f°\n", xTotal, yTotal, Math.toDegrees(result.correctionAngle)));
+                telemetry.addLine(String.format("Measured distance: (%d, %d), angle: %.2f°\n", xTotal, yTotal, Math.toDegrees(result.correctionAngle)));
                 telemetry.addLine(String.format("Press A once you've pushed exactly %.1f inches.", PUSH_INCHES));
                 telemetry.update();
             }
 
-            telemetry.addLine(String.format("Test result: Inches per tick: %f,\n correction: %.3f°\n", result.inchesPerTick, Math.toDegrees(result.correctionAngle)));
+            telemetry.addLine(String.format("Test result: Inches per tick: %f,\n correction: %.3f°\n", result.distanceMultiplier, Math.toDegrees(result.correctionAngle)));
             telemetry.addLine("Press A to continue, B to repeat this test");
             telemetry.update();
             while (opModeIsActive() && !buttonB()) {
@@ -179,9 +179,10 @@ public class OpticalTrackingTuner extends LinearOpMode {
         return new CenterOfRotation(centerX, centerY,0, 0, radius);
     }
 
-    CenterOfRotation measureCenterOfRotation(OpticalTrackingPaa5100 optical, MecanumDrive drive, Calibration calibration) {
+    @SuppressLint("DefaultLocale")
+    CenterOfRotation measureCenterOfRotation(SparkFunOTOS optical, MecanumDrive drive, Calibration calibration) {
         while (opModeIsActive()) {
-            telemetry.addLine(String.format("InchesPerTick: %f\n", calibration.inchesPerTick));
+            telemetry.addLine(String.format("InchesPerTick: %f\n", calibration.distanceMultiplier));
             telemetry.addLine("Now ready for the center-of-rotation test.");
             telemetry.addLine("The robot will need room to spin.\n");
             telemetry.addLine("Press A to start, B to skip");
@@ -197,17 +198,17 @@ public class OpticalTrackingTuner extends LinearOpMode {
             ArrayList<Point> points = new ArrayList<>();
             rampMotors(drive, true);
 
-            Point currentPoint = new Point(0, 0);
             double rotationTotal = 0;
             double rotationTarget = REVOLUTION_COUNT * 2 * Math.PI;
 
             double farthestDistance = 0;
             Point farthestPoint = new Point(0, 0);
+            Point currentPoint = new Point(0, 0);
             tickDistance = 0;
 
             // Reset the two sensors:
             Globals.getImu().resetYaw();
-            optical.getMotion();
+            optical.resetTracking();
 
             double lastYaw = Globals.getYaw();
             while (opModeIsActive() && (rotationTotal < rotationTarget)) {
@@ -219,19 +220,11 @@ public class OpticalTrackingTuner extends LinearOpMode {
                 rotationTotal += Globals.normalizeAngle(deltaYaw);
 
                 readTime.startSplit();
-                OpticalTrackingPaa5100.Motion motion = optical.getMotion();
+                SparkFunOTOS.otos_pose2d_t pose = optical.getPosition();
                 readTime.endSplit();
 
-                tickDistance += Math.hypot(motion.x, motion.y);
-
-System.out.printf("rotationTotal: %f, tickDistance: %f%n", rotationTotal, tickDistance);
-
-                Point motionVector
-                        = new Point(motion.x, motion.y).multiply(calibration.inchesPerTick).rotate(calibration.correctionAngle);
-                Point deltaPosition = deltaFieldPosition(yaw, motionVector.x, motionVector.y, deltaYaw);
-                currentPoint = currentPoint.add(deltaPosition);
+                currentPoint = new Point(pose.x, pose.y);
                 points.add(currentPoint);
-
                 double currentDistance = Math.hypot(currentPoint.x, currentPoint.y);
                 if (currentDistance > farthestDistance) {
                     farthestDistance = currentDistance;
@@ -261,7 +254,7 @@ System.out.printf("rotationTotal: %f, tickDistance: %f%n", rotationTotal, tickDi
 
             CenterOfRotation circleFit = fitCircle(points, farthestPoint.x / 2, farthestPoint.y / 2);
 
-            double inchesPerTick = calibration.inchesPerTick;
+            double inchesPerTick = calibration.distanceMultiplier;
             double resultX = farthestPoint.x / 2;
             double resultY = farthestPoint.y / 2;
             double farthestPointRadius = farthestDistance / 2;
@@ -285,15 +278,21 @@ System.out.printf("rotationTotal: %f, tickDistance: %f%n", rotationTotal, tickDi
         return null;
     }
 
+    @SuppressLint("DefaultLocale")
     @Override
     public void runOpMode() {
         Globals globals = new Globals(hardwareMap, telemetry);
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
-        TimeSplitter opticalInitialize = TimeSplitter.create("Optical Initialization");
+        TimeSplitter opticalInitialize = TimeSplitter.create("Optical Creation");
+        TimeSplitter opticalCalibrate = TimeSplitter.create("Optical Calibration");
 
         opticalInitialize.startSplit();
-        OpticalTrackingPaa5100 optical = hardwareMap.get(OpticalTrackingPaa5100.class, "optical1");
+        SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
         opticalInitialize.endSplit();
+
+        opticalCalibrate.startSplit();
+        optical.calibrateImu();
+        opticalCalibrate.endSplit();
 
         waitForStart();
 
@@ -301,7 +300,7 @@ System.out.printf("rotationTotal: %f, tickDistance: %f%n", rotationTotal, tickDi
         CenterOfRotation centerOfRotation = measureCenterOfRotation(optical, drive, calibration);
 
         telemetry.addLine("<< Completed all tuning tests! >>\n");
-        telemetry.addLine(String.format("Inches per tick: %f", calibration.inchesPerTick));
+        telemetry.addLine(String.format("Distance multiplier: %f", calibration.distanceMultiplier));
         telemetry.addLine(String.format("Correction angle (degrees): %.2f", Math.toDegrees(calibration.correctionAngle)));
         if (centerOfRotation != null) {
             telemetry.addLine(String.format("Offset to center-of-rotation (inches): (%.3f, %.3f)", centerOfRotation.x, centerOfRotation.y));
