@@ -26,14 +26,16 @@ public class SimpleOpticalDrive extends LinearOpMode {
 
         MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
+        double startYaw = Globals.getRawYaw();
 
         // Configure the Spark Fun sensor:
+        optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitDegrees);
         optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 179.9));
         optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitRadians);
         optical.setLinearScalar(0.956);
         optical.setAngularScalar(1.0);
         optical.calibrateImu();
-        optical.resetTracking(); // Seems to be needed?
+        optical.resetTracking(); // @@@ Needed?
 
         waitForStart();
 
@@ -43,12 +45,15 @@ public class SimpleOpticalDrive extends LinearOpMode {
                     -gamepad1.right_stick_x);
             drive.setDrivePowers(powers);
 
+            double imuHeading = Globals.normalizeAngle(Globals.getRawYaw() - startYaw);
             SparkFunOTOS.otos_pose2d_t pose = optical.getPosition();
 
             Pose2d pose2d = new Pose2d(pose.x, pose.y, pose.h);
             telemetry.addData("x", pose.x);
             telemetry.addData("y", pose.y);
-            telemetry.addData("heading (°)", Math.toDegrees(pose.h));
+            telemetry.addData("Sparkfun heading", "%.2f°", Math.toDegrees(pose.h));
+            telemetry.addData("IMU heading", "%.2f°", Math.toDegrees(imuHeading));
+            telemetry.addData("Heading deviation", "%.2f°", Math.toDegrees(imuHeading - pose.h));
             telemetry.update();
 
             // Begin drawing:

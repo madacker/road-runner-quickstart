@@ -95,7 +95,7 @@ public class Globals {
         Globals.canvas = null;
     }
 
-    static private double getRawYaw() {
+    static public double getRawYaw() {
         Stats.startTimer("io::imuYaw");
         Globals.global.cachedYaw = global.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
         Stats.endTimer("io::imuYaw");
