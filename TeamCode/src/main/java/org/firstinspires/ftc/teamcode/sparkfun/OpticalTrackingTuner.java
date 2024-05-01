@@ -300,7 +300,7 @@ public class OpticalTrackingTuner extends LinearOpMode {
         opticalInitialize.endSplit();
 
         // Sensor position settings:
-        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 180));
+        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 179.9));
         optical.setLinearScalar(0.956);
         optical.setAngularScalar(1.0);
 

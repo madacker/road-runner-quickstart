@@ -28,7 +28,7 @@ public class SimpleOpticalDrive extends LinearOpMode {
         SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
 
         // Configure the Spark Fun sensor:
-        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 180));
+        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 179.9));
         optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitRadians);
         optical.setLinearScalar(0.956);
         optical.setAngularScalar(1.0);
