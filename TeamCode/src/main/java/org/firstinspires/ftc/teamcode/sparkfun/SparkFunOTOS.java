@@ -6,6 +6,8 @@ import com.qualcomm.robotcore.hardware.I2cDeviceSynchSimple;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType;
 
+import java.util.Arrays;
+
 @I2cDeviceType
 @DeviceProperties(name = "SparkFunOTOS", xmlTag = "SparkFunOTOS")
 public class SparkFunOTOS extends I2cDeviceSynchDevice
@@ -120,6 +122,19 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
             this.x = 0;
             this.y = 0;
             this.h = 0;
+        }
+    }
+
+    public class otos_all_poses_t {
+        public otos_pose2d_t position;
+        public otos_pose2d_t velocity;
+        public otos_pose2d_t acceleration;
+
+        public otos_all_poses_t(otos_pose2d_t position, otos_pose2d_t velocity, otos_pose2d_t acceleration)
+        {
+            this.position = position;
+            this.velocity = velocity;
+            this.acceleration = acceleration;
         }
     }
 
@@ -344,6 +359,17 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
     public otos_pose2d_t getAccelerationStdDev()
     {
         return readPoseRegs(kOtosRegAccStdXL, kInt16ToMeter, kInt16ToRpss);
+    }
+
+    public otos_all_poses_t getAllPoses()
+    {
+        byte[] rawData = deviceClient.read(kOtosRegPosXL, 18);
+
+        return new otos_all_poses_t(
+                regsToPose(Arrays.copyOfRange(rawData, 0, 6), kInt16ToMeter, kInt16ToRad),
+                regsToPose(Arrays.copyOfRange(rawData, 6, 12), kInt16ToMeter, kInt16ToRps),
+                regsToPose(Arrays.copyOfRange(rawData, 12, 18), kInt16ToMeter, kInt16ToRpss)
+        );
     }
 
     private otos_pose2d_t readPoseRegs(int reg, double rawToXY, double rawToH)
