@@ -20,7 +20,7 @@ public class OdometrySensorExample extends LinearOpMode
         myOdometrySensor = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
 
         // Set offset location of sensor relative to center of robot
-        SparkFunOTOS.otos_pose2d_t offsetPose = myOdometrySensor.new otos_pose2d_t(3.7, -.55, 0);
+        SparkFunOTOS.otos_pose2d_t offsetPose = new SparkFunOTOS.otos_pose2d_t(3.7, -.55, 0);
         System.out.println(">> Calling setOffset...\n");
         myOdometrySensor.setOffset(offsetPose);
 
@@ -40,7 +40,7 @@ public class OdometrySensorExample extends LinearOpMode
         myOdometrySensor.resetTracking();
 
         // Set known location on field
-        SparkFunOTOS.otos_pose2d_t newPose = myOdometrySensor.new otos_pose2d_t(5, 10, 45);
+        SparkFunOTOS.otos_pose2d_t newPose = new SparkFunOTOS.otos_pose2d_t(5, 10, 45);
         System.out.println(">> Calling setPosition...\n");
         myOdometrySensor.setPosition(newPose);
 

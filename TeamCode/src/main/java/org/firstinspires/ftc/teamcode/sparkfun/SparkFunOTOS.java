@@ -105,7 +105,7 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
     final static double kInt16ToRpss = 1.0f / kRpssToInt16;
 
     // Struct to define a 2D pose, including x and y coordinates and an angle h
-    public class otos_pose2d_t {
+    static public class otos_pose2d_t {
         public double x;
         public double y;
         public double h;

@@ -12,6 +12,8 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 
 import org.firstinspires.ftc.teamcode.Globals;
 import org.firstinspires.ftc.teamcode.Point;
+import org.firstinspires.ftc.teamcode.Settings;
+import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 
@@ -84,8 +86,6 @@ public class OpticalTrackingTuner extends LinearOpMode {
                 }
             }
 
-            long xTotal = 0;
-            long yTotal = 0;
             Calibration result = new Calibration(0, 0);
             optical.resetTracking(); // Reset the sensor
 
@@ -94,15 +94,16 @@ public class OpticalTrackingTuner extends LinearOpMode {
                 SparkFunOTOS.otos_pose2d_t pose = optical.getPosition();
 
                 double measuredDistance = Math.hypot(pose.x, pose.y);
-                result.correctionAngle = -Math.atan2(yTotal, xTotal); // Rise over run
+                result.correctionAngle = -Math.atan2(pose.y, pose.x); // Rise over run
                 result.distanceMultiplier = (measuredDistance == 0) ? 0 : PUSH_INCHES / measuredDistance;
 
-                telemetry.addLine(String.format("Measured distance: (%d, %d), angle: %.2f°\n", xTotal, yTotal, Math.toDegrees(result.correctionAngle)));
+                telemetry.addLine(String.format("Measured pose: (%.1f, %.1f, %.1f°), distance: %.2f", pose.x, pose.y, pose.h, measuredDistance));
+                telemetry.addLine(String.format("Computed angle: %.2f°\n", Math.toDegrees(result.correctionAngle)));
                 telemetry.addLine(String.format("Press A once you've pushed exactly %.1f inches.", PUSH_INCHES));
                 telemetry.update();
             }
 
-            telemetry.addLine(String.format("Test result: Inches per tick: %f,\n correction: %.3f°\n", result.distanceMultiplier, Math.toDegrees(result.correctionAngle)));
+            telemetry.addLine(String.format("Test result: Linear Scalar: %f,\nAngle Correction: %.3f°\n", result.distanceMultiplier, Math.toDegrees(result.correctionAngle)));
             telemetry.addLine("Press A to continue, B to repeat this test");
             telemetry.update();
             while (opModeIsActive() && !buttonB()) {
@@ -281,18 +282,30 @@ public class OpticalTrackingTuner extends LinearOpMode {
     @SuppressLint("DefaultLocale")
     @Override
     public void runOpMode() {
-        Globals globals = new Globals(hardwareMap, telemetry);
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
         TimeSplitter opticalInitialize = TimeSplitter.create("Optical Creation");
         TimeSplitter opticalCalibrate = TimeSplitter.create("Optical Calibration");
+
+        Settings settings = new Settings(telemetry, gamepad1);
+        Stats stats = new Stats();
+        Globals globals = new Globals(hardwareMap, telemetry);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
 
         opticalInitialize.startSplit();
         SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
         opticalInitialize.endSplit();
 
+        // Sensor position settings:
+        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(0, 0, 180));
+        optical.setLinearScalar(0.956);
+        optical.setAngularScalar(1.0);
+
+        // IMU settings:
         opticalCalibrate.startSplit();
         optical.calibrateImu();
         opticalCalibrate.endSplit();
+
+        optical.resetTracking();
+        optical.setPosition(new SparkFunOTOS.otos_pose2d_t(0, 0, 0));
 
         waitForStart();
 
