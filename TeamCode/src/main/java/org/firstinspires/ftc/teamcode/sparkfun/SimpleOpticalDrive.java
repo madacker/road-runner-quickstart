@@ -14,6 +14,7 @@ import org.firstinspires.ftc.teamcode.Settings;
 import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
+import org.firstinspires.ftc.teamcode.roadrunner.SimpleMecanumDrive;
 
 @TeleOp(name="SimpleOpticalDrive",group="Explore")
 public class SimpleOpticalDrive extends LinearOpMode {
@@ -24,18 +25,8 @@ public class SimpleOpticalDrive extends LinearOpMode {
         Stats stats = new Stats();
         Globals globals = new Globals(hardwareMap, telemetry);
 
-        MecanumDrive drive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0), globals);
-        SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
+        SimpleMecanumDrive drive = new SimpleMecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         double startYaw = Globals.getRawYaw();
-
-        // Configure the Spark Fun sensor:
-        optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitDegrees);
-        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 179.9));
-        optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitRadians);
-        optical.setLinearScalar(0.956);
-        optical.setAngularScalar(1.0);
-        optical.calibrateImu();
-        optical.resetTracking(); // @@@ Needed?
 
         waitForStart();
 
@@ -46,7 +37,7 @@ public class SimpleOpticalDrive extends LinearOpMode {
             drive.setDrivePowers(powers);
 
             double imuHeading = Globals.normalizeAngle(Globals.getRawYaw() - startYaw);
-            SparkFunOTOS.otos_pose2d_t pose = optical.getPosition();
+            SparkFunOTOS.otos_pose2d_t pose = drive.optical.getPosition();
 
             Pose2d pose2d = new Pose2d(pose.x, pose.y, pose.h);
             telemetry.addData("x", pose.x);

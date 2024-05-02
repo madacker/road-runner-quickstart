@@ -125,7 +125,7 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
         }
     }
 
-    public class otos_all_poses_t {
+    static public class otos_all_poses_t {
         public otos_pose2d_t position;
         public otos_pose2d_t velocity;
         public otos_pose2d_t acceleration;
@@ -138,12 +138,12 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
         }
     }
 
-    enum otos_linear_unit_t {
+    public enum otos_linear_unit_t {
         kOtosLinearUnitMeters,
         kOtosLinearUnitInches
     }
 
-    enum otos_angular_unit_t {
+    public enum otos_angular_unit_t {
         kOtosAngularUnitRadians,
         kOtosAngularUnitDegrees
     }

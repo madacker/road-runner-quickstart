@@ -74,7 +74,7 @@ public final class MecanumDrive {
                 trackWidthTicks = 690.3255416844875;
 
                 // feedforward parameters (in tick units)
-                kS = 0.6298460597755153;
+                kS = 0.6298460597755153; // Voltage
                 kV = 0.004317546531109388;
                 kA = 0;
 

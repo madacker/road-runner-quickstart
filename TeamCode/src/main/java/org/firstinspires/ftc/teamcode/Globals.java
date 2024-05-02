@@ -5,6 +5,7 @@ import static java.lang.System.nanoTime;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
@@ -14,6 +15,7 @@ import com.wilyworks.common.WilyWorks;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.sparkfun.SparkFunOTOS;
 import org.firstinspires.inspection.InspectionState;
 import org.jetbrains.annotations.Nullable;
 
@@ -198,5 +200,19 @@ public class Globals {
     }
     static public void assertion(boolean correct) {
         assertion(correct, "Code assertion");
+    }
+
+    // Configure the optical sensor:
+    static public SparkFunOTOS getOptical(HardwareMap hardwareMap, Pose2d pose) {
+        SparkFunOTOS optical = hardwareMap.get(SparkFunOTOS.class, "sparkfun");
+        optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitDegrees);
+        optical.setOffset(new SparkFunOTOS.otos_pose2d_t(5.56, 3.39, 179.9));
+        optical.setAngularUnit(SparkFunOTOS.otos_angular_unit_t.kOtosAngularUnitRadians);
+        optical.setLinearScalar(0.956);
+        optical.setAngularScalar(1.0);
+        optical.calibrateImu();
+        optical.setPosition(new SparkFunOTOS.otos_pose2d_t(pose.position.x, pose.position.y, pose.heading.log()));
+        optical.resetTracking(); // @@@ Needed?
+        return optical;
     }
 }
