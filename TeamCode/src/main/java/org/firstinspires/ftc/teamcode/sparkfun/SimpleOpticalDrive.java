@@ -9,9 +9,8 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Globals;
-import org.firstinspires.ftc.teamcode.Settings;
-import org.firstinspires.ftc.teamcode.Stats;
 import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.SimpleMecanumDrive;
@@ -21,12 +20,8 @@ public class SimpleOpticalDrive extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        Settings settings = new Settings(telemetry, gamepad1);
-        Stats stats = new Stats();
-        Globals globals = new Globals(hardwareMap, telemetry);
-
         SimpleMecanumDrive drive = new SimpleMecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        double startYaw = Globals.getRawYaw();
+        double startYaw = drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
 
         waitForStart();
 
@@ -36,7 +31,7 @@ public class SimpleOpticalDrive extends LinearOpMode {
                     -gamepad1.right_stick_x);
             drive.setDrivePowers(powers);
 
-            double imuHeading = Globals.normalizeAngle(Globals.getRawYaw() - startYaw);
+            double imuHeading = Globals.normalizeAngle(drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - startYaw);
             SparkFunOTOS.otos_pose2d_t pose = drive.optical.getPosition();
 
             Pose2d pose2d = new Pose2d(pose.x, pose.y, pose.h);
