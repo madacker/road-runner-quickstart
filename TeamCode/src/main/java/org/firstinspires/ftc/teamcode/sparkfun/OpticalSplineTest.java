@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.roadrunner.SimpleMecanumDrive;
 
-@TeleOp
+@TeleOp(group="Optical")
 public final class OpticalSplineTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {

@@ -15,7 +15,7 @@ import org.firstinspires.ftc.teamcode.jutils.TimeSplitter;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.firstinspires.ftc.teamcode.roadrunner.SimpleMecanumDrive;
 
-@TeleOp(name="SimpleOpticalDrive",group="Explore")
+@TeleOp(group="Optical")
 public class SimpleOpticalDrive extends LinearOpMode {
 
     @Override
@@ -25,6 +25,8 @@ public class SimpleOpticalDrive extends LinearOpMode {
 
         waitForStart();
 
+        int zeroCount = 0;
+
         while (opModeIsActive()) {
             PoseVelocity2d powers = new PoseVelocity2d(
                     new Vector2d(-gamepad1.left_stick_y, -gamepad1.left_stick_x),
@@ -33,13 +35,20 @@ public class SimpleOpticalDrive extends LinearOpMode {
 
             double imuHeading = Globals.normalizeAngle(drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - startYaw);
             SparkFunOTOS.otos_pose2d_t pose = drive.optical.getPosition();
+            if ((pose.x == 0) && (pose.y == 0) && (pose.h == 0)) {
+                zeroCount++;
+            }
 
             Pose2d pose2d = new Pose2d(pose.x, pose.y, pose.h);
+
+
             telemetry.addData("x", pose.x);
             telemetry.addData("y", pose.y);
             telemetry.addData("Sparkfun heading", "%.2f°", Math.toDegrees(pose.h));
             telemetry.addData("IMU heading", "%.2f°", Math.toDegrees(imuHeading));
             telemetry.addData("Heading deviation", "%.2f°", Math.toDegrees(imuHeading - pose.h));
+            telemetry.addLine();
+            telemetry.addData("Zero count", zeroCount);
             telemetry.update();
 
             // Begin drawing:

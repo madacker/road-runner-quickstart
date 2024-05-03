@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.sparkfun;
 
+import android.util.Half;
+
 import com.qualcomm.robotcore.hardware.I2cAddr;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice;
 import com.qualcomm.robotcore.hardware.I2cDeviceSynchSimple;
@@ -163,7 +165,7 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
     {
         super(i2cDeviceSynchSimple, deviceClientIsOwned);
 
-        System.out.println("*** SparkFunOTOS *** initialization");
+        System.out.println("*** SparkFunOTOS *** constructor");
 
         deviceClient.setI2cAddress(I2cAddr.create7bit(kOtosDefaultAddress));
 
@@ -179,6 +181,7 @@ public class SparkFunOTOS extends I2cDeviceSynchDevice
     @Override
     protected boolean doInitialize()
     {
+        System.out.println("*** SparkFunOTOS *** doInitialize");
         return true;
     }
 

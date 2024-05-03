@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import java.util.ArrayList;
 import java.util.List;
 
-@TeleOp(name="*OpticalTrackingTuner",group="Explore")
+@TeleOp(name="*OpticalTrackingTuner",group="Optical")
 public class OpticalTrackingTuner extends LinearOpMode {
     final double REVOLUTION_COUNT = 1.0;
     final double RAMP_TIME = 0.5; // Seconds

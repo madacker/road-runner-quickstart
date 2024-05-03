@@ -212,7 +212,6 @@ public class Globals {
         optical.setAngularScalar(1.0);
         optical.calibrateImu();
         optical.setPosition(new SparkFunOTOS.otos_pose2d_t(pose.position.x, pose.position.y, pose.heading.log()));
-        optical.resetTracking(); // @@@ Needed?
         return optical;
     }
 }
